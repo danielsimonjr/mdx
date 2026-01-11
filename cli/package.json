@@ -1,0 +1,41 @@
+{
+  "name": "mdx-cli",
+  "version": "1.0.0",
+  "description": "CLI tool for working with MDX (Markdown eXtended Container) files",
+  "main": "src/index.js",
+  "bin": {
+    "mdx": "./src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "build": "pkg . --targets node18-win-x64 --output dist/mdx.exe",
+    "build:all": "pkg . --targets node18-win-x64,node18-macos-x64,node18-linux-x64 --out-path dist"
+  },
+  "keywords": [
+    "mdx",
+    "markdown",
+    "document",
+    "cli"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "adm-zip": "^0.5.10",
+    "chalk": "^4.1.2",
+    "commander": "^11.1.0",
+    "inquirer": "^8.2.6",
+    "marked": "^11.1.1",
+    "marked-terminal": "^6.2.0",
+    "open": "^8.4.2",
+    "ora": "^5.4.1"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  },
+  "pkg": {
+    "assets": [
+      "templates/**/*"
+    ],
+    "outputPath": "dist"
+  }
+}
