@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MDX Editor - Markdown eXtended Container</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/11.1.1/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/turndown@7.1.2/dist/turndown.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #ffffff;
+            --bg-secondary: #f8fafc;
+            --surface: #f1f5f9;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --toolbar-bg: #ffffff;
+            --sidebar-width: 280px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-secondary);
+            color: var(--text);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* App Layout */
+        .app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: var(--toolbar-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 0.5rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            z-index: 100;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--text);
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--primary), #8b5cf6);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 800;
+        }
+
+        .doc-title {
+            flex: 1;
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            padding: 0.25rem 0.5rem;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            background: transparent;
+            cursor: text;
+        }
+
+        .doc-title:hover { background: var(--surface); }
+        .doc-title:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: white;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.5rem 0.875rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: white;
+            color: var(--text);
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn:hover { background: var(--surface); border-color: #cbd5e1; }
+        .btn-primary { background: var(--primary); color: white; border-color: var(--primary); }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-icon { padding: 0.5rem; }
+
+        /* Toolbar */
+        .toolbar {
+            background: var(--toolbar-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 0.375rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            flex-wrap: wrap;
+        }
+
+        .toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: 0.125rem;
+            padding: 0 0.5rem;
+            border-right: 1px solid var(--border);
+        }
+
+        .toolbar-group:last-child { border-right: none; }
+
+        .tool-btn {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            border-radius: 4px;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.15s;
+            font-size: 0.875rem;
+        }
+
+        .tool-btn:hover { background: var(--surface); color: var(--text); }
+        .tool-btn.active { background: var(--primary); color: white; }
+        .tool-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+
+        .tool-select {
+            height: 32px;
+            padding: 0 0.5rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: white;
+            font-size: 0.8rem;
+            color: var(--text);
+            cursor: pointer;
+        }
+
+        /* Main Content */
+        .main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--toolbar-bg);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .sidebar.collapsed { width: 0; }
+
+        .sidebar-section {
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sidebar-header {
+            padding: 0.75rem 1rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            background: var(--bg-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .sidebar-content {
+            padding: 0.5rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        /* Asset List */
+        .asset-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .asset-item:hover { background: var(--surface); }
+        .asset-item .icon { font-size: 1rem; }
+        .asset-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .asset-item .size { color: var(--text-muted); font-size: 0.7rem; }
+        .asset-item .delete { opacity: 0; color: var(--danger); }
+        .asset-item:hover .delete { opacity: 1; }
+
+        /* Drop Zone */
+        .drop-zone {
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            transition: all 0.2s;
+            margin: 0.5rem;
+        }
+
+        .drop-zone.dragover {
+            border-color: var(--primary);
+            background: rgba(37, 99, 235, 0.05);
+            color: var(--primary);
+        }
+
+        .drop-zone i { font-size: 1.5rem; margin-bottom: 0.5rem; display: block; }
+
+        /* Editor Area */
+        .editor-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--bg);
+        }
+
+        .editor-wrapper {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .editor-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .editor-pane.hidden { display: none; }
+
+        .pane-header {
+            padding: 0.5rem 1rem;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* WYSIWYG Editor */
+        .wysiwyg-editor {
+            flex: 1;
+            padding: 2rem 4rem;
+            overflow-y: auto;
+            outline: none;
+            font-size: 1rem;
+            line-height: 1.7;
+        }
+
+        .wysiwyg-editor:focus { outline: none; }
+
+        .wysiwyg-editor h1 { font-size: 2rem; margin: 1.5rem 0 1rem; font-weight: 700; }
+        .wysiwyg-editor h2 { font-size: 1.5rem; margin: 1.25rem 0 0.75rem; font-weight: 600; }
+        .wysiwyg-editor h3 { font-size: 1.25rem; margin: 1rem 0 0.5rem; font-weight: 600; }
+        .wysiwyg-editor p { margin: 0 0 1rem; }
+        .wysiwyg-editor ul, .wysiwyg-editor ol { margin: 0 0 1rem; padding-left: 1.5rem; }
+        .wysiwyg-editor li { margin: 0.25rem 0; }
+        .wysiwyg-editor blockquote {
+            border-left: 4px solid var(--primary);
+            padding: 0.5rem 1rem;
+            margin: 1rem 0;
+            background: var(--bg-secondary);
+            color: var(--text-muted);
+        }
+        .wysiwyg-editor pre {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.9rem;
+        }
+        .wysiwyg-editor code {
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            background: var(--surface);
+            padding: 0.2em 0.4em;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        .wysiwyg-editor pre code { background: transparent; padding: 0; }
+        .wysiwyg-editor img {
+            max-width: 100%;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+        .wysiwyg-editor a { color: var(--primary); }
+        .wysiwyg-editor table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+        .wysiwyg-editor th, .wysiwyg-editor td {
+            border: 1px solid var(--border);
+            padding: 0.5rem;
+            text-align: left;
+        }
+        .wysiwyg-editor th { background: var(--bg-secondary); font-weight: 600; }
+        .wysiwyg-editor hr {
+            border: none;
+            border-top: 2px solid var(--border);
+            margin: 2rem 0;
+        }
+
+        /* Source Editor */
+        .source-editor {
+            flex: 1;
+            padding: 1rem;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            border: none;
+            resize: none;
+            outline: none;
+            background: var(--bg);
+        }
+
+        /* Preview Pane */
+        .preview-pane {
+            border-left: 1px solid var(--border);
+        }
+
+        .preview-content {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+
+        /* View Mode Tabs */
+        .view-tabs {
+            display: flex;
+            gap: 0.25rem;
+            padding: 0 0.5rem;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .view-tab {
+            padding: 0.5rem 1rem;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.15s;
+        }
+
+        .view-tab:hover { color: var(--text); }
+        .view-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        /* Status Bar */
+        .statusbar {
+            padding: 0.375rem 1rem;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Modals */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s;
+        }
+
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+
+        .modal {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow: hidden;
+        }
+
+        .modal-header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-title { font-weight: 600; font-size: 1.1rem; }
+
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 1.25rem;
+        }
+
+        .modal-close:hover { background: var(--surface); color: var(--text); }
+
+        .modal-body { padding: 1.5rem; overflow-y: auto; max-height: 60vh; }
+
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+        }
+
+        /* Form Elements */
+        .form-group { margin-bottom: 1rem; }
+        .form-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 0.375rem;
+            color: var(--text);
+        }
+        .form-input, .form-textarea {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.875rem;
+            transition: border-color 0.15s;
+        }
+        .form-input:focus, .form-textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        .form-textarea { resize: vertical; min-height: 80px; }
+
+        /* Welcome Screen */
+        .welcome {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .welcome-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, var(--primary), #8b5cf6);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: white;
+            margin-bottom: 1.5rem;
+        }
+
+        .welcome h2 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+        .welcome p { color: var(--text-muted); margin-bottom: 2rem; max-width: 400px; }
+
+        .welcome-actions { display: flex; gap: 1rem; }
+
+        /* Utility */
+        .hidden { display: none !important; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar { width: 100%; position: absolute; z-index: 50; height: 100%; }
+            .sidebar.collapsed { display: none; }
+            .wysiwyg-editor { padding: 1rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <div class="logo-icon">MDX</div>
+                <span>Editor</span>
+            </div>
+            <input type="text" class="doc-title" id="docTitle" value="Untitled Document" />
+            <div class="header-actions">
+                <button class="btn" id="btnNew"><i class="fas fa-file"></i> New</button>
+                <button class="btn" id="btnOpen"><i class="fas fa-folder-open"></i> Open</button>
+                <button class="btn btn-primary" id="btnSave"><i class="fas fa-save"></i> Save</button>
+                <button class="btn btn-icon" id="btnSettings" title="Document Settings"><i class="fas fa-cog"></i></button>
+            </div>
+        </header>
+
+        <!-- Toolbar -->
+        <div class="toolbar" id="toolbar">
+            <div class="toolbar-group">
+                <select class="tool-select" id="blockFormat">
+                    <option value="p">Paragraph</option>
+                    <option value="h1">Heading 1</option>
+                    <option value="h2">Heading 2</option>
+                    <option value="h3">Heading 3</option>
+                    <option value="blockquote">Quote</option>
+                    <option value="pre">Code Block</option>
+                </select>
+            </div>
+            <div class="toolbar-group">
+                <button class="tool-btn" data-cmd="bold" title="Bold (Ctrl+B)"><i class="fas fa-bold"></i></button>
+                <button class="tool-btn" data-cmd="italic" title="Italic (Ctrl+I)"><i class="fas fa-italic"></i></button>
+                <button class="tool-btn" data-cmd="underline" title="Underline (Ctrl+U)"><i class="fas fa-underline"></i></button>
+                <button class="tool-btn" data-cmd="strikeThrough" title="Strikethrough"><i class="fas fa-strikethrough"></i></button>
+                <button class="tool-btn" data-cmd="code" title="Inline Code"><i class="fas fa-code"></i></button>
+            </div>
+            <div class="toolbar-group">
+                <button class="tool-btn" data-cmd="insertUnorderedList" title="Bullet List"><i class="fas fa-list-ul"></i></button>
+                <button class="tool-btn" data-cmd="insertOrderedList" title="Numbered List"><i class="fas fa-list-ol"></i></button>
+                <button class="tool-btn" id="btnTaskList" title="Task List"><i class="fas fa-tasks"></i></button>
+            </div>
+            <div class="toolbar-group">
+                <button class="tool-btn" id="btnLink" title="Insert Link"><i class="fas fa-link"></i></button>
+                <button class="tool-btn" id="btnImage" title="Insert Image"><i class="fas fa-image"></i></button>
+                <button class="tool-btn" id="btnTable" title="Insert Table"><i class="fas fa-table"></i></button>
+                <button class="tool-btn" id="btnHR" title="Horizontal Rule"><i class="fas fa-minus"></i></button>
+            </div>
+            <div class="toolbar-group">
+                <button class="tool-btn" data-cmd="undo" title="Undo (Ctrl+Z)"><i class="fas fa-undo"></i></button>
+                <button class="tool-btn" data-cmd="redo" title="Redo (Ctrl+Y)"><i class="fas fa-redo"></i></button>
+            </div>
+            <div style="flex:1"></div>
+            <div class="toolbar-group" style="border:none">
+                <button class="tool-btn" id="btnToggleSidebar" title="Toggle Sidebar"><i class="fas fa-columns"></i></button>
+            </div>
+        </div>
+
+        <!-- View Tabs -->
+        <div class="view-tabs">
+            <button class="view-tab active" data-view="wysiwyg">Visual</button>
+            <button class="view-tab" data-view="source">Markdown</button>
+            <button class="view-tab" data-view="split">Split View</button>
+        </div>
+
+        <!-- Main Content -->
+        <main class="main">
+            <!-- Sidebar -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-section">
+                    <div class="sidebar-header">
+                        <span>Assets</span>
+                        <button class="tool-btn" id="btnAddAsset" title="Add Asset"><i class="fas fa-plus"></i></button>
+                    </div>
+                    <div class="sidebar-content" id="assetList">
+                        <!-- Assets will be listed here -->
+                    </div>
+                    <div class="drop-zone" id="assetDropZone">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        Drop files here<br>or click to browse
+                    </div>
+                </div>
+                <div class="sidebar-section" style="flex:1;overflow:hidden;">
+                    <div class="sidebar-header">Outline</div>
+                    <div class="sidebar-content" id="outlineList" style="max-height:none;">
+                        <!-- Document outline -->
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Editor Container -->
+            <div class="editor-container">
+                <div class="editor-wrapper">
+                    <!-- WYSIWYG Editor -->
+                    <div class="editor-pane" id="wysiwygPane">
+                        <div class="wysiwyg-editor" id="wysiwygEditor" contenteditable="true">
+                            <h1>Welcome to MDX Editor</h1>
+                            <p>Start writing your document here. Use the toolbar above for formatting.</p>
+                            <p>MDX documents bundle your content with images, videos, and other assets into a single portable file.</p>
+                        </div>
+                    </div>
+
+                    <!-- Source Editor -->
+                    <div class="editor-pane hidden" id="sourcePane">
+                        <textarea class="source-editor" id="sourceEditor" placeholder="# Write your Markdown here..."></textarea>
+                    </div>
+
+                    <!-- Preview Pane (for split view) -->
+                    <div class="editor-pane preview-pane hidden" id="previewPane">
+                        <div class="pane-header">Preview</div>
+                        <div class="preview-content" id="previewContent"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Status Bar -->
+        <footer class="statusbar">
+            <span id="statusLeft">Ready</span>
+            <span id="statusRight">Words: 0 | Characters: 0</span>
+        </footer>
+    </div>
+
+    <!-- Hidden File Inputs -->
+    <input type="file" id="fileInput" accept=".mdx,.zip" style="display:none">
+    <input type="file" id="assetInput" accept="image/*,video/*,audio/*,.pdf,.csv,.json,.gltf,.glb" multiple style="display:none">
+
+    <!-- Document Settings Modal -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">Document Settings</span>
+                <button class="modal-close" onclick="closeModal('settingsModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Title</label>
+                    <input type="text" class="form-input" id="settingTitle">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-textarea" id="settingDescription"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Author</label>
+                    <input type="text" class="form-input" id="settingAuthor">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Version</label>
+                    <input type="text" class="form-input" id="settingVersion" value="1.0.0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Language</label>
+                    <input type="text" class="form-input" id="settingLanguage" value="en-US">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal('settingsModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="saveSettings()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Link Modal -->
+    <div class="modal-overlay" id="linkModal">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">Insert Link</span>
+                <button class="modal-close" onclick="closeModal('linkModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">URL</label>
+                    <input type="url" class="form-input" id="linkUrl" placeholder="https://...">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Text</label>
+                    <input type="text" class="form-input" id="linkText" placeholder="Link text">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal('linkModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="insertLink()">Insert</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Modal -->
+    <div class="modal-overlay" id="imageModal">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">Insert Image</span>
+                <button class="modal-close" onclick="closeModal('imageModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Source</label>
+                    <select class="form-input" id="imageSource" onchange="toggleImageSource()">
+                        <option value="asset">From Assets</option>
+                        <option value="url">External URL</option>
+                    </select>
+                </div>
+                <div class="form-group" id="imageAssetGroup">
+                    <label class="form-label">Select Asset</label>
+                    <select class="form-input" id="imageAsset"></select>
+                </div>
+                <div class="form-group hidden" id="imageUrlGroup">
+                    <label class="form-label">Image URL</label>
+                    <input type="url" class="form-input" id="imageUrl" placeholder="https://...">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Alt Text</label>
+                    <input type="text" class="form-input" id="imageAlt" placeholder="Image description">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal('imageModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="insertImage()">Insert</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table Modal -->
+    <div class="modal-overlay" id="tableModal">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">Insert Table</span>
+                <button class="modal-close" onclick="closeModal('tableModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Rows</label>
+                    <input type="number" class="form-input" id="tableRows" value="3" min="1" max="20">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Columns</label>
+                    <input type="number" class="form-input" id="tableCols" value="3" min="1" max="10">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal('tableModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="insertTable()">Insert</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // =========================================================================
+    // MDX Editor Application
+    // =========================================================================
+
+    class MDXEditor {
+        constructor() {
+            this.document = {
+                manifest: this.createDefaultManifest(),
+                content: '',
+                assets: new Map()
+            };
+            this.currentView = 'wysiwyg';
+            this.isDirty = false;
+            this.turndown = new TurndownService({
+                headingStyle: 'atx',
+                codeBlockStyle: 'fenced'
+            });
+
+            this.init();
+        }
+
+        createDefaultManifest() {
+            return {
+                mdx_version: '1.0.0',
+                document: {
+                    id: crypto.randomUUID(),
+                    title: 'Untitled Document',
+                    created: new Date().toISOString(),
+                    modified: new Date().toISOString(),
+                    version: '1.0.0',
+                    language: 'en-US',
+                    authors: []
+                },
+                content: {
+                    entry_point: 'document.md',
+                    encoding: 'UTF-8',
+                    markdown_variant: 'CommonMark',
+                    extensions: ['tables', 'footnotes', 'task-lists', 'strikethrough']
+                },
+                assets: { images: [], video: [], audio: [], data: [], models: [] }
+            };
+        }
+
+        init() {
+            this.setupElements();
+            this.setupEventListeners();
+            this.setupToolbar();
+            this.updateWordCount();
+            this.updateOutline();
+        }
+
+        setupElements() {
+            this.elements = {
+                docTitle: document.getElementById('docTitle'),
+                wysiwygEditor: document.getElementById('wysiwygEditor'),
+                sourceEditor: document.getElementById('sourceEditor'),
+                wysiwygPane: document.getElementById('wysiwygPane'),
+                sourcePane: document.getElementById('sourcePane'),
+                previewPane: document.getElementById('previewPane'),
+                previewContent: document.getElementById('previewContent'),
+                sidebar: document.getElementById('sidebar'),
+                assetList: document.getElementById('assetList'),
+                outlineList: document.getElementById('outlineList'),
+                statusLeft: document.getElementById('statusLeft'),
+                statusRight: document.getElementById('statusRight'),
+                fileInput: document.getElementById('fileInput'),
+                assetInput: document.getElementById('assetInput'),
+                assetDropZone: document.getElementById('assetDropZone'),
+                blockFormat: document.getElementById('blockFormat')
+            };
+        }
+
+        setupEventListeners() {
+            // File operations
+            document.getElementById('btnNew').onclick = () => this.newDocument();
+            document.getElementById('btnOpen').onclick = () => this.elements.fileInput.click();
+            document.getElementById('btnSave').onclick = () => this.saveDocument();
+            document.getElementById('btnSettings').onclick = () => this.openSettings();
+
+            this.elements.fileInput.onchange = (e) => this.openDocument(e.target.files[0]);
+
+            // Document title
+            this.elements.docTitle.onchange = () => {
+                this.document.manifest.document.title = this.elements.docTitle.value;
+                this.markDirty();
+            };
+
+            // View tabs
+            document.querySelectorAll('.view-tab').forEach(tab => {
+                tab.onclick = () => this.switchView(tab.dataset.view);
+            });
+
+            // Editor input
+            this.elements.wysiwygEditor.oninput = () => {
+                this.markDirty();
+                this.updateWordCount();
+                this.updateOutline();
+            };
+
+            this.elements.sourceEditor.oninput = () => {
+                this.markDirty();
+                if (this.currentView === 'split') {
+                    this.updatePreview();
+                }
+            };
+
+            // Block format select
+            this.elements.blockFormat.onchange = () => {
+                const format = this.elements.blockFormat.value;
+                document.execCommand('formatBlock', false, format);
+                this.elements.wysiwygEditor.focus();
+            };
+
+            // Sidebar toggle
+            document.getElementById('btnToggleSidebar').onclick = () => {
+                this.elements.sidebar.classList.toggle('collapsed');
+            };
+
+            // Asset operations
+            document.getElementById('btnAddAsset').onclick = () => this.elements.assetInput.click();
+            this.elements.assetInput.onchange = (e) => this.addAssets(e.target.files);
+
+            // Asset drop zone
+            this.elements.assetDropZone.onclick = () => this.elements.assetInput.click();
+            this.elements.assetDropZone.ondragover = (e) => {
+                e.preventDefault();
+                this.elements.assetDropZone.classList.add('dragover');
+            };
+            this.elements.assetDropZone.ondragleave = () => {
+                this.elements.assetDropZone.classList.remove('dragover');
+            };
+            this.elements.assetDropZone.ondrop = (e) => {
+                e.preventDefault();
+                this.elements.assetDropZone.classList.remove('dragover');
+                this.addAssets(e.dataTransfer.files);
+            };
+
+            // Insert buttons
+            document.getElementById('btnLink').onclick = () => openModal('linkModal');
+            document.getElementById('btnImage').onclick = () => this.openImageModal();
+            document.getElementById('btnTable').onclick = () => openModal('tableModal');
+            document.getElementById('btnHR').onclick = () => {
+                document.execCommand('insertHTML', false, '<hr>');
+            };
+            document.getElementById('btnTaskList').onclick = () => this.insertTaskList();
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey || e.metaKey) {
+                    if (e.key === 's') { e.preventDefault(); this.saveDocument(); }
+                    if (e.key === 'o') { e.preventDefault(); this.elements.fileInput.click(); }
+                    if (e.key === 'n') { e.preventDefault(); this.newDocument(); }
+                }
+            });
+
+            // Prevent leaving with unsaved changes
+            window.onbeforeunload = () => this.isDirty ? true : null;
+        }
+
+        setupToolbar() {
+            document.querySelectorAll('.tool-btn[data-cmd]').forEach(btn => {
+                btn.onclick = () => {
+                    const cmd = btn.dataset.cmd;
+                    if (cmd === 'code') {
+                        // Wrap selection in <code>
+                        const selection = window.getSelection();
+                        if (selection.rangeCount > 0) {
+                            const range = selection.getRangeAt(0);
+                            const code = document.createElement('code');
+                            range.surroundContents(code);
+                        }
+                    } else {
+                        document.execCommand(cmd, false, null);
+                    }
+                    this.elements.wysiwygEditor.focus();
+                };
+            });
+        }
+
+        // View Management
+        switchView(view) {
+            this.currentView = view;
+
+            document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`[data-view="${view}"]`).classList.add('active');
+
+            if (view === 'wysiwyg') {
+                this.elements.wysiwygPane.classList.remove('hidden');
+                this.elements.sourcePane.classList.add('hidden');
+                this.elements.previewPane.classList.add('hidden');
+                // Sync from source if coming from source view
+                if (this.elements.sourceEditor.value) {
+                    this.elements.wysiwygEditor.innerHTML = marked.parse(this.elements.sourceEditor.value);
+                }
+            } else if (view === 'source') {
+                this.elements.wysiwygPane.classList.add('hidden');
+                this.elements.sourcePane.classList.remove('hidden');
+                this.elements.previewPane.classList.add('hidden');
+                // Convert HTML to Markdown
+                this.elements.sourceEditor.value = this.turndown.turndown(this.elements.wysiwygEditor.innerHTML);
+            } else if (view === 'split') {
+                this.elements.wysiwygPane.classList.add('hidden');
+                this.elements.sourcePane.classList.remove('hidden');
+                this.elements.previewPane.classList.remove('hidden');
+                this.elements.sourceEditor.value = this.turndown.turndown(this.elements.wysiwygEditor.innerHTML);
+                this.updatePreview();
+            }
+        }
+
+        updatePreview() {
+            const html = marked.parse(this.elements.sourceEditor.value);
+            this.elements.previewContent.innerHTML = html;
+            // Highlight code blocks
+            this.elements.previewContent.querySelectorAll('pre code').forEach(block => {
+                hljs.highlightElement(block);
+            });
+        }
+
+        // Document Operations
+        newDocument() {
+            if (this.isDirty && !confirm('Discard unsaved changes?')) return;
+
+            this.document = {
+                manifest: this.createDefaultManifest(),
+                content: '',
+                assets: new Map()
+            };
+
+            this.elements.docTitle.value = 'Untitled Document';
+            this.elements.wysiwygEditor.innerHTML = '<h1>Untitled Document</h1><p>Start writing...</p>';
+            this.elements.sourceEditor.value = '';
+            this.isDirty = false;
+            this.updateAssetList();
+            this.updateOutline();
+            this.updateWordCount();
+            this.elements.statusLeft.textContent = 'New document created';
+        }
+
+        async openDocument(file) {
+            if (!file) return;
+            if (this.isDirty && !confirm('Discard unsaved changes?')) return;
+
+            try {
+                this.elements.statusLeft.textContent = 'Opening...';
+                const zip = new JSZip();
+                const contents = await zip.loadAsync(file);
+
+                // Read manifest
+                const manifestFile = contents.file('manifest.json');
+                if (!manifestFile) throw new Error('Invalid MDX: missing manifest.json');
+                this.document.manifest = JSON.parse(await manifestFile.async('text'));
+
+                // Read content
+                const entryPoint = this.document.manifest.content?.entry_point || 'document.md';
+                const contentFile = contents.file(entryPoint);
+                this.document.content = contentFile ? await contentFile.async('text') : '';
+
+                // Read assets
+                this.document.assets.clear();
+                for (const [path, entry] of Object.entries(contents.files)) {
+                    if (path.startsWith('assets/') && !entry.dir) {
+                        const data = await entry.async('arraybuffer');
+                        this.document.assets.set(path, data);
+                    }
+                }
+
+                // Update UI
+                this.elements.docTitle.value = this.document.manifest.document.title || 'Untitled';
+                this.elements.wysiwygEditor.innerHTML = marked.parse(this.document.content);
+                this.elements.sourceEditor.value = this.document.content;
+
+                // Replace asset paths with data URLs in WYSIWYG
+                this.updateAssetReferences();
+                this.updateAssetList();
+                this.updateOutline();
+                this.updateWordCount();
+
+                this.isDirty = false;
+                this.elements.statusLeft.textContent = `Opened: ${file.name}`;
+            } catch (error) {
+                alert('Error opening file: ' + error.message);
+                this.elements.statusLeft.textContent = 'Error opening file';
+            }
+        }
+
+        async saveDocument() {
+            try {
+                this.elements.statusLeft.textContent = 'Saving...';
+
+                // Get content
+                const content = this.currentView === 'wysiwyg'
+                    ? this.turndown.turndown(this.elements.wysiwygEditor.innerHTML)
+                    : this.elements.sourceEditor.value;
+
+                // Update manifest
+                this.document.manifest.document.modified = new Date().toISOString();
+                this.document.manifest.document.title = this.elements.docTitle.value;
+
+                // Create ZIP
+                const zip = new JSZip();
+                zip.file('manifest.json', JSON.stringify(this.document.manifest, null, 2));
+                zip.file('document.md', content);
+
+                // Add assets
+                for (const [path, data] of this.document.assets) {
+                    zip.file(path, data);
+                }
+
+                // Generate and download
+                const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+                const filename = this.slugify(this.elements.docTitle.value) + '.mdx';
+
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = filename;
+                link.click();
+                URL.revokeObjectURL(link.href);
+
+                this.isDirty = false;
+                this.elements.statusLeft.textContent = `Saved: ${filename}`;
+            } catch (error) {
+                alert('Error saving: ' + error.message);
+                this.elements.statusLeft.textContent = 'Error saving';
+            }
+        }
+
+        // Asset Management
+        async addAssets(files) {
+            for (const file of files) {
+                const ext = file.name.split('.').pop().toLowerCase();
+                const categories = {
+                    'png': 'images', 'jpg': 'images', 'jpeg': 'images', 'gif': 'images',
+                    'svg': 'images', 'webp': 'images',
+                    'mp4': 'video', 'webm': 'video',
+                    'mp3': 'audio', 'wav': 'audio', 'ogg': 'audio',
+                    'csv': 'data', 'json': 'data',
+                    'gltf': 'models', 'glb': 'models',
+                    'pdf': 'documents'
+                };
+                const category = categories[ext] || 'other';
+                const path = `assets/${category}/${file.name}`;
+
+                const data = await file.arrayBuffer();
+                this.document.assets.set(path, data);
+
+                // Update manifest
+                if (!this.document.manifest.assets[category]) {
+                    this.document.manifest.assets[category] = [];
+                }
+                this.document.manifest.assets[category].push({
+                    path: path,
+                    mime_type: file.type,
+                    size_bytes: data.byteLength
+                });
+
+                this.markDirty();
+            }
+            this.updateAssetList();
+            this.elements.statusLeft.textContent = `Added ${files.length} asset(s)`;
+        }
+
+        updateAssetList() {
+            const icons = {
+                images: 'fa-image', video: 'fa-video', audio: 'fa-music',
+                data: 'fa-database', models: 'fa-cube', documents: 'fa-file-pdf'
+            };
+
+            let html = '';
+            for (const [path, data] of this.document.assets) {
+                const category = path.split('/')[1] || 'other';
+                const name = path.split('/').pop();
+                const size = this.formatSize(data.byteLength);
+                const icon = icons[category] || 'fa-file';
+
+                html += `
+                    <div class="asset-item" data-path="${path}" onclick="editor.insertAsset('${path}')">
+                        <span class="icon"><i class="fas ${icon}"></i></span>
+                        <span class="name">${name}</span>
+                        <span class="size">${size}</span>
+                        <button class="tool-btn delete" onclick="event.stopPropagation(); editor.removeAsset('${path}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+            }
+
+            this.elements.assetList.innerHTML = html || '<div style="padding:0.5rem;color:var(--text-muted);font-size:0.8rem;">No assets</div>';
+        }
+
+        removeAsset(path) {
+            if (!confirm(`Delete ${path.split('/').pop()}?`)) return;
+            this.document.assets.delete(path);
+
+            // Remove from manifest
+            for (const category of Object.keys(this.document.manifest.assets)) {
+                this.document.manifest.assets[category] =
+                    this.document.manifest.assets[category].filter(a => a.path !== path);
+            }
+
+            this.updateAssetList();
+            this.markDirty();
+        }
+
+        insertAsset(path) {
+            const category = path.split('/')[1];
+            const name = path.split('/').pop();
+
+            if (category === 'images') {
+                const data = this.document.assets.get(path);
+                const blob = new Blob([data]);
+                const url = URL.createObjectURL(blob);
+                document.execCommand('insertHTML', false, `<img src="${url}" alt="${name}" data-asset="${path}">`);
+            } else {
+                document.execCommand('insertHTML', false, `<a href="${path}">${name}</a>`);
+            }
+            this.elements.wysiwygEditor.focus();
+        }
+
+        updateAssetReferences() {
+            // Replace asset paths with data URLs in the WYSIWYG editor
+            const imgs = this.elements.wysiwygEditor.querySelectorAll('img');
+            imgs.forEach(img => {
+                const src = img.getAttribute('src');
+                if (src && src.startsWith('assets/')) {
+                    const data = this.document.assets.get(src);
+                    if (data) {
+                        const blob = new Blob([data]);
+                        img.src = URL.createObjectURL(blob);
+                        img.dataset.asset = src;
+                    }
+                }
+            });
+        }
+
+        // Insert Operations
+        insertTaskList() {
+            const html = `
+                <ul style="list-style:none;padding-left:0;">
+                    <li><input type="checkbox"> Task 1</li>
+                    <li><input type="checkbox"> Task 2</li>
+                    <li><input type="checkbox"> Task 3</li>
+                </ul>
+            `;
+            document.execCommand('insertHTML', false, html);
+        }
+
+        openImageModal() {
+            // Populate asset dropdown
+            const select = document.getElementById('imageAsset');
+            select.innerHTML = '<option value="">Select an image...</option>';
+            for (const [path] of this.document.assets) {
+                if (path.includes('/images/')) {
+                    const name = path.split('/').pop();
+                    select.innerHTML += `<option value="${path}">${name}</option>`;
+                }
+            }
+            openModal('imageModal');
+        }
+
+        // Settings
+        openSettings() {
+            document.getElementById('settingTitle').value = this.document.manifest.document.title || '';
+            document.getElementById('settingDescription').value = this.document.manifest.document.description || '';
+            document.getElementById('settingAuthor').value = this.document.manifest.document.authors?.[0]?.name || '';
+            document.getElementById('settingVersion').value = this.document.manifest.document.version || '1.0.0';
+            document.getElementById('settingLanguage').value = this.document.manifest.document.language || 'en-US';
+            openModal('settingsModal');
+        }
+
+        // Outline
+        updateOutline() {
+            const headings = this.elements.wysiwygEditor.querySelectorAll('h1, h2, h3');
+            let html = '';
+            headings.forEach((h, i) => {
+                const level = h.tagName.toLowerCase();
+                const indent = level === 'h1' ? 0 : level === 'h2' ? 12 : 24;
+                html += `<div class="asset-item" style="padding-left:${indent}px" onclick="editor.scrollToHeading(${i})">
+                    <span style="color:var(--text-muted);font-size:0.7rem;">${level.toUpperCase()}</span>
+                    <span class="name">${h.textContent}</span>
+                </div>`;
+            });
+            this.elements.outlineList.innerHTML = html || '<div style="padding:0.5rem;color:var(--text-muted);font-size:0.8rem;">No headings</div>';
+        }
+
+        scrollToHeading(index) {
+            const headings = this.elements.wysiwygEditor.querySelectorAll('h1, h2, h3');
+            if (headings[index]) {
+                headings[index].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        // Utilities
+        updateWordCount() {
+            const text = this.elements.wysiwygEditor.textContent || '';
+            const words = text.trim().split(/\s+/).filter(w => w).length;
+            const chars = text.length;
+            this.elements.statusRight.textContent = `Words: ${words} | Characters: ${chars}`;
+        }
+
+        markDirty() {
+            this.isDirty = true;
+            if (!this.elements.docTitle.value.endsWith('*')) {
+                // Visual indicator could be added
+            }
+        }
+
+        formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        slugify(text) {
+            return text.toLowerCase().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
+        }
+    }
+
+    // =========================================================================
+    // Modal Helpers
+    // =========================================================================
+
+    function openModal(id) {
+        document.getElementById(id).classList.add('active');
+    }
+
+    function closeModal(id) {
+        document.getElementById(id).classList.remove('active');
+    }
+
+    function saveSettings() {
+        editor.document.manifest.document.title = document.getElementById('settingTitle').value;
+        editor.document.manifest.document.description = document.getElementById('settingDescription').value;
+        editor.document.manifest.document.version = document.getElementById('settingVersion').value;
+        editor.document.manifest.document.language = document.getElementById('settingLanguage').value;
+
+        const authorName = document.getElementById('settingAuthor').value;
+        if (authorName) {
+            editor.document.manifest.document.authors = [{ name: authorName, role: 'author' }];
+        }
+
+        editor.elements.docTitle.value = editor.document.manifest.document.title;
+        editor.markDirty();
+        closeModal('settingsModal');
+    }
+
+    function toggleImageSource() {
+        const source = document.getElementById('imageSource').value;
+        document.getElementById('imageAssetGroup').classList.toggle('hidden', source !== 'asset');
+        document.getElementById('imageUrlGroup').classList.toggle('hidden', source !== 'url');
+    }
+
+    function insertLink() {
+        const url = document.getElementById('linkUrl').value;
+        const text = document.getElementById('linkText').value || url;
+        if (url) {
+            document.execCommand('insertHTML', false, `<a href="${url}">${text}</a>`);
+        }
+        closeModal('linkModal');
+        document.getElementById('linkUrl').value = '';
+        document.getElementById('linkText').value = '';
+    }
+
+    function insertImage() {
+        const source = document.getElementById('imageSource').value;
+        const alt = document.getElementById('imageAlt').value || 'Image';
+        let src;
+
+        if (source === 'asset') {
+            const path = document.getElementById('imageAsset').value;
+            if (!path) { alert('Please select an image'); return; }
+            const data = editor.document.assets.get(path);
+            const blob = new Blob([data]);
+            src = URL.createObjectURL(blob);
+            document.execCommand('insertHTML', false, `<img src="${src}" alt="${alt}" data-asset="${path}">`);
+        } else {
+            src = document.getElementById('imageUrl').value;
+            if (!src) { alert('Please enter a URL'); return; }
+            document.execCommand('insertHTML', false, `<img src="${src}" alt="${alt}">`);
+        }
+
+        closeModal('imageModal');
+    }
+
+    function insertTable() {
+        const rows = parseInt(document.getElementById('tableRows').value) || 3;
+        const cols = parseInt(document.getElementById('tableCols').value) || 3;
+
+        let html = '<table><thead><tr>';
+        for (let c = 0; c < cols; c++) html += `<th>Header ${c + 1}</th>`;
+        html += '</tr></thead><tbody>';
+        for (let r = 0; r < rows - 1; r++) {
+            html += '<tr>';
+            for (let c = 0; c < cols; c++) html += '<td>Cell</td>';
+            html += '</tr>';
+        }
+        html += '</tbody></table>';
+
+        document.execCommand('insertHTML', false, html);
+        closeModal('tableModal');
+    }
+
+    // =========================================================================
+    // Initialize
+    // =========================================================================
+
+    const editor = new MDXEditor();
+    </script>
+</body>
+</html>
