@@ -1209,12 +1209,36 @@
                 if (src && src.startsWith('assets/')) {
                     const data = this.document.assets.get(src);
                     if (data) {
-                        const blob = new Blob([data]);
+                        const mimeType = this.getMimeType(src);
+                        const blob = new Blob([data], { type: mimeType });
                         img.src = URL.createObjectURL(blob);
                         img.dataset.asset = src;
                     }
                 }
             });
+        }
+
+        getMimeType(path) {
+            const ext = path.split('.').pop().toLowerCase();
+            const mimeTypes = {
+                'png': 'image/png',
+                'jpg': 'image/jpeg',
+                'jpeg': 'image/jpeg',
+                'gif': 'image/gif',
+                'webp': 'image/webp',
+                'svg': 'image/svg+xml',
+                'mp4': 'video/mp4',
+                'webm': 'video/webm',
+                'mp3': 'audio/mpeg',
+                'wav': 'audio/wav',
+                'ogg': 'audio/ogg',
+                'pdf': 'application/pdf',
+                'json': 'application/json',
+                'csv': 'text/csv',
+                'gltf': 'model/gltf+json',
+                'glb': 'model/gltf-binary'
+            };
+            return mimeTypes[ext] || 'application/octet-stream';
         }
 
         // Insert Operations

@@ -93,6 +93,11 @@ mdx/
 │   │   └── mdx_format.ts
 │   └── python/                   # Python
 │       └── mdx_format.py
+├── cli/                           # Command-line tool
+│   ├── src/                      # CLI source code
+│   └── dist/                     # Built executables
+├── editor/                        # Web-based WYSIWYG editor
+│   └── index.html
 ├── viewer/                        # Web-based MDX viewer
 │   └── index.html
 ├── examples/                      # Example MDX documents
@@ -135,9 +140,79 @@ MDX supports CommonMark 0.31+ with extensions:
 ::data[Results]{src="assets/data/results.csv" visualization="chart" type="bar"}
 ```
 
-## Web Viewer
+## Tools
 
-Open `viewer/index.html` in a browser to view MDX documents. The viewer supports:
+### Command-Line Interface (CLI)
+
+A Node.js CLI tool for working with MDX files. Build a standalone executable or run directly with Node.
+
+**Installation:**
+```bash
+cd cli
+npm install
+```
+
+**Commands:**
+```bash
+# View - Open in browser with full rendering
+mdx view document.mdx
+mdx v document.mdx -p 8080    # Custom port
+
+# Extract - Extract archive contents
+mdx extract document.mdx
+mdx x document.mdx ./output   # Custom output directory
+
+# Info - Display document information
+mdx info document.mdx
+mdx i document.mdx -c         # Show content
+mdx i document.mdx -a         # Show asset details
+
+# Edit - Interactive terminal editor
+mdx edit document.mdx
+
+# Create - Create new document from template
+mdx create
+mdx c "My Document" -t article -o my-doc.mdx
+```
+
+**Build Executable:**
+```bash
+npm run build        # Windows x64
+npm run build:all    # All platforms
+```
+
+See [cli/README.md](cli/README.md) for full documentation.
+
+### Web Editor
+
+A lightweight, browser-based WYSIWYG editor similar to Word. No installation required.
+
+**Features:**
+- **Visual Mode** - WYSIWYG editing with live formatting
+- **Markdown Mode** - Edit raw markdown source
+- **Split View** - Side-by-side markdown and preview
+- Formatting toolbar (headings, bold, italic, lists, tables, etc.)
+- Drag-and-drop asset management
+- Document outline navigation
+- Open/save MDX files directly
+- Word and character count
+
+**Usage:**
+```bash
+cd editor
+python -m http.server 8080
+# Open http://localhost:8080 in your browser
+```
+
+Or simply open `editor/index.html` in any modern browser.
+
+See [editor/README.md](editor/README.md) for full documentation.
+
+### Web Viewer
+
+A read-only viewer for MDX documents. Open `viewer/index.html` in a browser.
+
+**Features:**
 - Drag-and-drop file loading
 - Markdown rendering with syntax highlighting
 - Asset preview and download
