@@ -1,0 +1,39 @@
+{
+  "$schema": "https://claude.ai/code/settings-schema.json",
+  "project": {
+    "name": "MDX Format",
+    "description": "Markdown eXtended Container - An open document format specification"
+  },
+  "permissions": {
+    "allow": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "Glob",
+      "Grep",
+      "WebFetch"
+    ],
+    "deny": []
+  },
+  "context": {
+    "include": [
+      "CLAUDE.md",
+      "README.md",
+      "spec/MDX_FORMAT_SPECIFICATION.md"
+    ]
+  },
+  "codeStyle": {
+    "typescript": {
+      "formatter": "prettier",
+      "strictNullChecks": true
+    },
+    "python": {
+      "formatter": "black",
+      "lineLength": 100
+    },
+    "markdown": {
+      "lineWidth": 100
+    }
+  }
+}

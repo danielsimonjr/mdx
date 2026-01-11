@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Claude Code local files (keep settings.json)
+.claude/*.local.md
+.claude/*.local.json
+
+# Playwright MCP artifacts
+.playwright-mcp/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# TypeScript
+*.js.map
+*.d.ts
+
+# Temporary files
+*.tmp
+*.temp
