@@ -17,14 +17,46 @@ mdx/
 │   │   └── mdx_format.ts             # TypeScript implementation (2,700+ lines)
 │   └── python/
 │       └── mdx_format.py             # Python implementation
+├── cli/                               # Command-line tool (Node.js)
+│   ├── src/
+│   │   ├── index.js                  # CLI entry point
+│   │   └── commands/                 # Command implementations
+│   └── dist/                         # Built executables
+├── editor/
+│   └── index.html                    # Web-based WYSIWYG editor
 ├── viewer/
-│   └── index.html                    # Web-based MDX viewer
+│   └── index.html                    # Web-based MDX viewer (read-only)
 ├── examples/
 │   └── example-document.mdx          # Working example
 └── .github/                          # GitHub templates & CI
 ```
 
 ## Development Commands
+
+### CLI Tool
+```bash
+# Install dependencies
+cd cli
+npm install
+
+# Run commands directly
+node src/index.js view document.mdx       # Open in browser
+node src/index.js extract document.mdx    # Extract contents
+node src/index.js info document.mdx       # Show metadata
+node src/index.js edit document.mdx       # Interactive editor
+node src/index.js create                  # Create new document
+
+# Build standalone executable
+npm run build          # Windows x64
+npm run build:all      # All platforms (outputs to dist/)
+```
+
+### Web Editor
+```bash
+cd editor
+python -m http.server 8080
+# Open http://localhost:8080 in browser
+```
 
 ### Python
 ```bash
@@ -43,7 +75,9 @@ tsc implementations/typescript/mdx_format.ts --target es2020 --module esnext
 ```
 
 ### Testing
-- Open `viewer/index.html` in a browser to test MDX documents
+- Use CLI: `node cli/src/index.js view examples/example-document.mdx`
+- Open `editor/index.html` to edit MDX documents with WYSIWYG interface
+- Open `viewer/index.html` for read-only viewing
 - Generate examples with Python script and verify structure
 - Open `.mdx` files with any ZIP utility to inspect contents
 
@@ -105,6 +139,40 @@ document.mdx (ZIP container)
 5. Verify output structure
 
 Uses only standard library: `json`, `zipfile`, `hashlib`, `uuid`, `pathlib`
+
+### CLI Tool
+
+Node.js command-line tool using Commander.js and Inquirer.js.
+
+**Commands:**
+- `view <file>` - Opens MDX in browser with embedded viewer, starts local server
+- `extract <file> [output]` - Extracts ZIP contents to folder
+- `info <file>` - Displays metadata, assets, content in terminal
+- `edit <file>` - Interactive terminal editor (inquirer-based)
+- `create [title]` - Creates new MDX from templates (blank, article, report, presentation)
+
+**Dependencies:** commander, inquirer, jszip, marked, chalk, open
+
+**Build:** Uses `pkg` to create standalone executables for Windows/Mac/Linux
+
+### Web Editor
+
+Single-file browser-based WYSIWYG editor (`editor/index.html`).
+
+**Features:**
+- Three view modes: Visual (WYSIWYG), Markdown (source), Split View
+- Formatting toolbar with all standard formatting options
+- Asset sidebar with drag-drop upload and file browser
+- Document outline navigation (clickable headings)
+- Direct open/save of MDX files via browser File API
+
+**Dependencies (CDN):** JSZip, Marked, Highlight.js, Turndown, Font Awesome
+
+**Key Functions:**
+- `openDocument(file)` - Loads MDX, parses manifest, extracts assets
+- `saveDocument()` - Converts HTML to Markdown, builds ZIP, downloads
+- `updateAssetReferences()` - Replaces asset paths with blob URLs (with MIME types)
+- `getMimeType(path)` - Returns correct MIME type for blob creation
 
 ## Key Standards
 
