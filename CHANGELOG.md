@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Open/save MDX files directly in browser
   - Word and character count
 
+- Claude Code configuration
+  - `.claude/settings.json` with project settings and code style preferences
+  - `.mcp.json` with MCP server configuration
+  - Root `.gitignore` for common ignores
+
 ### Fixed
 
 - SVG images now render correctly in editor (added MIME type detection)
