@@ -151,7 +151,7 @@ Node.js command-line tool using Commander.js and Inquirer.js.
 - `edit <file>` - Interactive terminal editor (inquirer-based)
 - `create [title]` - Creates new MDX from templates (blank, article, report, presentation)
 
-**Dependencies:** commander, inquirer, jszip, marked, chalk, open
+**Dependencies:** commander, inquirer, adm-zip, marked, marked-terminal, chalk (v4.x for CommonJS), open, ora
 
 **Build:** Uses `pkg` to create standalone executables for Windows/Mac/Linux
 

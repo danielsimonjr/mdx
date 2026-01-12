@@ -1,3 +1,26 @@
 {
-  "mcpServers": {}
+  "mcpServers": {
+    "memory-mcp": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "C:/mcp-servers/memory-mcp/dist/index.js"
+      ],
+      "env": {
+        "MEMORY_FILE_PATH": "c:/users/danie/dropbox/github/mdx/memory.db",
+        "MEMORY_STORAGE_TYPE": "sqlite"
+      }
+    },
+    "deepthinking-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "deepthinking-mcp"
+      ],
+      "env": {
+		  "MCP_EXPORT_PATH": "c:\\users\\daniel\\dropbox\\github\\mdx\\output\\"
+	  }
+    }
+  }
 }

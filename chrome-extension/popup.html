@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            width: 280px;
+            padding: 1rem;
+            background: #fff;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .logo {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #2563eb, #8b5cf6);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.6rem;
+            font-weight: 800;
+        }
+        .title {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+        .version {
+            color: #64748b;
+            font-size: 0.75rem;
+        }
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            width: 100%;
+            padding: 0.625rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            background: white;
+            color: #1e293b;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            margin-bottom: 0.5rem;
+        }
+        .btn:hover { background: #f8fafc; border-color: #cbd5e1; }
+        .btn-primary { background: #2563eb; color: white; border-color: #2563eb; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .info {
+            font-size: 0.75rem;
+            color: #64748b;
+            text-align: center;
+            margin-top: 0.5rem;
+        }
+        .info code {
+            background: #f1f5f9;
+            padding: 0.1rem 0.3rem;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">MDX</div>
+        <div>
+            <div class="title">MDX Viewer</div>
+            <div class="version">v1.0.0</div>
+        </div>
+    </div>
+
+    <button class="btn btn-primary" id="openViewer">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+        </svg>
+        Open MDX Viewer
+    </button>
+
+    <button class="btn" id="openFile">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+        </svg>
+        Open File...
+    </button>
+
+    <div class="info">
+        Supports <code>.mdx</code> and <code>.mdxc</code> files
+    </div>
+
+    <input type="file" id="fileInput" accept=".mdx,.mdxc,.zip" style="display:none">
+
+    <script>
+        document.getElementById('openViewer').onclick = () => {
+            chrome.tabs.create({ url: 'viewer.html' });
+            window.close();
+        };
+
+        document.getElementById('openFile').onclick = () => {
+            document.getElementById('fileInput').click();
+        };
+
+        document.getElementById('fileInput').onchange = async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                // Open viewer and pass file via message
+                const tab = await chrome.tabs.create({ url: 'viewer.html' });
+                // Note: File passing would need more complex handling
+                // For now, user can drag-drop or use Open button in viewer
+                window.close();
+            }
+        };
+    </script>
+</body>
+</html>
