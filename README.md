@@ -27,9 +27,12 @@ document.mdx (ZIP container)
 │   ├── video/             # MP4, WebM (+ VTT captions)
 │   ├── audio/             # MP3, WAV, OGG
 │   ├── models/            # glTF, GLB (3D models)
+│   ├── documents/         # PDF and other documents
 │   ├── data/              # CSV, JSON, Parquet
-│   └── fonts/             # WOFF2, TTF
+│   ├── fonts/             # WOFF2, TTF
+│   └── other/             # Uncategorized assets
 ├── styles/                 # Custom CSS
+├── scripts/                # Interactive content (sandboxed)
 ├── history/                # Version snapshots
 └── annotations/            # W3C Web Annotations
 ```
@@ -41,6 +44,7 @@ document.mdx (ZIP container)
 ```python
 import zipfile
 import json
+import uuid
 from datetime import datetime, timezone
 
 # Create a minimal MDX document
@@ -51,7 +55,7 @@ with zipfile.ZipFile('my-document.mdx', 'w', zipfile.ZIP_DEFLATED) as mdx:
         "mdx_version": "1.0.0",
         "document": {
             "title": "My Document",
-            "id": "doc-001",
+            "id": str(uuid.uuid4()),  # UUID v4 required
             "created": timestamp,
             "modified": timestamp
         },
@@ -68,7 +72,9 @@ with zipfile.ZipFile('my-document.mdx', 'w', zipfile.ZIP_DEFLATED) as mdx:
 ```typescript
 import { MDXDocument } from './implementations/typescript/mdx_format';
 
-const doc = MDXDocument.create("My Document", { author: "Your Name" });
+const doc = MDXDocument.create("My Document", {
+  author: { name: "Your Name", email: "you@example.com" }
+});
 doc.setContent("# Hello World\n\nThis is my MDX document.");
 await doc.addImage(imageData, "figure.png", { altText: "A figure" });
 const blob = await doc.save();
@@ -87,7 +93,12 @@ console.log(doc.getContent());
 ```
 mdx/
 ├── spec/                          # Specification documents
-│   └── MDX_FORMAT_SPECIFICATION.md
+│   ├── MDX_FORMAT_SPECIFICATION.md
+│   └── manifest.schema.json      # JSON Schema for validation
+├── docs/                          # Developer documentation
+│   ├── implementation-guide.md   # Implementation patterns
+│   ├── tool-builder-guide.md     # Building utilities
+│   └── format-internals.md       # Technical reference
 ├── implementations/               # Reference implementations
 │   ├── typescript/               # TypeScript/JavaScript
 │   │   └── mdx_format.ts
@@ -100,6 +111,8 @@ mdx/
 │   └── index.html
 ├── viewer/                        # Web-based MDX viewer
 │   └── index.html
+├── chrome-extension/              # Chrome browser extension
+│   └── manifest.json
 ├── examples/                      # Example MDX documents
 │   └── example-document.mdx
 └── .github/                       # GitHub templates & CI
@@ -121,6 +134,7 @@ The complete specification is available at [spec/MDX_FORMAT_SPECIFICATION.md](sp
 |--------|---------------|
 | DOCX | Human-readable source, simpler structure, web-native media |
 | PDF | Editable source, smaller size, true interactivity |
+| 3D PDF | Open format, modern 3D standards (glTF), no proprietary tools |
 | HTML | Self-contained, offline-capable, version-controlled |
 | Plain Markdown | Bundled assets, rich metadata, collaboration features |
 | EPUB | Simpler structure, better for documents vs. books |
@@ -221,6 +235,25 @@ A read-only viewer for MDX documents. Open `viewer/index.html` in a browser.
 - Markdown rendering with syntax highlighting
 - Asset preview and download
 - Manifest inspection
+
+### Chrome Extension
+
+A native Chrome extension for viewing MDX files directly in the browser.
+
+**Features:**
+- View MDX documents without a web server
+- Document outline navigation
+- Export to HTML, Markdown, or JSON
+- Syntax-highlighted code blocks
+
+**Installation:**
+```bash
+cd chrome-extension
+node setup.js              # Download dependencies
+# Load unpacked extension via chrome://extensions
+```
+
+See [chrome-extension/README.md](chrome-extension/README.md) for setup instructions.
 
 ## Contributing
 
