@@ -14,6 +14,7 @@ const extractCommand = require('./commands/extract');
 const infoCommand = require('./commands/info');
 const editCommand = require('./commands/edit');
 const createCommand = require('./commands/create');
+const validateCommand = require('./commands/validate');
 
 // CLI Banner
 const banner = `
@@ -70,6 +71,15 @@ program
   .option('-t, --template <template>', 'Template to use (blank, article, report, presentation)', 'blank')
   .option('-o, --output <path>', 'Output path for the MDX file')
   .action(createCommand);
+
+// Validate command - validate MDX file structure
+program
+  .command('validate <file>')
+  .alias('val')
+  .description('Validate MDX file structure and manifest')
+  .option('-v, --verbose', 'Show detailed information including info-level messages')
+  .option('--no-exit', 'Do not exit with error code on validation failure')
+  .action(validateCommand);
 
 // Default action when file is passed directly
 program

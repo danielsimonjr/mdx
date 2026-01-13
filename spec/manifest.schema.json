@@ -1,0 +1,659 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mdx-format.org/schemas/manifest.schema.json",
+  "title": "MDX Manifest Schema",
+  "description": "JSON Schema for MDX (Markdown eXtended Container) manifest.json files",
+  "type": "object",
+  "required": ["mdx_version", "document", "content"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "JSON Schema URI for validation"
+    },
+    "mdx_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9.]+)?$",
+      "description": "MDX specification version (SemVer format)"
+    },
+    "document": {
+      "$ref": "#/$defs/documentInfo"
+    },
+    "content": {
+      "$ref": "#/$defs/contentConfig"
+    },
+    "assets": {
+      "$ref": "#/$defs/assetsInventory"
+    },
+    "styles": {
+      "$ref": "#/$defs/stylesConfig"
+    },
+    "rendering": {
+      "$ref": "#/$defs/renderingConfig"
+    },
+    "interactivity": {
+      "$ref": "#/$defs/interactivityConfig"
+    },
+    "collaboration": {
+      "$ref": "#/$defs/collaborationConfig"
+    },
+    "history": {
+      "$ref": "#/$defs/historyConfig"
+    },
+    "security": {
+      "$ref": "#/$defs/securityConfig"
+    },
+    "extensions": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/extensionConfig"
+      },
+      "description": "Extension configurations keyed by extension ID"
+    },
+    "custom": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Application-specific custom data"
+    }
+  },
+  "$defs": {
+    "author": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Full name of the author"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Email address"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Personal or professional URL"
+        },
+        "role": {
+          "type": "string",
+          "description": "Role in the document (e.g., 'author', 'editor', 'reviewer')"
+        },
+        "organization": {
+          "type": "string",
+          "description": "Organization or company affiliation"
+        }
+      }
+    },
+    "licenseInfo": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "License identifier (e.g., 'MIT', 'CC-BY-4.0')"
+        },
+        {
+          "type": "object",
+          "required": ["type"],
+          "properties": {
+            "type": {
+              "type": "string",
+              "description": "License identifier"
+            },
+            "url": {
+              "type": "string",
+              "format": "uri",
+              "description": "URL to license text"
+            }
+          }
+        }
+      ]
+    },
+    "documentInfo": {
+      "type": "object",
+      "required": ["id", "title", "created", "modified"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "description": "Unique document identifier (UUID v4)"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Document title"
+        },
+        "subtitle": {
+          "type": "string",
+          "description": "Optional subtitle"
+        },
+        "description": {
+          "type": "string",
+          "description": "Brief description of the document"
+        },
+        "authors": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/author" },
+          "description": "List of document authors"
+        },
+        "contributors": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/author" },
+          "description": "List of contributors"
+        },
+        "created": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp (ISO 8601)"
+        },
+        "modified": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last modification timestamp (ISO 8601)"
+        },
+        "published": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Publication timestamp (ISO 8601)"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9.]+)?$",
+          "description": "Document version (SemVer recommended)"
+        },
+        "language": {
+          "type": "string",
+          "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$",
+          "description": "Primary language (BCP 47 tag)"
+        },
+        "license": {
+          "$ref": "#/$defs/licenseInfo"
+        },
+        "copyright": {
+          "type": "string",
+          "description": "Copyright notice"
+        },
+        "keywords": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Keywords/tags for the document"
+        },
+        "category": {
+          "type": "string",
+          "description": "Document category"
+        },
+        "subject": {
+          "type": "string",
+          "description": "Document subject"
+        },
+        "cover_image": {
+          "type": "string",
+          "description": "Path to cover image within the archive"
+        }
+      }
+    },
+    "additionalFile": {
+      "type": "object",
+      "required": ["path"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Path to the file within the archive"
+        },
+        "title": {
+          "type": "string",
+          "description": "Human-readable title"
+        }
+      }
+    },
+    "contentConfig": {
+      "type": "object",
+      "required": ["entry_point"],
+      "properties": {
+        "entry_point": {
+          "type": "string",
+          "default": "document.md",
+          "description": "Path to main Markdown file"
+        },
+        "encoding": {
+          "type": "string",
+          "default": "UTF-8",
+          "description": "Character encoding"
+        },
+        "markdown_variant": {
+          "type": "string",
+          "enum": ["CommonMark", "GFM", "Pandoc"],
+          "default": "CommonMark",
+          "description": "Markdown variant"
+        },
+        "markdown_version": {
+          "type": "string",
+          "description": "Markdown specification version"
+        },
+        "extensions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["tables", "footnotes", "task-lists", "math", "strikethrough", "autolinks", "definition-lists"]
+          },
+          "description": "Enabled Markdown extensions"
+        },
+        "additional_files": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/additionalFile" },
+          "description": "Additional content files"
+        }
+      }
+    },
+    "baseAssetMetadata": {
+      "type": "object",
+      "required": ["path", "mime_type", "size_bytes"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^[^\\\\<>:\"|?*]+$",
+          "description": "Path within the archive"
+        },
+        "mime_type": {
+          "type": "string",
+          "pattern": "^[a-z]+/[a-z0-9.+-]+$",
+          "description": "MIME type of the asset"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "File size in bytes"
+        },
+        "checksum": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+:[a-f0-9]+$",
+          "description": "Checksum (format: algorithm:hexdigest)"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description"
+        },
+        "credit": {
+          "type": "string",
+          "description": "Attribution or credit information"
+        }
+      }
+    },
+    "imageAssetMetadata": {
+      "allOf": [
+        { "$ref": "#/$defs/baseAssetMetadata" },
+        {
+          "type": "object",
+          "properties": {
+            "width": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Image width in pixels"
+            },
+            "height": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Image height in pixels"
+            },
+            "alt_text": {
+              "type": "string",
+              "description": "Alt text for accessibility"
+            },
+            "title": {
+              "type": "string",
+              "description": "Figure title or caption"
+            }
+          }
+        }
+      ]
+    },
+    "captionTrack": {
+      "type": "object",
+      "required": ["path", "language", "label", "kind"],
+      "properties": {
+        "path": { "type": "string" },
+        "language": { "type": "string" },
+        "label": { "type": "string" },
+        "kind": {
+          "type": "string",
+          "enum": ["subtitles", "captions", "descriptions"]
+        },
+        "default": { "type": "boolean" }
+      }
+    },
+    "videoAssetMetadata": {
+      "allOf": [
+        { "$ref": "#/$defs/baseAssetMetadata" },
+        {
+          "type": "object",
+          "properties": {
+            "width": { "type": "integer", "minimum": 1 },
+            "height": { "type": "integer", "minimum": 1 },
+            "duration_seconds": { "type": "number", "minimum": 0 },
+            "frame_rate": { "type": "number", "minimum": 0 },
+            "codec": { "type": "string" },
+            "poster": { "type": "string" },
+            "captions": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/captionTrack" }
+            },
+            "audio_tracks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "language": { "type": "string" },
+                  "label": { "type": "string" },
+                  "default": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "audioAssetMetadata": {
+      "allOf": [
+        { "$ref": "#/$defs/baseAssetMetadata" },
+        {
+          "type": "object",
+          "properties": {
+            "duration_seconds": { "type": "number", "minimum": 0 },
+            "sample_rate": { "type": "integer", "minimum": 1 },
+            "channels": { "type": "integer", "minimum": 1 },
+            "bit_rate": { "type": "integer", "minimum": 1 },
+            "transcript": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "modelAssetMetadata": {
+      "allOf": [
+        { "$ref": "#/$defs/baseAssetMetadata" },
+        {
+          "type": "object",
+          "properties": {
+            "format_version": { "type": "string" },
+            "preview": { "type": "string" },
+            "binary_buffers": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "textures": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "animations": { "type": "boolean" },
+            "vertex_count": { "type": "integer", "minimum": 0 },
+            "triangle_count": { "type": "integer", "minimum": 0 }
+          }
+        }
+      ]
+    },
+    "documentAssetMetadata": {
+      "allOf": [
+        { "$ref": "#/$defs/baseAssetMetadata" },
+        {
+          "type": "object",
+          "properties": {
+            "pages": { "type": "integer", "minimum": 1 },
+            "title": { "type": "string" },
+            "pdf_version": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "dataAssetMetadata": {
+      "allOf": [
+        { "$ref": "#/$defs/baseAssetMetadata" },
+        {
+          "type": "object",
+          "properties": {
+            "rows": { "type": "integer", "minimum": 0 },
+            "columns": { "type": "integer", "minimum": 0 },
+            "delimiter": { "type": "string" },
+            "has_header": { "type": "boolean" },
+            "encoding": { "type": "string" },
+            "schema_ref": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "fontAssetMetadata": {
+      "allOf": [
+        { "$ref": "#/$defs/baseAssetMetadata" },
+        {
+          "type": "object",
+          "properties": {
+            "family": { "type": "string" },
+            "weight": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 900
+            },
+            "style": {
+              "type": "string",
+              "enum": ["normal", "italic", "oblique"]
+            }
+          }
+        }
+      ]
+    },
+    "assetsInventory": {
+      "type": "object",
+      "properties": {
+        "images": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/imageAssetMetadata" }
+        },
+        "video": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/videoAssetMetadata" }
+        },
+        "audio": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/audioAssetMetadata" }
+        },
+        "models": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/modelAssetMetadata" }
+        },
+        "documents": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/documentAssetMetadata" }
+        },
+        "data": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/dataAssetMetadata" }
+        },
+        "fonts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/fontAssetMetadata" }
+        },
+        "other": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baseAssetMetadata" }
+        }
+      }
+    },
+    "stylesConfig": {
+      "type": "object",
+      "properties": {
+        "theme": { "type": "string" },
+        "print": { "type": "string" },
+        "syntax_highlighting": { "type": "string" },
+        "custom_properties": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "renderingConfig": {
+      "type": "object",
+      "properties": {
+        "math_renderer": {
+          "type": "string",
+          "enum": ["katex", "mathjax", "none"]
+        },
+        "math_delimiters": {
+          "type": "object",
+          "properties": {
+            "inline": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "block": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 2,
+              "maxItems": 2
+            }
+          }
+        },
+        "table_of_contents": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "depth": { "type": "integer", "minimum": 1, "maximum": 6 },
+            "ordered": { "type": "boolean" }
+          }
+        },
+        "line_numbers": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "start": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "footnotes": {
+          "type": "object",
+          "properties": {
+            "style": {
+              "type": "string",
+              "enum": ["end-of-document", "end-of-section", "inline"]
+            }
+          }
+        }
+      }
+    },
+    "scriptConfig": {
+      "type": "object",
+      "required": ["path"],
+      "properties": {
+        "path": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["module", "script"]
+        },
+        "integrity": { "type": "string" },
+        "sandbox": { "type": "boolean" },
+        "permissions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "load": {
+          "type": "string",
+          "enum": ["eager", "lazy"]
+        }
+      }
+    },
+    "interactivityConfig": {
+      "type": "object",
+      "properties": {
+        "scripts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/scriptConfig" }
+        },
+        "required_capabilities": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "optional_capabilities": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "fallback_behavior": {
+          "type": "string",
+          "enum": ["show-static-preview", "show-message", "hide"]
+        }
+      }
+    },
+    "collaborationConfig": {
+      "type": "object",
+      "properties": {
+        "allow_annotations": { "type": "boolean" },
+        "annotation_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["comment", "highlight", "suggestion", "question", "bookmark"]
+          }
+        },
+        "track_changes": { "type": "boolean" },
+        "allow_replies": { "type": "boolean" }
+      }
+    },
+    "historyConfig": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "versions_file": { "type": "string" },
+        "snapshots_directory": { "type": "string" },
+        "retention_policy": {
+          "type": "string",
+          "enum": ["all", "major", "recent"]
+        },
+        "diff_format": {
+          "type": "string",
+          "enum": ["unified", "context"]
+        }
+      }
+    },
+    "securityConfig": {
+      "type": "object",
+      "properties": {
+        "integrity": {
+          "type": "object",
+          "properties": {
+            "algorithm": { "type": "string" },
+            "manifest_checksum": { "type": "string" }
+          }
+        },
+        "signature": {
+          "type": "object",
+          "properties": {
+            "signed_by": { "type": "string" },
+            "algorithm": { "type": "string" },
+            "certificate": { "type": "string" },
+            "signature": { "type": "string" }
+          }
+        },
+        "permissions": {
+          "type": "object",
+          "properties": {
+            "allow_external_links": { "type": "boolean" },
+            "allow_external_images": { "type": "boolean" },
+            "allow_scripts": { "type": "boolean" },
+            "script_sandbox": {
+              "type": "string",
+              "enum": ["strict", "relaxed", "none"]
+            }
+          }
+        }
+      }
+    },
+    "extensionConfig": {
+      "type": "object",
+      "required": ["version"],
+      "properties": {
+        "version": { "type": "string" },
+        "config": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}
