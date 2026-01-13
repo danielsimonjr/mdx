@@ -2660,8 +2660,6 @@ ${processedContent}
    * Escapes HTML special characters.
    */
   private escapeHTML(text: string): string {
-    const div = { textContent: text } as { textContent: string; innerHTML: string };
-    // Simple escape without DOM
     return text
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")

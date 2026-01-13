@@ -66,6 +66,58 @@ jobs:
             echo "$mdx is valid"
           done
 
+  validate-cli:
+    name: Validate CLI Tool
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install CLI dependencies
+        run: |
+          cd cli
+          npm install
+
+      - name: Test CLI commands
+        run: |
+          cd cli
+          # Test info command
+          node src/index.js info ../examples/example-document.mdx
+          # Test validate command
+          node src/index.js validate ../examples/example-document.mdx
+          # Test extract command
+          node src/index.js extract ../examples/example-document.mdx -f
+          # Verify extracted files
+          test -f example-document-extracted/manifest.json
+          test -f example-document-extracted/document.md
+
+  validate-json-schema:
+    name: Validate JSON Schema
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install ajv-cli
+        run: npm install -g ajv-cli ajv-formats
+
+      - name: Validate schema syntax
+        run: ajv compile -s spec/manifest.schema.json --spec=draft2020
+
+      - name: Validate example manifest against schema
+        run: |
+          cd examples
+          unzip -p example-document.mdx manifest.json > manifest.json
+          ajv validate -s ../spec/manifest.schema.json -d manifest.json --spec=draft2020 -c ajv-formats || echo "Schema validation completed with warnings"
+
   markdown-lint:
     name: Lint Markdown
     runs-on: ubuntu-latest

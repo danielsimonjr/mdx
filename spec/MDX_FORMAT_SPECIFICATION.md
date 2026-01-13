@@ -934,8 +934,25 @@ A conforming MDX viewer MUST:
 
 ## Appendix A: JSON Schema
 
-The complete JSON Schema for manifest.json will be published alongside this specification.
-*(Schema URL to be determined upon final release)*
+The complete JSON Schema for manifest.json validation is available at [`manifest.schema.json`](manifest.schema.json).
+
+**Schema ID**: `https://mdx-format.org/schemas/manifest.schema.json`
+
+**Usage**: Manifest files may reference the schema for validation:
+
+```json
+{
+  "$schema": "https://mdx-format.org/schemas/manifest.schema.json",
+  "mdx_version": "1.0.0",
+  ...
+}
+```
+
+The schema validates:
+- Required fields (`mdx_version`, `document`, `content`)
+- Document metadata (UUID format, ISO 8601 timestamps, SemVer versions)
+- Asset inventory structure with category-specific metadata
+- Configuration options for styles, rendering, collaboration, and history
 
 ## Appendix B: Examples
 

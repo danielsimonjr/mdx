@@ -9,13 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- JSON Schema for manifest validation (`spec/manifest.schema.json`)
+  - Full schema for all manifest fields and asset types
+  - Category-specific asset metadata validation
+  - Schema ID: `https://mdx-format.org/schemas/manifest.schema.json`
+
+- CLI `validate` command for document validation
+  - Validates ZIP structure and required files
+  - Checks manifest schema compliance
+  - Verifies asset inventory and checksums
+  - Detects common issues (orphaned assets, path issues, etc.)
+  - Returns exit code 1 on failure (CI/CD friendly)
+
 - Command-line interface (CLI) tool
   - `view` command - Open MDX documents in browser with full rendering
   - `extract` command - Extract archive contents to folder
   - `info` command - Display document metadata, assets, and content
   - `edit` command - Interactive terminal editor for metadata and content
   - `create` command - Create new documents from templates (blank, article, report, presentation)
+  - `validate` command - Validate document structure and manifest
   - Cross-platform executable builds via pkg
+
+- CI/CD pipeline enhancements
+  - CLI tool testing in GitHub Actions
+  - JSON Schema validation job
+  - Example document validation with CLI
 
 - Web-based WYSIWYG editor
   - Visual mode with live WYSIWYG editing
@@ -34,6 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Implementation guide: Corrected assets structure from array to object with category keys
+- Implementation guide: Updated validation example to iterate over asset categories
+- Implementation guide: Fixed reader/writer examples to use correct manifest structure
+- TypeScript: Removed dead code (unused `div` variable in `escapeHTML` method)
+- Specification: Updated Appendix A with actual JSON Schema reference
 - SVG images now render correctly in editor (added MIME type detection)
 - Python implementation no longer uses hardcoded paths
 - TypeScript `tracking_enabled` field renamed to `enabled` to match spec

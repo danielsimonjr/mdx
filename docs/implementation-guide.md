@@ -134,30 +134,37 @@ manifest = {
     },
     "content": {
         "entry_point": "document.md",
-        "word_count": 0,  # Calculate from content
-        "reading_time_minutes": 0
+        "encoding": "UTF-8",
+        "markdown_variant": "CommonMark"
     },
-    "assets": []  # Populate as you add assets
+    "assets": {
+        "images": [],
+        "video": [],
+        "audio": [],
+        "models": [],
+        "documents": [],
+        "data": [],
+        "fonts": [],
+        "other": []
+    }
 }
 ```
 
 ### Step 3: Register Assets
 
-For each asset, add an entry to `manifest.assets`:
+Assets are organized by category. Add entries to the appropriate category array:
 
 ```python
-asset_entry = {
+image_asset = {
     "path": "assets/images/figure.png",
-    "type": "image/png",
-    "size": 12345,  # bytes
-    "hash": "sha256:abc123...",  # optional but recommended
-    "metadata": {
-        "alt_text": "A diagram showing the architecture",
-        "width": 800,
-        "height": 600
-    }
+    "mime_type": "image/png",
+    "size_bytes": 12345,
+    "checksum": "sha256:abc123...",  # optional but recommended
+    "alt_text": "A diagram showing the architecture",
+    "width": 800,
+    "height": 600
 }
-manifest["assets"].append(asset_entry)
+manifest["assets"]["images"].append(image_asset)
 ```
 
 **Asset categories and their directories:**
@@ -236,9 +243,12 @@ def validate_mdx(path):
             errors.append(f"Entry point '{entry}' not found")
 
         # 5. Check all registered assets exist
-        for asset in manifest.get('assets', []):
-            if asset['path'] not in names:
-                errors.append(f"Asset '{asset['path']}' not found")
+        assets = manifest.get('assets', {})
+        for category, asset_list in assets.items():
+            if isinstance(asset_list, list):
+                for asset in asset_list:
+                    if asset.get('path') and asset['path'] not in names:
+                        errors.append(f"Asset '{asset['path']}' not found")
 
     return errors
 ```
@@ -364,12 +374,15 @@ def read_mdx(path):
         entry = manifest.get('content', {}).get('entry_point', 'document.md')
         content = mdx.read(entry).decode('utf-8')
 
-        # Read assets list
-        assets = {
-            a['path']: mdx.read(a['path'])
-            for a in manifest.get('assets', [])
-            if a['path'] in mdx.namelist()
-        }
+        # Read assets from all categories
+        assets = {}
+        asset_inventory = manifest.get('assets', {})
+        for category, asset_list in asset_inventory.items():
+            if isinstance(asset_list, list):
+                for asset in asset_list:
+                    asset_path = asset.get('path')
+                    if asset_path and asset_path in mdx.namelist():
+                        assets[asset_path] = mdx.read(asset_path)
 
         return {
             'manifest': manifest,
@@ -402,7 +415,27 @@ def write_mdx(path, title, content, assets=None):
         "content": {
             "entry_point": "document.md"
         },
-        "assets": []
+        "assets": {
+            "images": [],
+            "video": [],
+            "audio": [],
+            "models": [],
+            "documents": [],
+            "data": [],
+            "fonts": [],
+            "other": []
+        }
+    }
+
+    # Map extensions to categories
+    ext_to_category = {
+        '.png': 'images', '.jpg': 'images', '.jpeg': 'images',
+        '.gif': 'images', '.svg': 'images', '.webp': 'images',
+        '.mp4': 'video', '.webm': 'video',
+        '.mp3': 'audio', '.wav': 'audio', '.ogg': 'audio',
+        '.gltf': 'models', '.glb': 'models',
+        '.pdf': 'documents',
+        '.csv': 'data', '.json': 'data'
     }
 
     with zipfile.ZipFile(path, 'w', zipfile.ZIP_DEFLATED) as mdx:
@@ -411,10 +444,15 @@ def write_mdx(path, title, content, assets=None):
             with open(local_path, 'rb') as f:
                 data = f.read()
             mdx.writestr(archive_path, data)
-            manifest["assets"].append({
+
+            # Determine category from file extension
+            ext = '.' + archive_path.rsplit('.', 1)[-1].lower() if '.' in archive_path else ''
+            category = ext_to_category.get(ext, 'other')
+
+            manifest["assets"][category].append({
                 "path": archive_path,
-                "type": mime_type,
-                "size": len(data)
+                "mime_type": mime_type,
+                "size_bytes": len(data)
             })
 
         # Add manifest and content

@@ -67,6 +67,20 @@ Creates a new MDX document with templates:
 - `report` - Business report
 - `presentation` - Slide-style document
 
+### Validate - Validate Structure
+```bash
+mdx validate document.mdx
+mdx val document.mdx -v  # Verbose output
+```
+Validates the MDX document structure and manifest, checking for:
+- Required files (manifest.json, entry point)
+- Manifest schema compliance
+- Asset inventory correctness
+- Checksum verification
+- Common issues (backslashes, orphaned assets, etc.)
+
+Returns exit code 1 if validation fails (useful for CI/CD).
+
 ## Building Executable
 
 ```bash

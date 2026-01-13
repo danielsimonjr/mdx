@@ -173,6 +173,10 @@ mdx edit document.mdx
 # Create - Create new document from template
 mdx create
 mdx c "My Document" -t article -o my-doc.mdx
+
+# Validate - Check document structure
+mdx validate document.mdx
+mdx val document.mdx -v   # Verbose mode
 ```
 
 **Build Executable:**
