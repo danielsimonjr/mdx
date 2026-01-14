@@ -35,3 +35,5 @@ __pycache__/
 *.tmp
 *.temp
 tmpclaude-ffc2-cwd
+*.db-wal
+*.db-shm
