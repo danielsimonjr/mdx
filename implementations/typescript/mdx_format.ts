@@ -35,7 +35,7 @@ import JSZip from "jszip";
 // ============================================================================
 
 /** Current MDX specification version */
-export const MDX_VERSION = "1.0.0";
+export const MDX_VERSION = "1.1.0";
 
 /** MIME type for MDX container files */
 export const MDX_MIME_TYPE = "application/vnd.mdx-container+zip";
@@ -784,6 +784,23 @@ export interface CustomCSSProperties {
 }
 
 /**
+ * Alignment class definitions (v1.1).
+ * Maps class names to CSS style declarations.
+ */
+export interface AlignmentClasses {
+  /** CSS for left alignment */
+  "align-left"?: string;
+  /** CSS for center alignment */
+  "align-center"?: string;
+  /** CSS for right alignment */
+  "align-right"?: string;
+  /** CSS for justify alignment */
+  "align-justify"?: string;
+  /** Allow additional custom alignment classes */
+  [key: string]: string | undefined;
+}
+
+/**
  * Styles configuration section.
  */
 export interface StylesConfig {
@@ -795,6 +812,8 @@ export interface StylesConfig {
   syntax_highlighting?: string;
   /** Custom CSS properties */
   custom_properties?: CustomCSSProperties;
+  /** Alignment class definitions (v1.1) */
+  alignment_classes?: AlignmentClasses;
 }
 
 /**
@@ -838,6 +857,17 @@ export interface FootnotesConfig {
 }
 
 /**
+ * Attributes configuration (v1.1).
+ * Controls block attribute and alignment parsing behavior.
+ */
+export interface AttributesConfig {
+  /** Whether attribute parsing is enabled */
+  enabled?: boolean;
+  /** Whether inline styles are allowed in attributes */
+  allow_inline_styles?: boolean;
+}
+
+/**
  * Rendering configuration section.
  */
 export interface RenderingConfig {
@@ -851,6 +881,8 @@ export interface RenderingConfig {
   line_numbers?: LineNumbersConfig;
   /** Footnotes settings */
   footnotes?: FootnotesConfig;
+  /** Attributes configuration (v1.1) */
+  attributes?: AttributesConfig;
 }
 
 /**
@@ -2577,6 +2609,11 @@ export class MDXDocument {
             text-align: left;
         }
         th { background: #f5f5f5; }
+        /* v1.1 Alignment classes */
+        .align-left { text-align: left; }
+        .align-center { text-align: center; }
+        .align-right { text-align: right; }
+        .align-justify { text-align: justify; }
         ${customCSS}
     </style>
 </head>
@@ -2598,13 +2635,143 @@ ${processedContent}
     // Escape HTML entities first (except in code blocks)
     // This is simplified - real implementation needs better handling
 
-    // Headings
-    html = html.replace(/^######\s+(.+)$/gm, "<h6>$1</h6>");
-    html = html.replace(/^#####\s+(.+)$/gm, "<h5>$1</h5>");
-    html = html.replace(/^####\s+(.+)$/gm, "<h4>$1</h4>");
-    html = html.replace(/^###\s+(.+)$/gm, "<h3>$1</h3>");
-    html = html.replace(/^##\s+(.+)$/gm, "<h2>$1</h2>");
-    html = html.replace(/^#\s+(.+)$/gm, "<h1>$1</h1>");
+    // v1.1: Parse alignment shorthand notation {:.left}, {:.center}, {:.right}, {:.justify}
+    // These appear on a separate line before or after block elements
+    const alignmentShorthandRegex = /\{:\.(left|center|right|justify)\}/g;
+
+    // v1.1: Parse full attribute blocks {.class #id style="..."}
+    const attributeBlockRegex = /\{([^}]+)\}/g;
+
+    // Helper to extract alignment class from attribute string
+    const extractAlignmentClass = (
+      attrs: string
+    ): { alignment: string | null; classes: string[]; id: string | null } => {
+      let alignment: string | null = null;
+      const classes: string[] = [];
+      let id: string | null = null;
+
+      // Parse alignment shorthand :.left, :.center, etc.
+      const alignMatch = attrs.match(/:\.(left|center|right|justify)/);
+      if (alignMatch) {
+        alignment = `align-${alignMatch[1]}`;
+      }
+
+      // Parse classes .classname
+      const classMatches = attrs.matchAll(/\.([a-zA-Z][\w-]*)/g);
+      for (const match of classMatches) {
+        if (!match[0].startsWith(":.")) {
+          classes.push(match[1]);
+        }
+      }
+
+      // Parse ID #idname
+      const idMatch = attrs.match(/#([a-zA-Z][\w-]*)/);
+      if (idMatch) {
+        id = idMatch[1];
+      }
+
+      return { alignment, classes, id };
+    };
+
+    // v1.1: Process headings with alignment attributes
+    // Match heading followed by attribute block on same line or next line
+    html = html.replace(
+      /^(#{1,6})\s+(.+?)\s*(?:\{([^}]+)\})?$/gm,
+      (match, hashes, content, attrs) => {
+        const level = hashes.length;
+        let classAttr = "";
+        let idAttr = "";
+
+        if (attrs) {
+          const { alignment, classes, id } = extractAlignmentClass(attrs);
+          const allClasses = alignment ? [alignment, ...classes] : classes;
+          if (allClasses.length > 0) {
+            classAttr = ` class="${allClasses.join(" ")}"`;
+          }
+          if (id) {
+            idAttr = ` id="${id}"`;
+          }
+        }
+
+        return `<h${level}${idAttr}${classAttr}>${content.trim()}</h${level}>`;
+      }
+    );
+
+    // v1.1: Process paragraphs with alignment (handled later in paragraph section)
+
+    // v1.1: Process container blocks (:::: syntax)
+    // Container blocks apply alignment/attributes to all contained content
+    // Pattern: ::::{.align-center}\nContent\n::::
+    html = html.replace(
+      /^::::\s*(?:\{([^}]+)\})?\s*\n([\s\S]*?)^::::\s*$/gm,
+      (match, attrs, content) => {
+        let classAttr = "";
+        let idAttr = "";
+
+        if (attrs) {
+          const { alignment, classes, id } = extractAlignmentClass(attrs);
+          const allClasses = alignment ? [alignment, ...classes] : classes;
+          if (allClasses.length > 0) {
+            classAttr = ` class="${allClasses.join(" ")}"`;
+          }
+          if (id) {
+            idAttr = ` id="${id}"`;
+          }
+        }
+
+        // Wrap content in a div with the container attributes
+        return `<div${idAttr}${classAttr}>\n${content.trim()}\n</div>`;
+      }
+    );
+
+    // v1.1: Process directive container blocks (::::directive-name{attrs}\n...\n::::)
+    html = html.replace(
+      /^::::(\w+)(?:\s*\{([^}]+)\})?\s*\n([\s\S]*?)^::::\s*$/gm,
+      (match, directive, attrs, content) => {
+        let classAttr = "";
+
+        if (attrs) {
+          const { alignment, classes } = extractAlignmentClass(attrs);
+          const allClasses = alignment ? [alignment, ...classes] : classes;
+          if (allClasses.length > 0) {
+            classAttr = ` class="${allClasses.join(" ")}"`;
+          }
+        }
+
+        // Handle specific directive types
+        if (directive === "note") {
+          const typeMatch = attrs?.match(/type="(\w+)"/);
+          const noteType = typeMatch ? typeMatch[1] : "note";
+          const icons: Record<string, string> = {
+            note: "ℹ️",
+            warning: "⚠️",
+            tip: "💡",
+            danger: "🚫",
+            success: "✅",
+          };
+          const icon = icons[noteType] || "ℹ️";
+          return `<div${classAttr} role="note" aria-label="${noteType}">\n<strong>${icon} ${noteType.charAt(0).toUpperCase() + noteType.slice(1)}:</strong>\n${content.trim()}\n</div>`;
+        }
+
+        if (directive === "details") {
+          const summaryMatch = attrs?.match(/summary="([^"]+)"/);
+          const summary = summaryMatch ? summaryMatch[1] : "Details";
+          return `<details${classAttr}>\n<summary>${summary}</summary>\n${content.trim()}\n</details>`;
+        }
+
+        // Generic directive block
+        return `<div${classAttr} data-directive="${directive}">\n${content.trim()}\n</div>`;
+      }
+    );
+
+    // Headings (without attributes - already handled above, but keep for backward compat)
+    // Only process if not already converted
+    html = html.replace(/^######\s+([^<].+)$/gm, "<h6>$1</h6>");
+    html = html.replace(/^#####\s+([^<].+)$/gm, "<h5>$1</h5>");
+    html = html.replace(/^####\s+([^<].+)$/gm, "<h4>$1</h4>");
+    html = html.replace(/^###\s+([^<].+)$/gm, "<h3>$1</h3>");
+    html = html.replace(/^##\s+([^<].+)$/gm, "<h2>$1</h2>");
+    html = html.replace(/^#\s+([^<].+)$/gm, "<h1>$1</h1>");
 
     // Bold and italic
     html = html.replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>");
@@ -2630,14 +2797,56 @@ ${processedContent}
     html = html.replace(/^---+$/gm, "<hr>");
     html = html.replace(/^\*\*\*+$/gm, "<hr>");
 
-    // Blockquotes
-    html = html.replace(/^>\s+(.+)$/gm, "<blockquote>$1</blockquote>");
+    // Blockquotes with v1.1 alignment support
+    html = html.replace(
+      /^>\s+(.+?)\s*(?:\{([^}]+)\})?$/gm,
+      (match, content, attrs) => {
+        let classAttr = "";
+        if (attrs) {
+          const alignMatch = attrs.match(/:\.(left|center|right|justify)/);
+          if (alignMatch) {
+            classAttr = ` class="align-${alignMatch[1]}"`;
+          }
+        }
+        return `<blockquote${classAttr}>${content}</blockquote>`;
+      }
+    );
 
-    // Paragraphs (simplified)
+    // v1.1: Parse standalone alignment blocks that apply to next paragraph
+    // Pattern: {:.center}\n\nParagraph text
+    const alignmentBlockPattern = /^\{:\.(left|center|right|justify)\}\s*\n\n/gm;
+
+    // Paragraphs (simplified) with v1.1 alignment support
     const paragraphs = html.split(/\n\n+/);
+    let pendingAlignment: string | null = null;
+
     html = paragraphs
       .map((p) => {
         p = p.trim();
+
+        // Check for standalone alignment block
+        const alignBlockMatch = p.match(/^\{:\.(left|center|right|justify)\}$/);
+        if (alignBlockMatch) {
+          pendingAlignment = `align-${alignBlockMatch[1]}`;
+          return ""; // Remove the alignment block itself
+        }
+
+        // Check for inline alignment at end of paragraph
+        const inlineAlignMatch = p.match(/^(.+?)\s*\{:\.(left|center|right|justify)\}$/s);
+        if (inlineAlignMatch) {
+          const [, content, align] = inlineAlignMatch;
+          if (
+            !content.startsWith("<h") &&
+            !content.startsWith("<pre") &&
+            !content.startsWith("<hr") &&
+            !content.startsWith("<blockquote") &&
+            !content.startsWith("<ul") &&
+            !content.startsWith("<ol")
+          ) {
+            return `<p class="align-${align}">${content.trim().replace(/\n/g, "<br>")}</p>`;
+          }
+        }
+
         if (
           !p ||
           p.startsWith("<h") ||
@@ -2647,10 +2856,20 @@ ${processedContent}
           p.startsWith("<ul") ||
           p.startsWith("<ol")
         ) {
+          pendingAlignment = null;
           return p;
         }
+
+        // Apply pending alignment from previous block
+        if (pendingAlignment) {
+          const result = `<p class="${pendingAlignment}">${p.replace(/\n/g, "<br>")}</p>`;
+          pendingAlignment = null;
+          return result;
+        }
+
         return `<p>${p.replace(/\n/g, "<br>")}</p>`;
       })
+      .filter((p) => p !== "")
       .join("\n\n");
 
     return html;

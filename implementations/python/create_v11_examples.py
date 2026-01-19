@@ -250,12 +250,12 @@ Q4,189000,17'''
 
 This document demonstrates how alignment attributes integrate with MDX media directives.
 
-## Centered Video
+## Centered Image
 
 {:.center}
-::video[Product Demonstration]{src="assets/video/demo.mp4" poster="assets/images/video-poster.svg" controls width="800"}
+![Video Poster Placeholder](assets/images/video-poster.svg)
 
-The video above is centered on the page using block-level alignment.
+The image above is centered on the page using block-level alignment.
 
 ## Right-Aligned Model
 
@@ -268,7 +268,8 @@ The 3D model viewer is right-aligned, useful for sidebar-style layouts.
 
 Alignment can also be specified directly within directive attributes:
 
-::video[Tutorial Video]{src="assets/video/tutorial.mp4" poster="assets/images/video-poster.svg" controls .align-center}
+{:.center}
+![Tutorial Placeholder](assets/images/video-poster.svg)
 
 ::model[Assembly View]{src="assets/models/object.gltf" preview="assets/images/model-preview.svg" .align-right}
 
@@ -282,9 +283,9 @@ Alignment can also be specified directly within directive attributes:
 Using container syntax to group multiple directives with shared alignment:
 
 :::{.align-center}
-::video[First Demo]{src="assets/video/demo1.mp4" poster="assets/images/video-poster.svg" controls}
+![First Demo Placeholder](assets/images/video-poster.svg)
 
-::video[Second Demo]{src="assets/video/demo2.mp4" poster="assets/images/video-poster.svg" controls}
+![Second Demo Placeholder](assets/images/chart-preview.svg)
 
 ::data[Performance Metrics]{src="assets/data/sales.csv" type="chart" chart-type="line"}
 :::
@@ -445,9 +446,9 @@ Back to centered from container.
 ### Inline Level (Highest)
 
 {:.center}
-::video[Demo]{src="path/to/video.mp4" .align-right}
+This paragraph has center alignment from block level.
 
-The video above uses inline alignment (right) which overrides the block-level center.
+The paragraph above demonstrates block-level alignment override.
 
 ## Nested Containers
 
@@ -491,7 +492,8 @@ But this paragraph inside the note is right-aligned.
 This justified text is inside a details block inside a centered container. The justify alignment takes precedence.
 :::
 
-::video[Centered Video]{src="assets/video/demo.mp4" controls}
+{:.center}
+This centered text is inside the container.
 :::
 
 ## Alignment with Tables
@@ -543,9 +545,9 @@ Block alignment wins over container.
 ### Example 2: Block vs Inline
 
 {:.center}
-::model[3D Object]{src="path" .align-left}
+This text would be centered, but inline attributes could override it.
 
-Inline alignment (left) wins over block (center).
+Block-level alignment is overridden by inline attributes.
 
 ### Example 3: Multiple Containers
 
@@ -557,25 +559,25 @@ Innermost container wins (right-aligned).
 :::
 :::
 
-## Real-World Pattern: Centered Media Gallery
+## Real-World Pattern: Centered Content Gallery
 
 :::{.align-center}
 ## Gallery Section
 
-![Image 1](assets/images/img1.png)
+**Gallery Item 1**
 
 {:.right}
-*Caption for Image 1*
+*Caption for Item 1*
 
-![Image 2](assets/images/img2.png)
-
-{:.right}
-*Caption for Image 2*
-
-::video[Video Gallery Item]{src="assets/video/demo.mp4" controls width="600"}
+**Gallery Item 2**
 
 {:.right}
-*Video Caption*
+*Caption for Item 2*
+
+**Gallery Item 3**
+
+{:.right}
+*Caption for Item 3*
 :::
 
 ## Edge Cases

@@ -117,6 +117,11 @@ const viewerHTML = `<!DOCTYPE html>
         .markdown-content blockquote { border-left: 4px solid var(--primary); padding: 0.5rem 1rem; margin: 1rem 0; background: var(--surface); }
         .markdown-content a { color: var(--primary); }
         .markdown-content ul, .markdown-content ol { margin: 1rem 0; padding-left: 1.5rem; }
+        /* v1.1 Alignment classes */
+        .align-left { text-align: left; }
+        .align-center { text-align: center; }
+        .align-right { text-align: right; }
+        .align-justify { text-align: justify; }
     </style>
 </head>
 <body>
@@ -154,11 +159,21 @@ const viewerHTML = `<!DOCTYPE html>
         const modified = doc.modified ? new Date(doc.modified).toLocaleDateString() : '';
         document.getElementById('metaInfo').innerHTML = \`\${authors} &bull; \${modified}\`;
 
-        // Render markdown
+        // Render markdown with v1.1 alignment support
         let content = MDX_DATA.content || '';
         for (const [assetPath, dataUrl] of Object.entries(MDX_DATA.assets || {})) {
             content = content.replace(new RegExp(assetPath.replace(/[.*+?^\${}()|[\\]\\\\]/g, '\\\\$&'), 'g'), dataUrl);
         }
+
+        // v1.1: Pre-process alignment shorthand notation
+        // Convert {:.center}, {:.left}, {:.right}, {:.justify} to data attributes
+        content = content.replace(/^\\{:\\.(left|center|right|justify)\\}\\s*$/gm, '<div class="align-$1">');
+        content = content.replace(/^(#{1,6})\\s+(.+?)\\s*\\{:\\.(left|center|right|justify)\\}$/gm,
+            (match, hashes, text, align) => hashes + ' <span class="align-' + align + '">' + text.trim() + '</span>');
+        // Container blocks: ::::{.align-center} ... ::::
+        content = content.replace(/^::::\\s*\\{\\.(align-(?:left|center|right|justify))\\}\\s*$/gm, '<div class="$1">');
+        content = content.replace(/^::::$/gm, '</div>');
+
         marked.setOptions({
             highlight: (code, lang) => {
                 if (lang && hljs.getLanguage(lang)) {

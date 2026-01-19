@@ -227,8 +227,32 @@ class MDXViewer {
             breaks: false
         });
 
+        // v1.1: Pre-process alignment shorthand notation
+        let content = this.document.content;
+
+        // Process alignment shorthand {:.left}, {:.center}, etc.
+        content = content.replace(
+            /^\{:\.(left|center|right|justify)\}\s*$/gm,
+            '<div class="align-$1">'
+        );
+
+        // Process heading alignment
+        content = content.replace(
+            /^(#{1,6})\s+(.+?)\s*\{:\.(left|center|right|justify)\}$/gm,
+            (match, hashes, text, align) => {
+                return `${hashes} <span class="align-${align}">${text.trim()}</span>`;
+            }
+        );
+
+        // Process container blocks ::::{.align-center} ... ::::
+        content = content.replace(
+            /^::::\s*\{\.(align-(?:left|center|right|justify))\}\s*$/gm,
+            '<div class="$1">'
+        );
+        content = content.replace(/^::::$/gm, '</div>');
+
         // Render markdown
-        let html = marked.parse(this.document.content);
+        let html = marked.parse(content);
 
         // Set content
         this.elements.documentContent.innerHTML = html;

@@ -3,7 +3,7 @@
 **Markdown eXtended Container** - An open document format that packages Markdown content with embedded media into self-contained ZIP archives.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Specification](https://img.shields.io/badge/Spec-v1.0.0--Draft-orange.svg)](spec/MDX_FORMAT_SPECIFICATION.md)
+[![Specification](https://img.shields.io/badge/Spec-v1.1.0--Draft-orange.svg)](spec/MDX_FORMAT_SPECIFICATION_v1.1.md)
 
 ## Overview
 
@@ -15,6 +15,13 @@ MDX is a portable document format designed to bundle Markdown content with image
 - **Web Standards Alignment** - Standard MIME types, CommonMark Markdown, W3C Web Annotations
 - **Version Control Friendly** - Text-based manifest and Markdown enable meaningful diffs
 - **Collaboration Ready** - Built-in support for annotations, comments, and version history
+
+### What's New in v1.1
+
+- **Text Alignment** - Align paragraphs, headings, and blocks with shorthand syntax `{:.center}`, `{:.right}`, `{:.left}`, `{:.justify}`
+- **Block Attributes** - Apply CSS classes, IDs, and styles to any block element
+- **Container Blocks** - Group multiple elements with shared formatting using `::::` syntax
+- **Directive Containers** - Enhanced `::::note`, `::::details`, and other directive blocks
 
 ## File Structure
 
@@ -52,14 +59,17 @@ with zipfile.ZipFile('my-document.mdx', 'w', zipfile.ZIP_DEFLATED) as mdx:
     # Add manifest
     timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
     manifest = {
-        "mdx_version": "1.0.0",
+        "mdx_version": "1.1.0",
         "document": {
             "title": "My Document",
             "id": str(uuid.uuid4()),  # UUID v4 required
             "created": timestamp,
             "modified": timestamp
         },
-        "content": {"entry_point": "document.md"}
+        "content": {
+            "entry_point": "document.md",
+            "extensions": ["tables", "attributes", "alignment"]
+        }
     }
     mdx.writestr('manifest.json', json.dumps(manifest, indent=2))
 
@@ -114,15 +124,23 @@ mdx/
 ├── chrome-extension/              # Chrome browser extension
 │   └── manifest.json
 ├── examples/                      # Example MDX documents
-│   └── example-document.mdx
+│   ├── example-document.mdx       # Basic example
+│   ├── alignment-basic.mdx        # v1.1 alignment examples
+│   ├── alignment-directives.mdx   # v1.1 alignment with directives
+│   ├── alignment-complex.mdx      # v1.1 nested containers
+│   └── technical-doc.mdx          # Real-world technical documentation
+├── tests/                         # Conformance test files
+│   └── alignment/                 # v1.1 alignment tests
 └── .github/                       # GitHub templates & CI
 ```
 
 ## Specification
 
-The complete specification is available at [spec/MDX_FORMAT_SPECIFICATION.md](spec/MDX_FORMAT_SPECIFICATION.md).
+The complete specification is available at:
+- **v1.1** (Current): [spec/MDX_FORMAT_SPECIFICATION_v1.1.md](spec/MDX_FORMAT_SPECIFICATION_v1.1.md)
+- **v1.0**: [spec/MDX_FORMAT_SPECIFICATION.md](spec/MDX_FORMAT_SPECIFICATION.md)
 
-**Current Version:** 1.0.0 (Draft)
+**Current Version:** 1.1.0 (Draft)
 
 **MIME Type:** `application/vnd.mdx-container+zip`
 
@@ -152,6 +170,19 @@ MDX supports CommonMark 0.31+ with extensions:
 ::audio[Narration]{src="assets/audio/narration.mp3" controls}
 ::model[3D Part]{src="assets/models/part.gltf" camera="front" controls}
 ::data[Results]{src="assets/data/results.csv" visualization="chart" type="bar"}
+
+<!-- v1.1: Text alignment -->
+{:.center}
+This paragraph is centered.
+
+## Centered Heading {:.center}
+
+<!-- v1.1: Container blocks -->
+::::{.align-center}
+Multiple paragraphs can share the same alignment.
+
+All content in this container is centered.
+::::
 ```
 
 ## Tools

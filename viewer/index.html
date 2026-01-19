@@ -341,6 +341,12 @@
         border-color: var(--success);
     }
 
+    /* v1.1 Alignment classes */
+    .align-left { text-align: left; }
+    .align-center { text-align: center; }
+    .align-right { text-align: right; }
+    .align-justify { text-align: justify; }
+
     /* Right Panel */
     .right-panel {
         width: 300px;
@@ -887,7 +893,36 @@
         }
 
         processDirectives(content) {
-            // Process :::note blocks
+            // v1.1: Process alignment shorthand notation {:.left}, {:.center}, etc.
+            content = content.replace(
+                /^\{:\.(left|center|right|justify)\}\s*$/gm,
+                '<div class="align-$1">'
+            );
+
+            // v1.1: Process heading alignment
+            content = content.replace(
+                /^(#{1,6})\s+(.+?)\s*\{:\.(left|center|right|justify)\}$/gm,
+                (match, hashes, text, align) => {
+                    return `${hashes} <span class="align-${align}">${text.trim()}</span>`;
+                }
+            );
+
+            // v1.1: Process container blocks ::::{.align-center} ... ::::
+            content = content.replace(
+                /^::::\s*\{\.(align-(?:left|center|right|justify))\}\s*$/gm,
+                '<div class="$1">'
+            );
+            content = content.replace(/^::::$/gm, '</div>');
+
+            // v1.1: Process ::::note blocks with 4 colons
+            content = content.replace(
+                /::::note\{type="(\w+)"\}([\s\S]*?)::::/g,
+                (match, type, body) => {
+                    return `<div class="admonition admonition-${type}">${marked.parse(body.trim())}</div>`;
+                }
+            );
+
+            // Process :::note blocks (v1.0 compat with 3 colons)
             content = content.replace(
                 /:::note\{type="(\w+)"\}([\s\S]*?):::/g,
                 (match, type, body) => {

@@ -353,6 +353,12 @@
             margin: 2rem 0;
         }
 
+        /* v1.1 Alignment classes */
+        .align-left, [style*="text-align: left"] { text-align: left; }
+        .align-center, [style*="text-align: center"] { text-align: center; }
+        .align-right, [style*="text-align: right"] { text-align: right; }
+        .align-justify, [style*="text-align: justify"] { text-align: justify; }
+
         /* Source Editor */
         .source-editor {
             flex: 1;
@@ -578,6 +584,13 @@
                 <button class="tool-btn" data-cmd="insertOrderedList" title="Numbered List"><i class="fas fa-list-ol"></i></button>
                 <button class="tool-btn" id="btnTaskList" title="Task List"><i class="fas fa-tasks"></i></button>
             </div>
+            <!-- v1.1: Alignment buttons -->
+            <div class="toolbar-group">
+                <button class="tool-btn" data-cmd="justifyLeft" title="Align Left"><i class="fas fa-align-left"></i></button>
+                <button class="tool-btn" data-cmd="justifyCenter" title="Align Center"><i class="fas fa-align-center"></i></button>
+                <button class="tool-btn" data-cmd="justifyRight" title="Align Right"><i class="fas fa-align-right"></i></button>
+                <button class="tool-btn" data-cmd="justifyFull" title="Justify"><i class="fas fa-align-justify"></i></button>
+            </div>
             <div class="toolbar-group">
                 <button class="tool-btn" id="btnLink" title="Insert Link"><i class="fas fa-link"></i></button>
                 <button class="tool-btn" id="btnImage" title="Insert Image"><i class="fas fa-image"></i></button>
@@ -801,12 +814,40 @@
                 codeBlockStyle: 'fenced'
             });
 
+            // v1.1: Add alignment rule to Turndown
+            this.turndown.addRule('alignment', {
+                filter: function (node) {
+                    const style = node.getAttribute('style') || '';
+                    return style.includes('text-align');
+                },
+                replacement: function (content, node) {
+                    const style = node.getAttribute('style') || '';
+                    let align = '';
+                    if (style.includes('text-align: center')) align = 'center';
+                    else if (style.includes('text-align: right')) align = 'right';
+                    else if (style.includes('text-align: justify')) align = 'justify';
+                    else if (style.includes('text-align: left')) align = 'left';
+
+                    if (align && content.trim()) {
+                        // For block elements, add alignment attribute
+                        const tagName = node.tagName.toLowerCase();
+                        if (['p', 'div'].includes(tagName)) {
+                            return `{:.${align}}\n${content}\n\n`;
+                        } else if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName)) {
+                            const level = tagName.charAt(1);
+                            return `${'#'.repeat(parseInt(level))} ${content.trim()} {:.${align}}\n\n`;
+                        }
+                    }
+                    return content;
+                }
+            });
+
             this.init();
         }
 
         createDefaultManifest() {
             return {
-                mdx_version: '1.0.0',
+                mdx_version: '1.1.0',
                 document: {
                     id: crypto.randomUUID(),
                     title: 'Untitled Document',
@@ -820,9 +861,23 @@
                     entry_point: 'document.md',
                     encoding: 'UTF-8',
                     markdown_variant: 'CommonMark',
-                    extensions: ['tables', 'footnotes', 'task-lists', 'strikethrough']
+                    extensions: ['tables', 'footnotes', 'task-lists', 'strikethrough', 'attributes', 'alignment']
                 },
-                assets: { images: [], video: [], audio: [], data: [], models: [] }
+                assets: { images: [], video: [], audio: [], data: [], models: [] },
+                styles: {
+                    alignment_classes: {
+                        'align-left': 'text-align: left;',
+                        'align-center': 'text-align: center;',
+                        'align-right': 'text-align: right;',
+                        'align-justify': 'text-align: justify;'
+                    }
+                },
+                rendering: {
+                    attributes: {
+                        enabled: true,
+                        allow_inline_styles: true
+                    }
+                }
             };
         }
 

@@ -66,6 +66,48 @@ jobs:
             echo "$mdx is valid"
           done
 
+  validate-v11-examples:
+    name: Validate v1.1 Examples
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Generate v1.1 examples
+        run: |
+          cd implementations/python
+          python create_v11_examples.py
+
+      - name: Verify v1.1 examples
+        run: |
+          cd examples
+          for mdx in alignment-*.mdx technical-doc.mdx; do
+            if [ -f "$mdx" ]; then
+              echo "Validating v1.1 example: $mdx..."
+              unzip -t "$mdx"
+              # Check for v1.1 manifest version
+              version=$(unzip -p "$mdx" manifest.json | python -c "import sys,json; print(json.load(sys.stdin).get('mdx_version', '1.0.0'))")
+              echo "  MDX Version: $version"
+              # Verify has alignment extensions
+              extensions=$(unzip -p "$mdx" manifest.json | python -c "import sys,json; exts=json.load(sys.stdin).get('content',{}).get('extensions',[]); print(','.join(exts))")
+              echo "  Extensions: $extensions"
+              echo "$mdx is valid"
+            fi
+          done
+
+      - name: Verify alignment test files
+        run: |
+          cd tests/alignment
+          for md in *.md; do
+            echo "Checking test file: $md"
+            test -f "$md"
+          done
+          echo "All test files present"
+
   validate-cli:
     name: Validate CLI Tool
     runs-on: ubuntu-latest

@@ -143,17 +143,33 @@ Standard Markdown tables:
 
 ## Callouts
 
-:::note{type="info"}
+::::note{type="info"}
 **Information**: MDX supports callout blocks for highlighting important content.
-:::
+::::
 
-:::note{type="warning"}
+::::note{type="warning"}
 **Warning**: Always validate MDX documents before distribution.
-:::
+::::
 
-:::note{type="tip"}
+::::note{type="tip"}
 **Tip**: Use the CLI tools to quickly create and inspect MDX files.
-:::
+::::
+
+## Text Alignment (v1.1)
+
+MDX 1.1 introduces text alignment using block attributes:
+
+{:.center}
+This paragraph is centered using the shorthand `{:.center}` notation.
+
+{:.right}
+This paragraph is right-aligned using `{:.right}`.
+
+::::{.align-center}
+Container blocks can apply alignment to multiple elements.
+
+All content within this container is centered.
+::::
 
 ## Mathematical Content
 
@@ -334,6 +350,12 @@ blockquote {
 .note-warning { background: #fffbeb; border-color: #f59e0b; }
 .note-tip { background: #f0fdf4; border-color: #22c55e; }
 
+/* v1.1: Alignment classes */
+.align-left { text-align: left; }
+.align-center { text-align: center; }
+.align-right { text-align: right; }
+.align-justify { text-align: justify; }
+
 @media print {
   body { font-size: 11pt; }
   pre { white-space: pre-wrap; }
@@ -349,7 +371,7 @@ blockquote {
     timestamp = iso_timestamp()
     
     manifest = {
-        "mdx_version": "1.0.0",
+        "mdx_version": "1.1.0",
         "document": {
             "id": doc_id,
             "title": "MDX Format Demonstration Document",
@@ -368,7 +390,8 @@ blockquote {
             "entry_point": "document.md",
             "encoding": "UTF-8",
             "markdown_variant": "CommonMark",
-            "extensions": ["tables", "footnotes", "task-lists", "math", "strikethrough"]
+            # v1.1: Added "attributes" and "alignment" extensions
+            "extensions": ["tables", "footnotes", "task-lists", "math", "strikethrough", "attributes", "alignment"]
         },
         "assets": {
             "images": [
@@ -411,11 +434,23 @@ blockquote {
         },
         "styles": {
             "theme": "styles/theme.css",
-            "syntax_highlighting": "github-dark"
+            "syntax_highlighting": "github-dark",
+            # v1.1: Alignment class definitions
+            "alignment_classes": {
+                "align-left": "text-align: left;",
+                "align-center": "text-align: center;",
+                "align-right": "text-align: right;",
+                "align-justify": "text-align: justify;"
+            }
         },
         "rendering": {
             "math_renderer": "katex",
-            "table_of_contents": {"enabled": True, "depth": 3}
+            "table_of_contents": {"enabled": True, "depth": 3},
+            # v1.1: Attributes configuration
+            "attributes": {
+                "enabled": True,
+                "allow_inline_styles": True
+            }
         },
         "collaboration": {
             "allow_annotations": True,
@@ -541,7 +576,7 @@ blockquote {
         # Annotations
         zf.writestr('annotations/annotations.json', json.dumps(annotations, indent=2))
     
-    print(f"✓ Created: {output_path}")
+    print(f"[OK] Created: {output_path}")
     
     # ========================================================================
     # 8. Also extract to directory for inspection
@@ -553,7 +588,7 @@ blockquote {
     with zipfile.ZipFile(output_path, 'r') as zf:
         zf.extractall(extract_path)
     
-    print(f"✓ Extracted to: {extract_path}")
+    print(f"[OK] Extracted to: {extract_path}")
     
     # Print summary
     print("\nDocument Summary:")

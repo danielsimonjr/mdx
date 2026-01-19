@@ -140,6 +140,19 @@ async function infoCommand(file, options) {
             features.push(`📝 Extensions: ${manifest.content.extensions.join(', ')}`);
         }
 
+        // v1.1: Show alignment and attributes info
+        if (manifest.styles?.alignment_classes) {
+            const alignClasses = Object.keys(manifest.styles.alignment_classes);
+            features.push(`📐 Alignment: ${alignClasses.join(', ')}`);
+        }
+        if (manifest.rendering?.attributes?.enabled) {
+            let attrInfo = '📋 Attributes: enabled';
+            if (manifest.rendering.attributes.allow_inline_styles) {
+                attrInfo += ' (inline styles allowed)';
+            }
+            features.push(attrInfo);
+        }
+
         if (features.length > 0) {
             features.forEach(f => console.log(`  ${f}`));
         } else {
