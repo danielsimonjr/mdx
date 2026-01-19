@@ -234,7 +234,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["tables", "footnotes", "task-lists", "math", "strikethrough", "autolinks", "definition-lists"]
+            "enum": ["tables", "footnotes", "task-lists", "math", "strikethrough", "autolinks", "definition-lists", "attributes", "alignment"]
           },
           "description": "Enabled Markdown extensions"
         },
@@ -485,6 +485,17 @@
         "custom_properties": {
           "type": "object",
           "additionalProperties": { "type": "string" }
+        },
+        "alignment_classes": {
+          "type": "object",
+          "description": "Custom CSS for alignment classes (v1.1+)",
+          "additionalProperties": { "type": "string" },
+          "properties": {
+            "align-left": { "type": "string", "default": "text-align: left;" },
+            "align-center": { "type": "string", "default": "text-align: center;" },
+            "align-right": { "type": "string", "default": "text-align: right;" },
+            "align-justify": { "type": "string", "default": "text-align: justify;" }
+          }
         }
       }
     },
@@ -533,6 +544,22 @@
             "style": {
               "type": "string",
               "enum": ["end-of-document", "end-of-section", "inline"]
+            }
+          }
+        },
+        "attributes": {
+          "type": "object",
+          "description": "Block attribute settings (v1.1+)",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enable block-level attributes"
+            },
+            "allow_inline_styles": {
+              "type": "boolean",
+              "default": false,
+              "description": "Allow inline CSS in attributes"
             }
           }
         }

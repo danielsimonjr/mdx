@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- MDX Format Specification v1.1.0 Draft (`spec/MDX_FORMAT_SPECIFICATION_v1.1.md`)
+  - Text alignment and block attribute system (Section 4.4)
+  - Shorthand alignment notation (`{:.center}`, `{:.right}`, etc.)
+  - Directive block container syntax (`:::`)
+  - Attribute precedence rules (inline > block > container)
+  - Alignment integration with existing directives
+  - New capability Level 4 "Advanced" for alignment support
+  - Inline styles security considerations (Section 7.5)
+
+- v1.1 Example documents
+  - `examples/alignment-basic.mdx` - Basic alignment demonstrations
+  - `examples/alignment-directives.mdx` - Alignment with media directives
+  - `examples/alignment-complex.mdx` - Nested containers and precedence
+  - `examples/technical-doc.mdx` - Real-world technical documentation
+
+- Alignment conformance test suite (`tests/alignment/`)
+  - 10 test files covering all alignment scenarios
+  - Tests for basic alignment, headings, lists, blockquotes
+  - Tests for directive integration and container blocks
+  - Tests for attribute precedence and conflict resolution
+  - Tests for malformed syntax and backward compatibility
+
+- JSON Schema v1.1 updates (`spec/manifest.schema.json`)
+  - Added `attributes` and `alignment` to extensions enum
+  - Added `alignment_classes` to styles configuration
+  - Added `attributes` section to rendering configuration
+
+- Python script to generate v1.1 examples (`implementations/python/create_v11_examples.py`)
+
 - JSON Schema for manifest validation (`spec/manifest.schema.json`)
   - Full schema for all manifest fields and asset types
   - Category-specific asset metadata validation

@@ -4,14 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-MDX (Markdown eXtended Container) is a draft specification (v1.0.0) for an open document format that packages Markdown content with embedded media into self-contained ZIP archives.
+MDX (Markdown eXtended Container) is a draft specification for an open document format that packages Markdown content with embedded media into self-contained ZIP archives. The current version is v1.1.0 (draft), which adds text alignment and block attribute support.
 
 ## Repository Structure
 
 ```
 mdx/
 ├── spec/                              # Specification documents
-│   └── MDX_FORMAT_SPECIFICATION.md   # Complete formal specification
+│   ├── MDX_FORMAT_SPECIFICATION.md   # v1.0 formal specification
+│   ├── MDX_FORMAT_SPECIFICATION_v1.1.md  # v1.1 with alignment features
+│   └── manifest.schema.json          # JSON Schema for manifest validation
 ├── implementations/                   # Reference implementations
 │   ├── typescript/
 │   │   └── mdx_format.ts             # TypeScript implementation (2,700+ lines)
@@ -26,8 +28,16 @@ mdx/
 │   └── index.html                    # Web-based WYSIWYG editor
 ├── viewer/
 │   └── index.html                    # Web-based MDX viewer (read-only)
-├── examples/
-│   └── example-document.mdx          # Working example
+├── chrome-extension/                  # Chrome browser extension
+│   └── manifest.json
+├── examples/                          # Example MDX documents
+│   ├── example-document.mdx          # Basic working example
+│   ├── alignment-basic.mdx           # v1.1 basic alignment
+│   ├── alignment-directives.mdx      # v1.1 alignment with media
+│   ├── alignment-complex.mdx         # v1.1 nested containers
+│   └── technical-doc.mdx             # v1.1 technical documentation
+├── tests/
+│   └── alignment/                    # v1.1 conformance tests
 └── .github/                          # GitHub templates & CI
 ```
 
@@ -45,6 +55,7 @@ node src/index.js extract document.mdx    # Extract contents
 node src/index.js info document.mdx       # Show metadata
 node src/index.js edit document.mdx       # Interactive editor
 node src/index.js create                  # Create new document
+node src/index.js validate document.mdx   # Validate structure
 
 # Build standalone executable
 npm run build          # Windows x64
@@ -86,6 +97,8 @@ The GitHub Actions workflow (`ci.yml`) runs:
 - TypeScript type checking
 - Python syntax validation and example generation
 - MDX structure validation (manifest.json, document.md present)
+- JSON Schema validation of manifests
+- CLI command tests (info, validate, extract)
 - Markdown linting
 
 ## Architecture
@@ -150,6 +163,7 @@ Node.js command-line tool using Commander.js and Inquirer.js.
 - `info <file>` - Displays metadata, assets, content in terminal
 - `edit <file>` - Interactive terminal editor (inquirer-based)
 - `create [title]` - Creates new MDX from templates (blank, article, report, presentation)
+- `validate <file>` - Validates MDX structure and manifest against JSON Schema
 
 **Dependencies:** commander, inquirer, adm-zip, marked, marked-terminal, chalk (v4.x for CommonJS), open, ora
 
@@ -174,6 +188,19 @@ Single-file browser-based WYSIWYG editor (`editor/index.html`).
 - `updateAssetReferences()` - Replaces asset paths with blob URLs (with MIME types)
 - `getMimeType(path)` - Returns correct MIME type for blob creation
 
+### Chrome Extension
+
+Native Chrome extension for viewing MDX files directly in the browser without a server.
+
+**Setup:**
+```bash
+cd chrome-extension
+node setup.js              # Download dependencies
+# Load unpacked extension via chrome://extensions
+```
+
+**Features:** Document outline navigation, export to HTML/Markdown/JSON, syntax highlighting
+
 ## Key Standards
 
 - **Markdown:** CommonMark 0.31+ with extensions (tables, footnotes, math, task lists)
@@ -191,6 +218,30 @@ Beyond standard Markdown, MDX supports directives for:
 - `::embed[src]` - PDFs and documents
 - `::data[src]` - Data visualization (CSV, JSON)
 - `::figure`, `::note`, `::details`, `::toc` - Document structure
+
+## v1.1 Alignment Features
+
+MDX v1.1 adds text alignment and block attributes:
+
+**Shorthand alignment:**
+```markdown
+{:.center}
+This paragraph is centered.
+
+{:.right}
+This is right-aligned.
+```
+
+**Container blocks:**
+```markdown
+:::{.align-center}
+All content in this container is centered.
+:::
+```
+
+**Alignment classes:** `.align-left`, `.align-center`, `.align-right`, `.align-justify`
+
+**Precedence:** inline attributes > block attributes > container attributes
 
 ## Design Principles
 
