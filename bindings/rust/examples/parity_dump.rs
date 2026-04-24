@@ -156,9 +156,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         secmap.insert("signatures".into(), Value::Array(sigs));
         if let Some(ic) = &sec.integrity {
             let mut io = Map::new();
-            if let Some(a) = &ic.algorithm {
-                io.insert("algorithm".into(), json!(a));
-            }
+            io.insert("algorithm".into(), json!(ic.algorithm));
             if let Some(c) = &ic.manifest_checksum {
                 io.insert("manifest_checksum".into(), json!(c));
             }
