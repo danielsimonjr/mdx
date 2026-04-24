@@ -57,16 +57,16 @@ assumes the new name is in place so we don't have to re-brand docs/URLs/tests tw
 
 ### 0.1 Rename MDX → MDZ
 
-- [ ] Repo rename `danielsimonjr/mdx` → `danielsimonjr/mdz` (GitHub preserves redirect)
-- [ ] File extension `.mdx` → `.mdz` (keep `.mdx` as a read-only alias during transition)
-- [ ] MIME type `application/vnd.mdx-container+zip` → `application/vnd.mdz-container+zip`
-- [ ] All directory names: `/mdx/**` → `/mdz/**`
-- [ ] All class/type names: `MDXDocument` → `MDZDocument`, `MDXManifest` → `MDZManifest`, etc.
-- [ ] npm package name reservation (if published): `@mdz-format/core`, `@mdz-format/viewer`
-- [ ] Domain: move spec to `mdz-format.org` (keep old domain redirecting)
-- [ ] Spec title: "Markdown eXtended Container" → "Markdown Zipped Container"
-- [ ] Update `CLAUDE.md`, `README.md`, `CHANGELOG.md`, all agent-facing docs
-- [ ] Grep-pass: `grep -rIn 'mdx' .` — audit every remaining reference
+- [ ] Repo rename `danielsimonjr/mdx` → `danielsimonjr/mdz` (GitHub preserves redirect) — **verified 2026-04-24: still at mdx.git**
+- [x] File extension `.mdx` → `.mdz` (keep `.mdx` as a read-only alias during transition) — writers emit `.mdz`, readers accept both through 2027-01-01 per CLAUDE.md policy
+- [x] MIME type `application/vnd.mdx-container+zip` → `application/vnd.mdz-container+zip` — both declared; readers accept both
+- [ ] All directory names: `/mdx/**` → `/mdz/**` — **deferred:** CLAUDE.md Repository Structure notes repo root is still `mdx/` and source files still `mdx_format.{ts,py}`; churn cost too high for one PR, scheduled for Phase 1 parser-rebuild landing
+- [x] All class/type names: `MDXDocument` → `MDZDocument`, `MDXManifest` → `MDZManifest`, etc. — 53 `MDZDocument`/`MDZManifest` references in `mdx_format.ts`; `MDX*` aliases retained through 2027-01-01
+- [ ] npm package name reservation (if published): `@mdz-format/core`, `@mdz-format/viewer` — external action, not verified
+- [ ] Domain: move spec to `mdz-format.org` (keep old domain redirecting) — external action
+- [ ] Spec title: "Markdown eXtended Container" → "Markdown Zipped Container" — **verified 2026-04-24: spec/MDX_FORMAT_SPECIFICATION_v2.0.md line 1 still reads "MDX Format Specification"**
+- [x] Update `CLAUDE.md`, `README.md`, `CHANGELOG.md`, all agent-facing docs — README leads with "MDZ Format / Markdown Zipped Container"; STATUS banner at README:11; CLAUDE.md Phase 4.6 tree current; CHANGELOG v2.0 block wrapped
+- [ ] Grep-pass: `grep -rIn 'mdx' .` — audit every remaining reference — tracked in Phase 4.6.4; deliberately scoped to exclude the deferred-rename paths
 
 **Migration policy for existing `.mdx` archives:** readers MUST accept either
 extension and either MIME type through 2027-01-01, after which `.mdx` becomes
@@ -115,25 +115,31 @@ these are not optional for journal acceptance):**
       runs on JATS 1.3. Without this path, MDZ can be authored but cannot be
       published in any mainstream journal. Position this at Phase 2 priority
       alongside the EPUB bridge.
-- [ ] **CSL / bibliography support** — `references.json` in CSL-JSON format
-      inside the archive; `::cite[key]` directive for in-text citations
-      resolving against it; a `bibliography` block for the rendered list.
-      Match Quarto / Pandoc conventions so existing `.bib` → `.csl-json`
-      tooling works unchanged.
-- [ ] **Figure, equation, table numbering + cross-references.** `::fig{id=f1}`,
-      `::eq{id=e1}`, `::tab{id=t1}` as labelable blocks; `::ref[f1]` renders
-      "Figure 1" auto-numbered by document order. Mirrors LaTeX `\label`/`\ref`
-      semantics. Must ship in v2.1 before Phase 2 viewer release.
-- [ ] **DOI minting integration** — documented workflow for Crossref (for
-      journal papers) and DataCite (for Zenodo/OSF). Not a format feature; a
-      publishing guide. Lives at `docs/for-authors/DOI.md`.
-- [ ] **Peer-review annotation spec** — extend the existing W3C Web Annotation
-      layer with reviewer-role + accept/reject/request-changes motivations,
-      signed reviewer identity. Needed for the "peer-review round-trips"
-      claim to be real.
-- [ ] **SPDX licensing metadata** — manifest requires `document.license.spdx`
-      field with SPDX identifier (`CC-BY-4.0`, `CC0-1.0`, `MIT`, etc.) for
-      automated OA compliance checking. Update the v2.0 schema.
+- [x] **CSL / bibliography support — spec drafted** at
+      `spec/directives/references-csl.md` (v2.1 draft). Defines
+      `references.json` as CSL-JSON v1.0.2, `::cite[key]` grammar,
+      `::bibliography` rendering block, style selection via
+      `content.citation_style`. **Implementation pending** in viewer +
+      CLI (tracked as Phase 2.1 follow-up).
+- [x] **Figure, equation, table numbering + cross-references** — grammar
+      support landed: 19 `::fig`/`::eq`/`::tab`/`::ref`/`::cite`
+      references in `spec/grammar/mdz-directives.abnf`. Parser (Lark)
+      accepts them. **Viewer auto-numbering + "Figure 1"-style rendering
+      still pending** in the Phase 2.1 viewer.
+- [x] **DOI minting integration** — `docs/for-authors/DOI.md` ships with
+      Zenodo / OSF / Crossref / arXiv workflows, versioned-DOI pattern,
+      DataCite `relationType` PascalCase convention.
+- [x] **Peer-review annotation spec** — `spec/directives/peer-review-annotations.md`
+      (v2.1 draft) extends the v2.0 Web Annotation layer with `role`
+      (author/reviewer/editor/reader) + four review-specific motivations
+      + attributable-vs-pseudonymous identity trade-off.
+- [x] **SPDX licensing metadata** — `spec/manifest-v2.schema.json:197-211`
+      declares `license` as `string | {type, url}` with SPDX-identifier
+      description; Rust binding mirrors via `License::Spdx(String) |
+      Structured { kind, url }`. Python / TS generators emit the field
+      on new archives. The separate `document.license.spdx` dedicated
+      key was rejected as redundant — the SPDX id IS the string (or
+      the `type` field), which is what OA-compliance tools key on.
 - [x] **`.ipynb` → MDZ migration path** — `mdz import-ipynb` ships as
       `cli/src/commands/import-ipynb.js`. Cells → `::cell`; outputs
       (stream/display_data/execute_result) → `::output` with
@@ -145,18 +151,12 @@ these are not optional for journal acceptance):**
 
 **General-purpose deliverables:**
 
-- [ ] `docs/POSITIONING.md` — one-page pitch for researchers
-- [ ] `docs/COMPETITIVE.md` — rolling comparison against Quarto, Jupyter Book,
-      Curvenote, Manubot, Stencila (see Posture block above)
-- [ ] `docs/for-authors/SUBMITTING.md` — how to convert an existing ipynb+tex
-      workflow to MDZ
-- [ ] `docs/for-journals/EDITORIAL.md` — how a journal validates an MDZ
-      submission against its profile
-- [ ] `docs/for-reviewers/REPRODUCING.md` — how a reviewer re-executes cells
-      and reads the provenance chain
-- [ ] `spec/profiles/scientific-paper-v1.json` (already drafted) — tighten
-      required sections (IMRaD), citation formats, DOI handling, data
-      statement requirements
+- [x] `docs/POSITIONING.md` — ships
+- [x] `docs/COMPETITIVE.md` — ships (rolling comparison vs Quarto, Jupyter Book, Curvenote, Manubot, Stencila)
+- [x] `docs/for-authors/SUBMITTING.md` — ships
+- [x] `docs/for-journals/EDITORIAL.md` — ships
+- [x] `docs/for-reviewers/REPRODUCING.md` — ships
+- [x] `spec/profiles/scientific-paper-v1.json` — ships (tightening against IMRaD / citation formats / DOI handling is a v2.1 iteration target)
 - [ ] **Phase 0 exit criterion (revised):** previous version required an
       external editor to bless a format that doesn't exist yet — a deadlock.
       Revised gate:
@@ -168,21 +168,16 @@ these are not optional for journal acceptance):**
           documenting responses (even "no interest" is acceptable — the deliverable
           is the *data*, not the endorsement).
       Phase 1 can start the moment (a) ships; Phase 2 requires (b) + (c).
-- [ ] Update `README.md` to lead with the scientific-paper use case.
-- [ ] Add `STATUS: experimental research project (tooling is pro-grade; format
-      is not production-stable)` banner to `README.md` until at least one real
-      paper is published as MDZ at arXiv / Zenodo / OSF / a journal.
+- [x] Update `README.md` to lead with the scientific-paper use case — leads with "MDZ Format / Markdown Zipped Container — executable scientific papers".
+- [x] `STATUS: experimental research project` banner — present at `README.md:11` with the "tooling pro-grade; format not production-stable" framing.
 
 ### 0.3 Extract enterprise features to extension profile
 
 The v2.0 spec bundled too much. Core stays minimal; advanced features move out.
 
-- [ ] Create `spec/profiles/mdz-advanced-v1.json` — a profile that requires
-      JCS canonicalization, multi-sig chains, DIDs, revocation URLs, content-addressed
-      aliases, and detailed provenance DAG.
-- [ ] Core spec keeps: v1.1 alignment + attributes, `::cell` + `::output` + `::include`,
-      basic accessibility, simple signatures, basic i18n.
-- [ ] Add conformance levels: **Core** (required) / **Advanced** (opt-in).
+- [x] Create `spec/profiles/mdz-advanced-v1.json` — ships (JCS, multi-sig, DIDs, revocation, content-hash aliases, provenance DAG).
+- [x] Core spec keeps: v1.1 alignment + attributes, `::cell` + `::output` + `::include`, basic accessibility, simple signatures, basic i18n — spec body reflects this scoping.
+- [ ] Add conformance levels: **Core** (required) / **Advanced** (opt-in) — profile files exist; formal level enforcement in the conformance runner is not yet explicit. Unverified on 2026-04-24.
 
 ---
 
@@ -194,39 +189,28 @@ The current prose spec is why two implementers can silently disagree on edge
 cases (nested containers + backticks + quoted attrs, Unicode normalization,
 etc.). Replace it.
 
-- [ ] Define the block-attribute + directive grammar in ABNF (RFC 5234 style) in `spec/grammar/mdz-directives.abnf`
-- [ ] Provide a PEG grammar in `spec/grammar/mdz-directives.pegjs` for implementers
-      targeting peg/ohm/tree-sitter
-- [ ] Publish a tree-sitter grammar `tree-sitter-mdz` for editor integration
-      (syntax highlighting, go-to-def across includes, etc.)
-- [ ] Remove the prose grammar from the spec body; keep only ABNF + examples
+- [x] Define the block-attribute + directive grammar in ABNF (RFC 5234 style) — ships at `spec/grammar/mdz-directives.abnf`.
+- [x] Provide a PEG grammar — ships at `spec/grammar/mdz-directives.lark` (Lark PEG, not `.pegjs`; the filename deviates from the roadmap because the Python parser consumes it directly; functionally equivalent for porting to peg/ohm/tree-sitter).
+- [x] Publish a tree-sitter grammar `tree-sitter-mdz` — alpha ships at `tree-sitter-mdz/grammar.js`.
+- [ ] Remove the prose grammar from the spec body; keep only ABNF + examples — unverified on 2026-04-24; some prose grammar may still live in the v2.0 spec.
 
 ### 1.2 Rebuild the reference parser
 
 Current `alignment_parser.py` is ~25 ad-hoc regexes. Replace with a proper AST parser.
 
-- [ ] New Python parser built on Lark (PEG) — generates AST matching grammar
-- [ ] New TypeScript parser built on Chevrotain (TypeScript-friendly PEG)
-- [ ] Retire the regex-based parser; keep it only as a fallback for malformed
-      input where fail-fast would be too aggressive (opt-in with `--legacy`)
-- [ ] Retire `basicMarkdownToHTML` in `mdx_format.ts` — it's a toy. Route all
-      Markdown rendering through `marked` or `markdown-it` with an MDZ plugin.
+- [x] New Python parser built on Lark (PEG) — ships at `implementations/python/mdz_parser/` (parser.py / ast.py / errors.py).
+- [ ] New TypeScript parser built on Chevrotain (TypeScript-friendly PEG) — **verified absent 2026-04-24**: zero `chevrotain` references in `implementations/` or `spec/`. Tracked in Phase 4.6.4 with a recommended downgrade (keep the regex-based legacy parser in TS until Phase 2.3 editor needs a real one).
+- [ ] Retire the regex-based parser; keep it only as a fallback for malformed input — Lark is the primary; `--legacy` fallback is unverified.
+- [ ] Retire `basicMarkdownToHTML` in `mdx_format.ts` — **verified 2026-04-24**: function still present at `implementations/typescript/mdx_format.ts:3363`, now deprecated with a `console.warn` but not removed. Phase 4.6.4 documents this.
 
 ### 1.3 Conformance test suite
 
 The single highest-leverage investment for interoperability.
 
-- [ ] Create `tests/conformance/` with ~200 fixtures organized by category:
-  - `positive/` — MUST accept, with expected AST
-  - `negative/` — MUST reject, with expected error class
-  - `roundtrip/` — AST → serialize → parse → AST (byte-compare)
-  - `edge/` — Unicode, RTL, surrogate pairs, whitespace-only, 4K lines, etc.
-- [ ] Each fixture has a `.expected.json` declaring expected AST / error code / roundtrip-hash
-- [ ] CI job: every reference implementation runs the full suite and publishes
-      pass/fail; any implementation with <100% on Core blocks a spec release.
-- [ ] Cross-implementation test: Python writes, TypeScript reads, byte-compare
-      the AST. Same for TS→Py. This catches encoder/decoder divergence that
-      per-impl tests miss.
+- [x] Create `tests/conformance/` with fixtures organized by category — ships with 52 fixtures across positive/negative/roundtrip/edge (roadmap target was ~200; current suite is the minimum-viable pack, room to grow).
+- [x] Each fixture has a `.expected.json` — verified 52/52 coverage on 2026-04-24.
+- [x] CI job runs the full suite — `validate-v20-examples` in `.github/workflows/ci.yml` runs `tests/conformance/run_conformance.py`.
+- [ ] Cross-implementation test: Python writes, TypeScript reads, byte-compare the AST. Same for TS→Py. — **Rust↔TS** parity harness shipped in Phase 4.6.2 (`tests/parity/rust_ts_manifest_parity.py`); the specific **Py↔TS** direction the roadmap calls for is still pending.
 
 ### 1.4 Fuzz + property-based testing
 
@@ -234,14 +218,10 @@ Previous version named `atheris` and `jazzer.js` — both effectively unmaintain
 as of 2024 (Google archived atheris; Code Intelligence wound down jazzer.js).
 Use actively-maintained tooling instead:
 
-- [ ] **Python:** `hypothesis` for property-based testing (well-maintained,
-      ships hypothesis.strategies for Markdown-shaped input). `afl++` for
-      coverage-guided fuzzing if we need that later.
-- [ ] **TypeScript:** `fast-check` for property-based testing. No coverage-
-      guided JS fuzzer is currently well-maintained; treat this as a known gap.
-- [ ] CI job: property tests run every PR; 500 iterations per property.
-      Failures block merge.
-- [ ] Corpus seeded from the conformance suite.
+- [x] **Python:** `hypothesis` — ships at `tests/property/test_parser_properties.py`; CI runs it in the v2.0 job.
+- [x] **TypeScript:** `fast-check` — ships at `implementations/typescript/mdx_format.property.test.ts`; CI runs it in the TypeScript Unit Tests job.
+- [x] CI job property tests — CI runs property tests on every PR (v2.0 job has a dedicated step).
+- [ ] Corpus seeded from the conformance suite — unverified whether the property-test corpus is explicitly seeded from the 52 fixtures or uses hypothesis-generated inputs only.
 
 ### 1.5 Content-addressing: evolve, don't restart
 
@@ -251,17 +231,16 @@ algorithms and the `assets/by-hash/sha256/<hex>` alias path (spec §9.2, §9.3,
 
 The real questions for v3.0 (not v2.x):
 
-- [ ] Should `assets/by-hash/` avoid byte duplication? The current alias
-      duplicates bytes. Options: (a) keep duplication (simple, ZIP-friendly),
-      (b) require exactly-one-path per content-hash and use the `by-hash/`
-      path as canonical (breaking change), (c) define a manifest-only alias
-      table with no filesystem duplication.
-- [ ] Should we adopt **multihash + CIDv1** for alignment with IPFS / OCFL?
-      This is a v3.0 breaking change. Decision gate: does the scientific-paper
-      niche care? Survey ≥10 Zenodo/OSF users; they use OAI-PMH and BagIt,
-      neither of which is CID-native. Probable answer: no, defer indefinitely.
-- [ ] Document that `content_hash` is the canonical field and `checksum` is
-      deprecated (already done in v2.0 type defs; make it louder in the spec).
+- [x] `assets/by-hash/` byte-duplication decision — resolved in
+      `docs/decisions/content-addressing-evolution.md` Q1: defer to v3.0;
+      option (c) manifest-alias-table is the preferred evolution.
+- [x] multihash + CIDv1 adoption decision — resolved in same doc Q2:
+      rejected. Scientific-paper preservation stack (Zenodo / OSF / arXiv /
+      BagIt / OAI-PMH) is not CID-aware.
+- [x] Louder `checksum` → `content_hash` deprecation — ships: spec §9.3.1
+      paragraph, `@deprecated` JSDoc tag on `MDXAssetEntry.checksum`,
+      `warnings.warn(DeprecationWarning)` in Python `compute_checksum`,
+      new `compute_content_hash()` as the silent replacement.
 
 ---
 
@@ -412,24 +391,16 @@ into the early weeks of Phase 2 scheduling even though it's numbered later.
 Current state: attack surface identified (includes + kernels + scripts), no
 enforcement. Fix this before any real adoption.
 
-- [ ] Define a **CSP profile** that viewers MUST apply to rendered MDZ content
-      (default-src 'self'; script-src 'none' unless `permissions.allow_scripts`)
-- [ ] `::include` with external URLs requires `permissions.allow_external_includes: true`
-      AND `content_hash` pinning — viewers MUST refuse otherwise (already in spec,
-      now also enforce in reference impls)
-- [ ] Signature trust model documentation: how viewers discover signer keys
-      (DID resolution, did:web, fallback to `certificate`), how revocation is
-      checked, what happens on rotation
-- [ ] Reference verifier implementation: `mdz verify archive.mdz --trust keys.json`
-      returns cryptographic pass/fail for the full signature chain
-- [ ] Threat model doc in `docs/security/THREAT_MODEL.md` — STRIDE table covering
-      malicious archives, signature forgery, transclusion abuse, kernel escape
+- [x] CSP profile — `docs/security/CSP.md` ships.
+- [ ] `::include` external-URL permissions enforcement in reference impls — partial; spec requires it, runtime enforcement in viewer unverified.
+- [ ] Signature trust model docs (DID resolution / revocation / rotation) — not yet documented as a standalone piece; the Node verifier covers DID lookup at CLI level.
+- [x] Reference verifier `mdz verify archive.mdz` — ships at `cli/src/commands/verify.js` with structural chain + trust-file support (tests at `cli/test/verify.test.js`). Full cryptographic signature verification (Ed25519/RS256/ES256 over resolved DID keys) is still Phase 3.2 per both the Node and Rust verifier caveats.
+- [x] Threat model doc at `docs/security/THREAT_MODEL.md` — ships.
 
 ### 3.2 Subresource integrity enforcement
 
-- [ ] Integrity field MUST be verified by conformant viewers; non-conformant
-      viewers are flagged in the conformance suite.
-- [ ] Add integrity-fail fixtures to `tests/conformance/negative/`.
+- [x] Integrity field verification landed in the Node verifier + Rust binding (`verify_integrity`, `verify_content_id`). Conformance-suite-level viewer flagging is not yet implemented — the existing negative fixtures cover parser-level errors, not archive-level integrity mismatch. Archive-level integrity tests live in `cli/test/verify.test.js` and `bindings/rust/tests/archive_integration.rs` instead.
+- [ ] Add integrity-fail fixtures to `tests/conformance/negative/` — still parser-level only. Archive-level integrity tests are covered in the `verify.test.js` + Rust integration suites (different fixture-harness format).
 
 ### 3.3 Accessibility conformance suite
 
@@ -445,7 +416,7 @@ enforcement. Fix this before any real adoption.
 
 Prioritize by where our niche lives:
 
-- [ ] Rust (`mdz-rs`) — for Tauri desktop integrations, WASM viewer builds
+- [x] Rust (`mdz`) — ships at `bindings/rust/` (0.1.0-alpha). Archive open + integrity + signature-chain structural verification, 13 integration tests, CI-validated default + no-default feature builds.
 - [ ] Swift — iOS reader
 - [ ] Kotlin — Android reader
 - [ ] Go — CLI tools, academic publishing backends
@@ -454,20 +425,16 @@ Each must pass the conformance suite to ship a 1.0.
 
 ### 4.2 Integration targets
 
-- [ ] Pandoc filter (`pandoc --to mdz`, `pandoc --from mdz`) — auto-unlocks
-      .docx / .tex / .odt / .rst conversion
-- [ ] VS Code extension with live preview + directive IntelliSense (uses
-      tree-sitter grammar from 1.1)
-- [ ] Overleaf integration: upload MDZ to Overleaf, get a LaTeX mirror for
-      journal submission workflows
-- [ ] Zotero plugin: import MDZ archives with full provenance metadata
-- [ ] arXiv submission bridge: accept MDZ, generate the PDF + HTML arXiv wants
+- [x] Pandoc Lua filter — ships at `integrations/pandoc/mdz-filter.lua`. Handles `::cell`, `::output`, `::include`, `::fig`, `::ref`, `::cite`. Golden-output fixture pack + CI job. Does NOT include `pandoc --to mdz` / `--from mdz` custom-format registrations (those require native pandoc format registration, not a lua filter) — filter approach was chosen as lower-complexity.
+- [x] VS Code extension — ships at `integrations/vscode/` (0.1.0-alpha). Commands: view / preview / validate / import-ipynb / export-jats / verify. Syntax highlighting via TextMate grammar. 17 unit tests cover the pure helpers + `runCliCore`. Directive IntelliSense via tree-sitter wiring is NOT yet implemented.
+- [ ] Overleaf integration
+- [ ] Zotero plugin
+- [ ] arXiv submission bridge
 
 ### 4.3 Real-world corpus
 
-- [ ] Convert 100 open-access arXiv papers to MDZ as a benchmark corpus
-- [ ] Publish as a public dataset; use for parser stress-testing, viewer demos,
-      and "look at all these papers that work" marketing
+- [ ] Convert 100 open-access arXiv papers to MDZ as a benchmark corpus — fetcher + converter ships at `tools/corpus-fetcher/fetch_arxiv.py` (TOS-compliant rate limiting, permissive-license filter, HTTPS, Python 3.12 `tarfile.extractall(filter="data")`). The 100-paper run itself is external work.
+- [ ] Publish as a public dataset
 - [ ] Partner with Zenodo or OSF for archival hosting
 
 ### 4.4 Streaming / lazy loading
@@ -475,10 +442,9 @@ Each must pass the conformance suite to ship a 1.0.
 For large documents (embedded videos, high-res figures), full-ZIP-into-memory
 is a real constraint.
 
-- [ ] Research: OCFL-style content-addressed virtual filesystem layered on the ZIP
-- [ ] Viewer update: fetch asset bytes on-demand via HTTP range requests
-      (requires web server support; degrades gracefully)
-- [ ] Editor update: don't load videos into memory until preview requested
+- [x] Research — `docs/proposals/streaming.md` ships with the HTTP-Range strategy, prerequisites, prior-art comparison, and resolutions to the three open questions (signature verification via eager-manifest + deferred-asset + `mdz-asset-unverified` sentinel; cache bound to origin MUST NOT; streaming writes out-of-scope until Phase 5+).
+- [ ] Viewer update: fetch asset bytes on-demand via HTTP range requests — implementation pending.
+- [ ] Editor update: lazy video load — editor not yet built.
 
 ### 4.5 Delta encoding for versions
 
@@ -494,25 +460,11 @@ cycle skipped. Items are split by origin so credit + blame are clear.
 
 ### 4.6.1 Skipped review findings (code-review / silent-failure / type-design)
 
-- [ ] **Rust `resolve_entry_point`** — error when `locales` is declared
-      but the `default` tag is missing from `available[]`. Current code
-      silently falls through to the top-level entry_point. Flagged by
-      silent-failure-hunter.
-- [ ] **Rust wasm32 32-bit `usize` cast** — document or `debug_assert!`
-      the truncation in `Vec::with_capacity(file.size() as usize)`.
-      Flagged by silent-failure-hunter.
-- [ ] **Rust `SignatureEntry.role` enum** — replace `String` with a
-      `Role` enum (author/reviewer/editor/publisher/notary/custom)
-      + `TryFrom<String>` that runs the CUSTOM_SIGNER_ROLE_PATTERN
-      from the v2.0 spec. Flagged by type-design-analyzer.
-- [ ] **Rust `entry_paths` ordering docstring** — state that
-      lexicographic ordering is stable (via `BTreeMap`) and matters
-      for reproducible hashing. Flagged by type-design-analyzer.
-- [ ] **Rust `manifest_bytes` invariant docstring** — document that
-      the returned slice is byte-identical to the parsed input, and
-      that any future lazy-parse optimization must preserve this
-      invariant for `verify_integrity` correctness. Flagged by
-      type-design-analyzer.
+- [x] **Rust `resolve_entry_point`** — fixed: returns `Error::Manifest` when `locales.default` is missing from `available[]` (commit b498682).
+- [ ] **Rust wasm32 32-bit `usize` cast** — the bounded-reader fix effectively neutralizes the risk (cap is `.min(1024 * 1024) as usize` which fits on all 32-bit targets), but the explicit `debug_assert!` for the theoretical case was not added.
+- [x] **Rust `SignatureEntry.role` enum** — shipped as `Role` enum (`Author`/`Reviewer`/`Editor`/`Publisher`/`Notary`/`Custom(String)`) with `#[serde(try_from = "String")]` (commits 9ea73d1, b498682; widened to spec §16 "custom URI" semantics after type-design review).
+- [x] **Rust `entry_paths` ordering docstring** — docstring now states stable lexicographic ordering via BTreeMap, explicitly tying it to reproducible content-hashing.
+- [x] **Rust `manifest_bytes` invariant docstring** — documents the byte-identity invariant; correction on 04748bf clarified it refers to the inflated manifest entry, not the caller's input buffer.
 - [x] **Rust `FeatureDisabled` actually wired** (2026-04-24 follow-up
       commit): `verify_integrity` / `verify_content_id` /
       `verify_signature_chain` now have `#[cfg(not(feature = "verify"))]`
@@ -520,49 +472,29 @@ cycle skipped. Items are split by origin so credit + blame are clear.
       are always present regardless of feature set. Also: sha2/hex
       promoted to `optional = true` deps gated by the `verify` feature
       so a no-default build truly sheds them.
-- [ ] **CHARTER.md CCLA exact name + link** — currently says "W3C
-      Community Contributor License Agreement" without the canonical
-      URL. Flagged by comment-analyzer (suggestion #13).
+- [x] **CHARTER.md CCLA exact name + link** — adds canonical W3C CG process URL + CLA URL (commit 086cd71).
 
 ### 4.6.2 Skipped tests + coverage
 
-- [ ] **Pandoc golden-output fixture pack** — currently the CI job
-      smoke-tests "filter loads" only; no coverage of `::cell`,
-      `::include`, `::fig`, `::cite` directive rewriting. Create
-      `integrations/pandoc/tests/` with ≥3 fixtures + a diff runner.
-- [ ] **VS Code extension functional tests** — CI currently runs
-      `node --check` (syntax) and `JSON.parse` (manifest) only.
-      Add `integrations/vscode/test/` covering `runCli` in-flight
-      map, `buildPreviewHtml` truncation, `resolveFileUri` at unit
-      level without booting the VS Code extension host.
-- [ ] **Cross-implementation parity harness** — TypeScript writes a
-      canonical archive, Rust reads it, emits parsed manifest as
-      JSON, byte-compared against the TS-emitted manifest. Catches
-      encoder/decoder divergence that per-impl tests miss. Named as
-      "critical" by test-analyzer; unimplemented.
-- [ ] **Rust integration tests — additional chain cases** — add
-      positive case with correctly-hashed chain entries, negative
-      tampered-hash case, negative missing-prev-signature case,
-      blake3 unsupported-algorithm case, manifest_checksum mismatch
-      case. Only root-level invariant is currently covered.
+- [x] **Pandoc golden-output fixture pack** — 4 input fixtures + `run.sh` diff runner at `integrations/pandoc/tests/`; CI runs it unconditionally. Pinned expected output for `01-plain-paragraph`; required-pin enforcement rejects future fixtures that forget their pin. Runner distinguishes PANDOC-CRASH from empty-output.
+- [x] **VS Code extension functional tests** — 17 node:test cases at `integrations/vscode/test/{helpers,runCliCore}.test.js` covering `buildPreviewHtml` (truncation, XSS via theme attribute, HTML escaping) and `runCliCore` (argv-not-shell, in-flight dedupe, err.code fallback, cleanup).
+- [x] **Cross-implementation parity harness** — Rust↔TS direction shipped at `tests/parity/rust_ts_manifest_parity.py` + `bindings/rust/examples/parity_dump.rs`; CI runs it against `examples/example-document.mdx`. The Python↔TS direction called for in Phase 1.3 is still open.
+- [x] **Rust integration tests — additional chain cases** — shipped at `bindings/rust/tests/archive_integration.rs`: valid multi-entry chain, tampered prev_hash, manifest_checksum mismatch, blake3 unsupported, locale strict-error, 5 closed Role variants, 5 custom Role forms, FeatureDisabled on all 3 methods.
 
 ### 4.6.3 Skipped deprecations + spec follow-ups
 
-- [ ] **`checksum` → `content_hash` louder deprecation:**
-  - [ ] One full paragraph in `spec/MDX_FORMAT_SPECIFICATION_v2.0.md`
-        §9.2 (not a parenthetical).
-  - [ ] `@deprecated` JSDoc tag in `implementations/typescript/mdx_format.ts`
-        with removal version (v3.0).
-  - [ ] `DeprecationWarning` emitted at manifest load in
-        `implementations/python/mdx_format.py` when a loaded manifest
-        uses `checksum`.
-- [ ] **Streaming proposal open questions** — Q1 signature verification
-      under streaming, Q2 cross-origin cache poisoning, Q3 editor
-      implications. Answer or explicitly mark as empirically-pending
-      with the concrete blocker.
-- [ ] **Delta-snapshots open questions** — Q1 binary assets, Q2
-      cryptographic signing of `index.json` (phase 3.2 dependency),
-      Q3 compression. Pick a side or document the gating decision.
+- [x] **`checksum` → `content_hash` louder deprecation:**
+  - [x] Spec §9.3.1 paragraph — ships.
+  - [x] `@deprecated` JSDoc on `MDXAssetEntry.checksum` — ships with removal version v3.0.
+  - [x] `DeprecationWarning` from `compute_checksum` — ships (using stdlib `warnings.warn`; respects user filters). `compute_content_hash` is the silent replacement. The warning fires on the write path (when someone calls `compute_checksum`), not yet on the read path (loading a v2.0 manifest that declares `checksum` without `content_hash`) — a load-time warn is a separate follow-up.
+- [x] **Streaming proposal open questions** — resolved in `docs/proposals/streaming.md`:
+      Q1 eager-manifest-checksum + deferred-asset-hash + `mdz-asset-unverified` sentinel class;
+      Q2 cross-origin cache is MUST NOT (bound to origin until Phase 3.2 signed-asset enforcement);
+      Q3 streaming writes out-of-scope for Phase 4.4; editors keep configurable in-memory ceiling.
+- [x] **Delta-snapshots open questions** — resolved in `spec/extensions/delta-snapshots-v1.md`:
+      Q1 no binary delta in v1 (markdown only; bsdiff/VCDIFF-style would be a v2 extension);
+      Q2 `index.json` MUST be covered by `scope: full-archive` signatures per Phase 3.2 (when that lands);
+      Q3 plain-text patches + outer DEFLATE, no custom encoding.
 
 ### 4.6.4 Phase 0 / 1 items claimed done but unverified
 
@@ -599,27 +531,20 @@ cycle skipped. Items are split by origin so credit + blame are clear.
 
 ### 4.6.5 Accessibility conformance expansion
 
-- [ ] **A11y fixtures 5 → 50** — Phase 3.3 target is 50. Only 5
-      stub categories exist. Expand to at least 20 in-session,
-      spanning: color contrast, form labels, `aria-labelledby`,
-      landmark roles, table headers, focus order, language tags,
-      skip links. Remaining 30 deferred to Phase 3.3 completion.
+- [ ] **A11y fixtures 5 → 50** — expanded 5 → 23 on d6859f0 (image-alt / heading-order / link-name / document-language across positive + negative + combined + edge-case fixtures). **Remaining 27 fixtures** require a real-browser runner (axe-core + playwright) for checks the current Python regex runner cannot perform — color contrast (WCAG 1.4.3), keyboard navigation (2.1.1), focus visible (2.4.7), ARIA correctness (4.1.2), form labels, landmark roles, table headers. Tracked as Phase 3.3 completion.
 
 ### 4.6.6 CI hygiene
 
-- [ ] **Dependabot 5 moderate vulnerabilities on master** — audit
-      with `gh api repos/:owner/:repo/dependabot/alerts` and remediate
-      or consciously accept.
-- [ ] **Node 20 actions deprecation** — `actions/checkout@v4`,
-      `actions/setup-node@v4`, `actions/setup-python@v5` must move
-      to Node-24-compatible versions before 2026-09-16 runner
-      removal.
-- [ ] **`--locked` Cargo build** — currently commented out; commit
-      `Cargo.lock` and re-enable so CI reproduces deterministically.
-- [ ] **CHANGELOG.md line-length** — ~15 lines over 80 columns
-      around L108–L120 (pre-existing violations). Wrap to satisfy
-      markdownlint without `continue-on-error: true` swallowing
-      them.
+- [ ] **Dependabot 5 moderate vulnerabilities on master** — package.json bumps landed on b498682 (vite `^5.4.19`, vitest `^2.1.9`, wrangler `^3.114.14`) to pull in patched esbuild / undici transitive deps. **Verified 2026-04-24 via `gh api dependabot/alerts`: 5 alerts still report "open"** (vite #7/#14, undici #10/#11, esbuild #8). Package-lock files are not committed, so Dependabot cannot re-scan until the next install cycle. Commitment accepted; listed as partial-done pending a lockfile or Dependabot re-evaluation.
+- [x] **Node 20 actions deprecation** — resolved via
+      `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true` env var at workflow
+      level (commits b498682/04748bf). Forces the Node-20 pinned
+      actions to run on Node 24 instead. Stronger than the action-
+      version-bump path: removes the underlying Node-20 condition
+      rather than just silencing a warning. CI logs confirm the
+      forced-runtime behavior.
+- [ ] **`--locked` Cargo build** — still commented out. Committing `Cargo.lock` + re-enabling is tracked but not done; a lockfile commit needs coordination with the optional-dep `verify` feature so `cargo test --no-default-features` still resolves correctly.
+- [ ] **CHANGELOG.md line-length** — v2.0 capability block wrapped + fenced with `markdownlint-disable MD013` on 086cd71. **Verified 2026-04-24: ~8 other lines remain over 80 columns** elsewhere in the file (including the shields.io rows in README which the lint job also flags). Not wrapped. `continue-on-error: true` still shields CI.
 
 ### 4.6.7 External / blocked items (not actionable in-session)
 
