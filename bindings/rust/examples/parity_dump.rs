@@ -30,6 +30,16 @@ fn role_to_string(role: &Role) -> String {
     }
 }
 
+/// Insert `key -> Value::from(v)` into `map` only if `v` is `Some`. Cuts
+/// the `if let Some(x) = ... { map.insert(...) }` boilerplate that
+/// otherwise dominates this file.
+fn insert_opt<T: serde::Serialize>(map: &mut Map<String, Value>, key: &str, v: &Option<T>) {
+    if let Some(val) = v {
+        // to_value is infallible for all types used here (String/Vec<String>).
+        map.insert(key.into(), serde_json::to_value(val).unwrap());
+    }
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path: PathBuf = std::env::args()
         .nth(1)
@@ -43,16 +53,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // fields exclusively. The Python harness mirrors this projection.
     let mut doc = Map::new();
     doc.insert("id".into(), json!(m.document.id));
-    if let Some(cid) = &m.document.content_id {
-        doc.insert("content_id".into(), json!(cid));
-    }
+    insert_opt(&mut doc, "content_id", &m.document.content_id);
     doc.insert("title".into(), json!(m.document.title));
-    if let Some(s) = &m.document.subtitle {
-        doc.insert("subtitle".into(), json!(s));
-    }
-    if let Some(l) = &m.document.language {
-        doc.insert("language".into(), json!(l));
-    }
+    insert_opt(&mut doc, "subtitle", &m.document.subtitle);
+    insert_opt(&mut doc, "language", &m.document.language);
     doc.insert("created".into(), json!(m.document.created));
     doc.insert("modified".into(), json!(m.document.modified));
     // License: re-serialize the untagged enum to its JSON shape.
@@ -64,9 +68,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 mdz::License::Structured { kind, url } => {
                     let mut o = Map::new();
                     o.insert("type".into(), json!(kind));
-                    if let Some(u) = url {
-                        o.insert("url".into(), json!(u));
-                    }
+                    insert_opt(&mut o, "url", url);
                     Value::Object(o)
                 }
             },
@@ -80,21 +82,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map(|a| {
                 let mut o = Map::new();
                 o.insert("name".into(), json!(a.name));
-                if let Some(v) = &a.email {
-                    o.insert("email".into(), json!(v));
-                }
-                if let Some(v) = &a.url {
-                    o.insert("url".into(), json!(v));
-                }
-                if let Some(v) = &a.did {
-                    o.insert("did".into(), json!(v));
-                }
-                if let Some(v) = &a.role {
-                    o.insert("role".into(), json!(v));
-                }
-                if let Some(v) = &a.organization {
-                    o.insert("organization".into(), json!(v));
-                }
+                insert_opt(&mut o, "email", &a.email);
+                insert_opt(&mut o, "url", &a.url);
+                insert_opt(&mut o, "did", &a.did);
+                insert_opt(&mut o, "role", &a.role);
+                insert_opt(&mut o, "organization", &a.organization);
                 Value::Object(o)
             })
             .collect();
@@ -111,9 +103,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut o = Map::new();
                 o.insert("tag".into(), json!(a.tag));
                 o.insert("entry_point".into(), json!(a.entry_point));
-                if let Some(t) = &a.title {
-                    o.insert("title".into(), json!(t));
-                }
+                insert_opt(&mut o, "title", &a.title);
                 Value::Object(o)
             })
             .collect();
@@ -140,15 +130,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 o.insert("role".into(), json!(role_to_string(&s.role)));
                 let mut signer = Map::new();
                 signer.insert("name".into(), json!(s.signer.name));
-                if let Some(d) = &s.signer.did {
-                    signer.insert("did".into(), json!(d));
-                }
+                insert_opt(&mut signer, "did", &s.signer.did);
                 o.insert("signer".into(), Value::Object(signer));
                 o.insert("algorithm".into(), json!(s.algorithm));
                 o.insert("signature".into(), json!(s.signature));
-                if let Some(p) = &s.prev_signature {
-                    o.insert("prev_signature".into(), json!(p));
-                }
+                insert_opt(&mut o, "prev_signature", &s.prev_signature);
                 Value::Object(o)
             })
             .collect();
@@ -157,9 +143,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Some(ic) = &sec.integrity {
             let mut io = Map::new();
             io.insert("algorithm".into(), json!(ic.algorithm));
-            if let Some(c) = &ic.manifest_checksum {
-                io.insert("manifest_checksum".into(), json!(c));
-            }
+            insert_opt(&mut io, "manifest_checksum", &ic.manifest_checksum);
             secmap.insert("integrity".into(), Value::Object(io));
         }
         out.insert("security".into(), Value::Object(secmap));

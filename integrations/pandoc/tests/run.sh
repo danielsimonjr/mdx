@@ -53,14 +53,12 @@ for input in "$SCRIPT_DIR"/*.input.md; do
     fi
 
     if [ -f "$expected" ]; then
-        diff_log=$(mktemp)
-        if ! diff -u "$expected" <(printf '%s\n' "$actual") > "$diff_log" 2>&1; then
+        # Capture diff output in-memory; no second mktemp needed.
+        if ! diff_out=$(diff -u "$expected" <(printf '%s\n' "$actual") 2>&1); then
             fail=$((fail + 1))
-            failures+=("$name: output differs from expected — $(head -5 "$diff_log" | tr '\n' ' ')")
-            rm -f "$diff_log"
+            failures+=("$name: output differs from expected — $(printf '%s\n' "$diff_out" | head -5 | tr '\n' ' ')")
             continue
         fi
-        rm -f "$diff_log"
     else
         # Required-pin fixtures MUST have a pinned expected file.
         for required in "${REQUIRED_PINS[@]}"; do

@@ -27,6 +27,15 @@ fn build_zip(entries: &[(&str, &[u8])]) -> Vec<u8> {
     buf.into_inner()
 }
 
+/// Shortcut: build a 2-entry ZIP with `manifest.json` and a stub
+/// `document.md`. Most tests here don't care about the document body.
+fn zip_with_manifest(manifest: &str) -> Vec<u8> {
+    build_zip(&[
+        ("manifest.json", manifest.as_bytes()),
+        ("document.md", b"# hi"),
+    ])
+}
+
 const MINIMAL_MANIFEST: &str = r#"{
   "mdx_version": "2.0.0",
   "document": {
@@ -131,11 +140,7 @@ fn signature_chain_root_must_not_have_prev_signature() {
         ]
       }
     }"#;
-    let zip = build_zip(&[
-        ("manifest.json", manifest.as_bytes()),
-        ("document.md", b"# hello"),
-    ]);
-    let archive = Archive::open(&zip).unwrap();
+    let archive = Archive::open(&zip_with_manifest(manifest)).unwrap();
     match archive.verify_signature_chain() {
         Err(Error::Integrity(IntegrityError::SignatureChain(msg))) => {
             assert!(msg.contains("signatures[0]"), "got: {}", msg);
@@ -168,11 +173,7 @@ fn signature_chain_accepts_single_root_without_prev() {
         ]
       }
     }"#;
-    let zip = build_zip(&[
-        ("manifest.json", manifest.as_bytes()),
-        ("document.md", b"# hello"),
-    ]);
-    let archive = Archive::open(&zip).unwrap();
+    let archive = Archive::open(&zip_with_manifest(manifest)).unwrap();
     archive.verify_signature_chain().expect("single-root chain is valid");
 }
 
@@ -216,12 +217,7 @@ fn manifest_with_valid_chain(n: usize) -> String {
 #[cfg(feature = "verify")]
 #[test]
 fn signature_chain_accepts_valid_multi_entry() {
-    let manifest = manifest_with_valid_chain(3);
-    let zip = build_zip(&[
-        ("manifest.json", manifest.as_bytes()),
-        ("document.md", b"# hi"),
-    ]);
-    let archive = Archive::open(&zip).unwrap();
+    let archive = Archive::open(&zip_with_manifest(&manifest_with_valid_chain(3))).unwrap();
     archive
         .verify_signature_chain()
         .expect("valid 3-entry chain should pass");
@@ -240,11 +236,7 @@ fn signature_chain_rejects_tampered_prev_hash() {
     let legit_prev = format!("sha256:{}", hex::encode(Sha256::digest(b"sig-0")));
     let tampered_prev = "sha256:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
     let manifest = manifest.replace(&legit_prev, tampered_prev);
-    let zip = build_zip(&[
-        ("manifest.json", manifest.as_bytes()),
-        ("document.md", b"# hi"),
-    ]);
-    let archive = Archive::open(&zip).unwrap();
+    let archive = Archive::open(&zip_with_manifest(&manifest)).unwrap();
     match archive.verify_signature_chain() {
         Err(Error::Integrity(IntegrityError::SignatureChain(msg))) => {
             // Pin that the diagnostic names the offending entry index.
@@ -274,11 +266,7 @@ fn verify_integrity_rejects_manifest_checksum_mismatch() {
         }
       }
     }"#;
-    let zip = build_zip(&[
-        ("manifest.json", manifest.as_bytes()),
-        ("document.md", b"# hi"),
-    ]);
-    let archive = Archive::open(&zip).unwrap();
+    let archive = Archive::open(&zip_with_manifest(manifest)).unwrap();
     match archive.verify_integrity() {
         Err(Error::Integrity(IntegrityError::Mismatch { kind, .. })) => {
             assert_eq!(kind, "manifest_checksum");
@@ -301,11 +289,7 @@ fn verify_content_id_rejects_unsupported_blake3() {
       },
       "content": {"entry_point": "document.md"}
     }"#;
-    let zip = build_zip(&[
-        ("manifest.json", manifest.as_bytes()),
-        ("document.md", b"# hi"),
-    ]);
-    let archive = Archive::open(&zip).unwrap();
+    let archive = Archive::open(&zip_with_manifest(manifest)).unwrap();
     match archive.verify_content_id() {
         Err(Error::Integrity(IntegrityError::UnsupportedAlgorithm(msg))) => {
             assert!(msg.contains("blake3"), "got: {}", msg);
@@ -384,11 +368,8 @@ fn role_enum_parses_all_five_closed_variants() {
     ];
     for (i, (role_str, expected)) in cases.iter().enumerate() {
         let manifest = manifest_with_role(role_str, &format!("{:02}", 70 + i));
-        let zip = build_zip(&[
-            ("manifest.json", manifest.as_bytes()),
-            ("document.md", b"hi"),
-        ]);
-        let archive = Archive::open(&zip).expect(&format!("'{}' should parse", role_str));
+        let archive = Archive::open(&zip_with_manifest(&manifest))
+            .expect(&format!("'{}' should parse", role_str));
         let sigs = &archive.manifest().security.as_ref().unwrap().signatures;
         assert_eq!(&sigs[0].role, expected, "role {} misparsed", role_str);
     }
@@ -408,11 +389,8 @@ fn role_enum_preserves_custom_namespace_and_uri_forms() {
     ];
     for (i, role_str) in cases.iter().enumerate() {
         let manifest = manifest_with_role(role_str, &format!("{:02}", 80 + i));
-        let zip = build_zip(&[
-            ("manifest.json", manifest.as_bytes()),
-            ("document.md", b"hi"),
-        ]);
-        let archive = Archive::open(&zip).expect(&format!("'{}' should parse as Custom", role_str));
+        let archive = Archive::open(&zip_with_manifest(&manifest))
+            .expect(&format!("'{}' should parse as Custom", role_str));
         let sigs = &archive.manifest().security.as_ref().unwrap().signatures;
         assert_eq!(
             sigs[0].role,
@@ -426,11 +404,7 @@ fn role_enum_preserves_custom_namespace_and_uri_forms() {
 #[test]
 fn role_enum_rejects_empty_string() {
     let manifest = manifest_with_role("", "90");
-    let zip = build_zip(&[
-        ("manifest.json", manifest.as_bytes()),
-        ("document.md", b"hi"),
-    ]);
-    match Archive::open(&zip) {
+    match Archive::open(&zip_with_manifest(&manifest)) {
         Err(Error::Manifest(msg)) => assert!(msg.contains("empty"), "got: {}", msg),
         other => panic!("expected empty-role rejection, got {:?}", other),
     }
@@ -439,11 +413,7 @@ fn role_enum_rejects_empty_string() {
 #[cfg(not(feature = "verify"))]
 #[test]
 fn verify_methods_return_feature_disabled_without_flag() {
-    let zip = build_zip(&[
-        ("manifest.json", MINIMAL_MANIFEST.as_bytes()),
-        ("document.md", b"# hi"),
-    ]);
-    let archive = Archive::open(&zip).unwrap();
+    let archive = Archive::open(&zip_with_manifest(MINIMAL_MANIFEST)).unwrap();
     // All three verify methods must surface FeatureDisabled with the
     // correct method name. One assertion per method catches copy-paste
     // regressions that would otherwise only surface in one branch.

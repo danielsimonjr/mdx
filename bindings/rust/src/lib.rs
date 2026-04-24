@@ -624,10 +624,7 @@ impl Archive {
     /// surface stable across feature sets.
     pub fn verify_integrity(&self) -> Result<(), Error> {
         #[cfg(not(feature = "verify"))]
-        return Err(Error::FeatureDisabled {
-            feature: "verify",
-            method: "verify_integrity",
-        });
+        return Err(feature_disabled("verify_integrity"));
         #[cfg(feature = "verify")]
         {
             let Some(declared) = self
@@ -648,10 +645,7 @@ impl Archive {
     /// Returns [`Error::FeatureDisabled`] when built without `verify`.
     pub fn verify_content_id(&self) -> Result<(), Error> {
         #[cfg(not(feature = "verify"))]
-        return Err(Error::FeatureDisabled {
-            feature: "verify",
-            method: "verify_content_id",
-        });
+        return Err(feature_disabled("verify_content_id"));
         #[cfg(feature = "verify")]
         {
             let Some(declared) = &self.manifest.document.content_id else {
@@ -676,19 +670,16 @@ impl Archive {
     /// Returns [`Error::FeatureDisabled`] when built without `verify`.
     pub fn verify_signature_chain(&self) -> Result<(), Error> {
         #[cfg(not(feature = "verify"))]
-        return Err(Error::FeatureDisabled {
-            feature: "verify",
-            method: "verify_signature_chain",
-        });
+        return Err(feature_disabled("verify_signature_chain"));
         #[cfg(feature = "verify")]
         {
             let Some(security) = &self.manifest.security else {
                 return Ok(());
             };
             let sigs = &security.signatures;
-            // Root signer (signatures[0]) MUST NOT carry prev_signature — it is the
-            // chain anchor. A present value means corruption, a mid-chain entry
-            // placed as root, or a re-rooting attack.
+            // Root signer (signatures[0]) MUST NOT carry prev_signature — it
+            // is the chain anchor. A present value means corruption, a
+            // mid-chain entry placed as root, or a re-rooting attack.
             if sigs.first().is_some_and(|s| s.prev_signature.is_some()) {
                 return Err(IntegrityError::SignatureChain(
                     "signatures[0] must not have prev_signature (chain root)".into(),
@@ -724,6 +715,17 @@ impl Archive {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/// Build the `FeatureDisabled` error for a `verify_*` method when the
+/// `verify` cargo feature is off. Keeps the three no-feature stubs above
+/// to a single line each instead of a 4-line struct literal.
+#[cfg(not(feature = "verify"))]
+fn feature_disabled(method: &'static str) -> Error {
+    Error::FeatureDisabled {
+        feature: "verify",
+        method,
+    }
+}
 
 /// Reject `..` path segments, absolute paths, drive letters, NUL bytes.
 /// Returns canonicalized forward-slash form or `None` if unsafe.
