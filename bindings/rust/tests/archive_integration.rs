@@ -121,6 +121,7 @@ fn signature_chain_root_must_not_have_prev_signature() {
       "security": {
         "signatures": [
           {
+            "role": "author",
             "signer": {"name": "Alice", "did": "did:web:example.com"},
             "algorithm": "ed25519",
             "signature": "abc",
@@ -158,6 +159,7 @@ fn signature_chain_accepts_single_root_without_prev() {
       "security": {
         "signatures": [
           {
+            "role": "author",
             "signer": {"name": "Alice", "did": "did:web:example.com"},
             "algorithm": "ed25519",
             "signature": "abc",
