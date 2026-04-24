@@ -1,11 +1,107 @@
 # Changelog
 
-All notable changes to the MDX Format specification and implementations will be documented in this file.
+All notable changes to the MDZ Format (formerly MDX Format) specification
+and implementations.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Renamed: MDX → MDZ (2026-04-24)
+
+Project renamed from **MDX** (Markdown eXtended Container) to **MDZ** (Markdown
+Zipped Container). Reason: the original "MDX" name collides with the React
+ecosystem's Markdown+JSX format, which dominates search results and developer
+mindshare for "MDX file format." While deployed usage of this project is
+effectively zero, it's the cheapest possible time to rename.
+
+**Backward compatibility:** readers MUST accept both extensions and both MIME
+types through 2027-01-01:
+
+- Extensions: `.mdz` (new, preferred) and `.mdx` (legacy, accepted on read)
+- MIME types: `application/vnd.mdz-container+zip` (new) and
+  `application/vnd.mdx-container+zip` (legacy)
+- Class names: `MDZDocument`, `MDZManifest`, etc. with `MDX*` deprecated
+  aliases exported from the TypeScript library
+- Manifest field: `mdx_version` retained (not renamed) to avoid breaking every
+  existing manifest; readers treat it as equivalent to a hypothetical
+  `mdz_version` field
+
+After 2027-01-01, writers SHOULD emit `.mdz` exclusively; readers will
+continue accepting `.mdx` indefinitely for archival access.
+
+### Repositioned: "executable scientific papers" as the core niche
+
+Previously framed as a general-purpose document format. Scope narrowed to
+serve researchers publishing to arXiv / bioRxiv / Zenodo / OSF and the OA
+journals that ingest from them. Every feature in the spec is now evaluated
+against that niche. See [`docs/POSITIONING.md`](docs/POSITIONING.md) and
+[`ROADMAP.md`](ROADMAP.md).
+
+### Added — Strategic documents (2026-04-24)
+
+- `ROADMAP.md` — phased plan through end-2027 with explicit success metrics
+- `docs/POSITIONING.md` — one-page pitch for researchers
+- `docs/COMPETITIVE.md` — honest comparison vs Quarto / Jupyter Book /
+  Curvenote / Manubot / Stencila with feature matrix
+- `docs/FUNDING.md` — resourcing reality and funding options (open)
+- `docs/PARTNERSHIPS.md` — outreach plan targeting arXiv / Zenodo / journals
+- `docs/for-authors/SUBMITTING.md` — ipynb+tex → MDZ conversion guide
+- `docs/for-journals/EDITORIAL.md` — validation + JATS-XML production path
+- `docs/for-reviewers/REPRODUCING.md` — re-execute cells, verify provenance
+- `spec/profiles/mdz-advanced-v1.json` — opt-in enterprise-grade profile
+  (JCS canonicalization, multi-sig, DIDs, content-addressing)
+- Tightened `spec/profiles/scientific-paper-v1.json` — added IMRaD + Data
+  Availability section requirements, ORCID-resolvable author DID requirement,
+  SPDX license requirement, CSL-JSON bibliography requirement, stricter
+  accessibility baseline.
+
+### Hardened — v2.0 implementations (from PR review, 2026-04-24)
+
+Parser (`alignment_parser.py`) now fails loud instead of silent on:
+
+- Unterminated fenced code blocks (was: silently absorb to EOF)
+- Empty `::cell` source, empty `::include` target, empty `::output` body
+- Missing `type=` on `::output` (was: default to "text")
+- Non-integer `execution_count` (was: silent string coercion)
+
+TypeScript type design:
+
+- `SignerRole` is now `BuiltInSignerRole | CustomSignerRole` (branded) — drops
+  the `| string` escape hatch that erased the union.
+- `VersionEntry.parent_versions?: string[]` added for §15.4 fork/merge DAG.
+- `cleanObject<T>` now uses `PlainObject<T>` conditional + runtime guard to
+  exclude arrays/Maps/Sets/Dates.
+- `MDZManifest.validate()` enforces invariants JSON Schema can't express:
+  `locales.default` must be in `available[].tag`, no duplicate tags,
+  `signature` XOR `signatures[]`, `prev_signature` required on chain
+  entries 1+.
+- `addSignature()` refuses chain-breaking insertions at call time.
+
+Tests (+40 new):
+
+- 6 parser error-path tests, 17 schema negative-rejection tests,
+  v1.1→v2.0 loader compat tests, full v2.0 JSON roundtrip tests, v2.0
+  MDZDocument integration tests through JSZip save+open.
+
+CI:
+
+- Removed `|| echo "completed with warnings"` — schema validation failures
+  now break CI instead of being swallowed.
+- Added Python setup to `validate-json-schema` job to run
+  `test_schema_negatives.py`.
+
+CLI:
+
+- `info.js` top-level catch now prints stack trace to stderr (was: swallowed
+  root cause).
+
+Comprehensive example now exercises previously-partial v2.0 features:
+
+- `document.content_id` (content-addressed identifier)
+- Second signature with `prev_signature` (chain demo)
+- Per-asset `locales[]` alternatives for es-ES and ja-JP alt-text
 
 ### Added — v2.0.0 Draft
 

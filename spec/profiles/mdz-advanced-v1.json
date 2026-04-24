@@ -1,0 +1,135 @@
+{
+  "$schema": "https://mdz-format.org/schemas/profile.schema.json",
+  "id": "https://mdz-format.org/profiles/mdz-advanced/v1",
+  "name": "MDZ Advanced",
+  "version": "1.0.0",
+  "description": "Advanced conformance profile for MDZ documents requiring enterprise-grade features: JCS canonicalization, multi-signature chains, W3C DIDs, content-addressed storage, and full provenance DAGs. Not required for Core conformance. A document that validates against mdz-advanced-v1 also validates against mdz-core.",
+
+  "required_manifest_fields": [
+    "document.id",
+    "document.content_id",
+    "document.created",
+    "document.modified",
+    "security.signatures",
+    "security.integrity",
+    "security.integrity.algorithm",
+    "security.integrity.manifest_checksum"
+  ],
+
+  "recommended_manifest_fields": [
+    "document.derived_from",
+    "history.graph_file",
+    "content.locales"
+  ],
+
+  "required_extensions": ["signatures", "content-addressing"],
+
+  "validation_rules": [
+    {
+      "rule": "document_content_id_required",
+      "value": true,
+      "description": "document.content_id must be present. This is the hash of the primary entry_point — enables verification that the rendered content matches what was signed."
+    },
+    {
+      "rule": "content_id_algorithm",
+      "value": ["sha256", "sha512", "blake3"],
+      "description": "document.content_id algorithm must be one of the v2.0 spec's accepted hash algorithms."
+    },
+    {
+      "rule": "all_assets_have_content_hash",
+      "value": true,
+      "description": "Every asset entry across all categories must have content_hash. Advanced profile does not accept legacy `checksum` field only — a migration path exists but must complete before Advanced validation."
+    },
+    {
+      "rule": "at_least_one_signature",
+      "value": true,
+      "description": "security.signatures[] must have at least one entry. Documents without signatures are not Advanced-conformant."
+    },
+    {
+      "rule": "signature_canonicalization_required",
+      "value": "jcs",
+      "description": "Every signature entry must declare canonicalization: 'jcs' (RFC 8785). Without canonicalization, signature verification is ambiguous across implementations."
+    },
+    {
+      "rule": "signature_chain_integrity",
+      "value": true,
+      "description": "For every signatures[i] with i > 0, prev_signature must be set and equal to the hash of signatures[i-1].signature. Enforces chain consistency detectable via spec-level validator."
+    },
+    {
+      "rule": "signer_did_required",
+      "value": true,
+      "description": "Every signature entry's signer must have a did field. Name-only signers are not Advanced-conformant — identity must be machine-resolvable.",
+      "severity": "error"
+    },
+    {
+      "rule": "signer_did_method_allowlist",
+      "value": ["did:web", "did:key", "did:jwk", "did:plc"],
+      "description": "Signer DIDs must use one of the registered DID methods on this allowlist. Invented methods (e.g., `did:ror`) are not registered and are rejected.",
+      "severity": "error"
+    },
+    {
+      "rule": "signature_algorithm_allowlist",
+      "value": ["Ed25519", "RS256", "ES256"],
+      "description": "Signature algorithms restricted to modern, widely-implemented choices. RSA with <2048-bit keys or SHA-1 is rejected."
+    },
+    {
+      "rule": "integrity_manifest_checksum_required",
+      "value": true,
+      "description": "security.integrity.manifest_checksum must be present and valid. Without it, the manifest itself can be swapped under a valid signature."
+    },
+    {
+      "rule": "derived_from_recommended_for_revisions",
+      "value": true,
+      "description": "If the document has a non-initial version, document.derived_from[] should reference the prior version. Enforces provenance DAG completeness.",
+      "severity": "warning"
+    },
+    {
+      "rule": "history_graph_file_for_dag",
+      "value": true,
+      "description": "If history.enabled is true AND versions.json contains >1 version, history.graph_file must be set and the file must be present.",
+      "severity": "warning"
+    },
+    {
+      "rule": "content_addressed_alias_for_assets",
+      "value": true,
+      "description": "Every asset referenced by content_hash should have a corresponding assets/by-hash/<algo>/<hex>.<ext> entry that is byte-identical. Enables content-first retrieval.",
+      "severity": "warning"
+    },
+    {
+      "rule": "locales_default_in_available",
+      "value": true,
+      "description": "If content.locales is set, default must be in available[].tag. (Also enforced by MDZManifest.validate() in the reference impls.)"
+    },
+    {
+      "rule": "no_external_scripts_without_integrity",
+      "value": true,
+      "description": "If interactivity.scripts[] contains any entry, integrity (SRI hash) must be set. Without SRI, the viewer cannot verify scripts haven't been swapped in transit."
+    },
+    {
+      "rule": "permissions_explicit_required",
+      "value": true,
+      "description": "security.permissions must be fully populated; Advanced profile does not accept implicit 'whatever the default is.'"
+    },
+    {
+      "rule": "no_deprecated_fields",
+      "value": true,
+      "description": "Advanced profile rejects v1.1 deprecated fields: security.signature (singular), asset.checksum (use content_hash), etc. Accepting them would legitimize inconsistent manifests.",
+      "severity": "warning"
+    }
+  ],
+
+  "preferred_capabilities": [
+    "signatures",
+    "content-addressing",
+    "multi-locale",
+    "structural-provenance"
+  ],
+
+  "notes": [
+    "Advanced profile is intentionally strict. Documents failing Advanced may still be valid against Core.",
+    "Advanced is appropriate for: archival deposits, legal documents, supply-chain-sensitive technical reports, high-stakes publications.",
+    "Most scientific papers will validate against scientific-paper-v1 (which is Core-based). Only papers that need full provenance chain + multi-sig should pursue Advanced.",
+    "Migrating from Core to Advanced: add DIDs to all signers, compute and add content_id and content_hashes, add JCS canonicalization to signatures. No breaking change to the file format; additive.",
+    "A document may declare BOTH a primary profile (e.g., scientific-paper-v1) and mdz-advanced-v1 in document.profiles[] — they validate independently and both must pass."
+  ]
+}

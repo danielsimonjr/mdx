@@ -1,34 +1,58 @@
 {
-  "$schema": "https://mdx-format.org/schemas/profile.schema.json",
-  "id": "https://mdx-format.org/profiles/scientific-paper/v1",
+  "$schema": "https://mdz-format.org/schemas/profile.schema.json",
+  "id": "https://mdz-format.org/profiles/scientific-paper/v1",
   "name": "Scientific Paper",
-  "version": "1.0.0",
-  "description": "A peer-reviewable scientific paper with standard IMRaD structure plus abstract, keywords, and references.",
+  "version": "1.1.0",
+  "description": "A peer-reviewable, signable, reproducible scientific paper. Requires IMRaD structure, CSL-JSON bibliography, SPDX license, at least one ORCID-resolvable author DID, and declared accessibility baseline. Tightened per the scientific-paper positioning (docs/POSITIONING.md).",
+
   "required_sections": [
     { "heading_pattern": "^(Abstract|Summary)$", "level": 1 },
     { "heading_pattern": "^Introduction$", "level": 1 },
-    { "heading_pattern": "^(Methods?|Materials and Methods)$", "level": 1 },
+    { "heading_pattern": "^(Methods?|Materials and Methods|Methodology)$", "level": 1 },
     { "heading_pattern": "^Results$", "level": 1 },
     { "heading_pattern": "^Discussion$", "level": 1 },
-    { "heading_pattern": "^References$", "level": 1 }
+    { "heading_pattern": "^(References|Bibliography)$", "level": 1 },
+    { "heading_pattern": "^Data Availability( Statement)?$", "level": 1 }
   ],
+
   "recommended_sections": [
     { "heading_pattern": "^Acknowledg(e?)ments$", "level": 1 },
-    { "heading_pattern": "^(Supplementary Materials|Appendix( [A-Z])?)$", "level": 1 }
+    { "heading_pattern": "^(Supplementary Materials|Appendix( [A-Z])?)$", "level": 1 },
+    { "heading_pattern": "^Conflicts? of Interest$", "level": 1 },
+    { "heading_pattern": "^(Funding|Funding Sources?)$", "level": 1 },
+    { "heading_pattern": "^Author Contributions$", "level": 1 }
   ],
+
   "required_manifest_fields": [
     "document.title",
     "document.authors",
     "document.keywords",
     "document.license",
-    "document.created"
-  ],
-  "recommended_manifest_fields": [
+    "document.created",
     "document.accessibility.features",
-    "document.derived_from"
+    "document.accessibility.api_compliance",
+    "content.includes"
   ],
-  "required_extensions": ["math", "footnotes"],
-  "recommended_extensions": ["cell", "attributes"],
+
+  "recommended_manifest_fields": [
+    "document.derived_from",
+    "document.subject",
+    "document.contributors",
+    "document.published",
+    "security.signatures"
+  ],
+
+  "required_extensions": ["math", "footnotes", "cite", "cross-reference"],
+  "recommended_extensions": ["cell", "attributes", "include", "bibliography"],
+
+  "required_files": [
+    {
+      "path": "references.json",
+      "description": "CSL-JSON bibliography. Every ::cite[key] reference must resolve against an entry here.",
+      "format": "csl-json"
+    }
+  ],
+
   "validation_rules": [
     {
       "rule": "min_authors",
@@ -36,25 +60,116 @@
       "description": "At least one author required for attribution."
     },
     {
+      "rule": "author_requires_did_or_orcid",
+      "value": true,
+      "description": "Every author entry must have either a did:web resolving to an ORCID record, or an explicit orcid field. Unattributed papers are not valid scientific contributions.",
+      "severity": "error"
+    },
+    {
       "rule": "keyword_min_count",
       "value": 3,
-      "description": "At least 3 keywords recommended for discoverability."
+      "description": "At least 3 keywords required for discoverability and indexing."
+    },
+    {
+      "rule": "keyword_max_count",
+      "value": 10,
+      "description": "Cap at 10 keywords to avoid keyword stuffing."
     },
     {
       "rule": "figures_have_alt_text",
       "value": true,
-      "description": "Every figure asset must have non-empty alt_text."
+      "description": "Every figure asset must have non-empty alt_text. Required for WCAG 2.1 AA."
+    },
+    {
+      "rule": "figures_have_long_description",
+      "value": true,
+      "description": "Every figure must have either inline long_description or long_description_path.",
+      "severity": "warning"
     },
     {
       "rule": "math_requires_mathml_fallback",
       "value": true,
-      "description": "Math directives should include MathML accessibility alternative."
+      "description": "Math directives must include MathML accessibility alternative for WCAG 2.1 AA compliance."
+    },
+    {
+      "rule": "license_spdx_required",
+      "value": true,
+      "description": "document.license must use an SPDX identifier. Unlabeled or custom licenses are not valid for scientific publication."
+    },
+    {
+      "rule": "license_must_be_oa_compatible",
+      "value": ["CC-BY-4.0", "CC-BY-SA-4.0", "CC-BY-NC-4.0", "CC0-1.0", "MIT", "Apache-2.0"],
+      "description": "For scientific-paper profile, license must be on the OA-compatible allow-list. Journals may further restrict via their own derived profile.",
+      "severity": "warning"
+    },
+    {
+      "rule": "accessibility_baseline_required",
+      "value": "WCAG-2.1-AA",
+      "description": "document.accessibility.api_compliance must contain at least WCAG-2.1-AA. Upgrade to 2.2-AA optional."
+    },
+    {
+      "rule": "cells_must_declare_kernel",
+      "value": true,
+      "description": "Every ::cell block must reference a kernel declared in interactivity.kernels[]. Reviewers need to know what to re-execute with."
+    },
+    {
+      "rule": "cells_must_have_cached_output",
+      "value": true,
+      "description": "Every ::cell block must have at least one ::output (cached execution result). Authors must ship proof of execution; reviewers re-execute for verification.",
+      "severity": "warning"
+    },
+    {
+      "rule": "external_includes_require_content_hash",
+      "value": true,
+      "description": "Every external ::include (non-local target) must have content_hash pinning. Transclusion without pinning is a supply-chain risk."
+    },
+    {
+      "rule": "citation_resolves_against_bibliography",
+      "value": true,
+      "description": "Every ::cite[key] must resolve to an entry in references.json. Unresolved citations block submission."
+    },
+    {
+      "rule": "cross_reference_resolves_to_labeled_block",
+      "value": true,
+      "description": "Every ::ref[id] must resolve to a ::fig / ::eq / ::tab / heading-id in the document or an included file."
+    },
+    {
+      "rule": "data_availability_section_present",
+      "value": true,
+      "description": "A Data Availability Statement section is required by most modern OA journals; profile enforces it."
+    },
+    {
+      "rule": "no_bare_external_urls",
+      "value": true,
+      "description": "External images and scripts must be explicitly permitted via security.permissions.allow_external_images / allow_scripts. Default is deny.",
+      "severity": "warning"
     }
   ],
-  "preferred_capabilities": ["math", "structural-navigation"],
+
+  "preferred_capabilities": [
+    "math",
+    "structural-navigation",
+    "long-description",
+    "reading-order",
+    "structural-navigation"
+  ],
+
+  "signature_requirements": {
+    "author": {
+      "min_count": 1,
+      "description": "At least one author signature required for submission."
+    },
+    "corresponding_author": {
+      "min_count": 1,
+      "description": "Exactly one corresponding-author signature required."
+    }
+  },
+
   "notes": [
-    "Use ::figure directive with caption + credit attributes for every figure.",
-    "Cite sources in a References section using Markdown footnotes or a citation extension.",
-    "Include a DOI in document.keywords or document.custom if the paper has one assigned."
+    "Use ::fig{id=X} / ::eq{id=X} / ::tab{id=X} for labelable figures, equations, and tables; reference via ::ref[X].",
+    "Cite sources via ::cite[key] resolving against references.json (CSL-JSON).",
+    "Include a DOI in document.custom.doi once minted via Crossref or DataCite.",
+    "Record preprint-to-published provenance in document.derived_from[].",
+    "Re-signing is required after every content change; stale signatures block submission."
   ]
 }

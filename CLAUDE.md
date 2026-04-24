@@ -4,7 +4,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-MDX (Markdown eXtended Container) is a draft specification for an open document format that packages Markdown content with embedded media into self-contained ZIP archives. The current version is v1.1.0 (draft), which adds text alignment and block attribute support.
+**This project was renamed from MDX to MDZ on 2026-04-24.** See `ROADMAP.md`
+Phase 0 and `CHANGELOG.md` for rename details. Throughout this file, older
+references to "MDX" may remain in paths, class names, and spec filenames
+pending the Phase 0 code-rename sweep (task #46 in the TaskList).
+
+MDZ (**Markdown Zipped Container**) is a draft specification for an open file
+format for **executable scientific papers** — one signed ZIP archive carrying
+the manuscript, executable code cells, data, figures, citations, and
+cryptographic provenance chain. The narrowing to "executable scientific
+papers" happened 2026-04-24 per `docs/POSITIONING.md`; previously the format
+was pitched as general-purpose. Current spec version is v2.0.0 (draft).
+
+Backward-compat policy: readers MUST accept both `.mdx` and `.mdz`
+extensions and both MIME types (`application/vnd.mdx-container+zip` and
+`application/vnd.mdz-container+zip`) through 2027-01-01. Writers should emit
+`.mdz` for new archives.
 
 ## Repository Structure
 

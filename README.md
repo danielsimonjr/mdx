@@ -1,22 +1,62 @@
-# MDX Format
+# MDZ Format
 
-**Markdown eXtended Container** - An open document format that packages Markdown content with embedded media into self-contained ZIP archives.
+**Markdown Zipped Container** — an open file format for **executable
+scientific papers**. One signed ZIP archive carries the manuscript,
+executable code cells, data, figures, citations, multi-signature
+provenance, and accessibility metadata.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Specification](https://img.shields.io/badge/Spec-v2.0.0--Draft-orange.svg)](spec/MDX_FORMAT_SPECIFICATION_v2.0.md)
 
-## Overview
+> **STATUS: experimental research project.** The tooling targets
+> professional-grade UX (polished, keyboard-first, accessible, fast). The
+> *format itself* is not yet production-stable — breaking changes may land
+> up to v3.0. Do not base production infrastructure on MDZ until at least
+> one external organization has published in the format. See
+> [ROADMAP.md](ROADMAP.md) for current phase and [docs/FUNDING.md](docs/FUNDING.md)
+> for resourcing status.
 
-MDX is a portable document format designed to bundle Markdown content with images, videos, 3D models, data files, and other assets into a single, self-contained file. Think of it as "Markdown meets ZIP" - human-readable content with all dependencies included.
+> **Naming.** This project was renamed from **MDX** to **MDZ** on
+> 2026-04-24 because "MDX" collides with the React ecosystem's Markdown+JSX
+> format. The file extension `.mdx` and MIME type
+> `application/vnd.mdx-container+zip` remain accepted by readers as legacy
+> aliases through 2027-01-01. New archives should use `.mdz` and
+> `application/vnd.mdz-container+zip`.
 
-**Key Features:**
-- **Universal Accessibility** - Any ZIP utility can extract contents; any text editor can read the Markdown
-- **Graceful Degradation** - Basic viewers show text and images; advanced viewers unlock full interactivity
-- **Web Standards Alignment** - Standard MIME types, CommonMark Markdown, W3C Web Annotations
-- **Version Control Friendly** - Text-based manifest and Markdown enable meaningful diffs
-- **Collaboration Ready** - Built-in support for annotations, comments, and version history
+## What MDZ is for
 
-### What's New in v2.0
+MDZ replaces the duct-tape stack of `.ipynb` + Overleaf + supplementary
+`.zip` + post-hoc DOI. See [docs/POSITIONING.md](docs/POSITIONING.md) for
+the full pitch. In short: a grad student authors a reproducible paper, a
+reviewer re-executes any cell in-browser, a journal validates the
+submission against its profile and exports JATS-XML for production —
+one archive carries all of it, cryptographically signed end to end.
+
+This is a focused niche. MDZ is *not* a Google Docs replacement, not a
+page-layout tool, not a general-purpose document format. See
+[docs/POSITIONING.md](docs/POSITIONING.md) "What MDZ is NOT" for the
+explicit boundaries, and [docs/COMPETITIVE.md](docs/COMPETITIVE.md) for
+honest comparison against Quarto, Jupyter Book, Curvenote, Manubot, and
+Stencila.
+
+## Key capabilities
+
+- **One archive, one hash.** Signed, content-addressed, offline-ready.
+- **Executable cells** (`::cell`) with cached outputs — reviewers re-run
+  what they doubt; the rest render from cache.
+- **Multi-signature chains** (author → corresponding author → reviewer →
+  editor) with W3C DID identity resolution via `did:web`.
+- **Provenance DAG** — preprint → revisions → accepted version, all in
+  one file.
+- **Accessibility built-in** — WCAG 2.1 AA baseline declared in the
+  manifest, not only in the rendered HTML.
+- **Multi-locale content** — primary language + translations in one archive.
+- **Profile-driven validation** — journals own their submission profile
+  and reject non-conformant manuscripts programmatically.
+- **Graceful degradation** — any ZIP tool extracts contents; any Markdown
+  reader reads the prose; cells and outputs layer on top.
+
+### What's New in v2.0 (still named `mdx_version` in manifests for compatibility)
 
 Ten capability additions, each backward-compatible with v1.1:
 
