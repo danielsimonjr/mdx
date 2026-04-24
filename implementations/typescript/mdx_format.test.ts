@@ -479,12 +479,15 @@ describe("MDXManifest v2.0 helpers — §16 multi-signature", () => {
       scope: "full-archive",
       signature: "base64-sig-a",
     });
+    // Entry 1+ requires prev_signature per §16.3 chain invariant,
+    // enforced by addSignature at insertion time.
     m.addSignature({
       role: "reviewer",
       signer: { name: "Bob" },
       algorithm: "Ed25519",
       scope: "manifest-only",
       signature: "base64-sig-b",
+      prev_signature: "sha256:hash-of-sig-a",
     });
 
     const sigs = m.toObject().security?.signatures;
@@ -492,6 +495,7 @@ describe("MDXManifest v2.0 helpers — §16 multi-signature", () => {
     expect(sigs?.[0].role).toBe("author");
     expect(sigs?.[0].signer.did).toBe("did:web:alice.example.com");
     expect(sigs?.[1].role).toBe("reviewer");
+    expect(sigs?.[1].prev_signature).toBe("sha256:hash-of-sig-a");
   });
 });
 
