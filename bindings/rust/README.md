@@ -99,7 +99,8 @@ cargo test
 
 ## Minimum supported Rust version
 
-1.73. Pinned by `zip 2.2` (requires `let…else` and `time 0.3.36` features).
+1.85. Pinned by transitive dependencies (`indexmap 2.14+` uses edition
+2024, which requires Rust 1.85+).
 
 ## License
 

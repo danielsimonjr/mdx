@@ -8,7 +8,7 @@ repository = "https://github.com/danielsimonjr/mdx"
 keywords = ["mdz", "mdx", "markdown", "scientific", "archive"]
 categories = ["parser-implementations", "science"]
 readme = "README.md"
-rust-version = "1.73"
+rust-version = "1.85"
 
 [lib]
 name = "mdz"

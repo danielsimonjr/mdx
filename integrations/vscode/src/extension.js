@@ -99,7 +99,8 @@ function viewArchive(uri, out) {
         return;
     }
     // The `mdz view` command starts a local server; defer to it rather
-    // than reinventing a browser launcher.
+    // than reinventing a browser launcher. Fire-and-forget — no OUTPUT
+    // streaming because the server is long-running.
     const cli = getCliPath();
     out.show(true);
     out.appendLine(`$ ${cli} view ${filePath}`);

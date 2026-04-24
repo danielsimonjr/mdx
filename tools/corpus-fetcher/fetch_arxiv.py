@@ -43,13 +43,15 @@ from __future__ import annotations
 import argparse
 import io
 import json
-import re
 import shutil
 import subprocess
 import sys
 import tarfile
 import time
-from dataclasses import dataclass, field, asdict
+import uuid
+import zipfile
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -186,12 +188,12 @@ def search_papers(category: str, count: int) -> list[PaperMeta]:
         categories = [
             c.attrib.get("term", "") for c in entry.findall("atom:category", ns)
         ]
-        pdf_url = ""
-        source_url = ""
-        for link in entry.findall("atom:link", ns):
-            title_attr = link.attrib.get("title", "")
-            if title_attr == "pdf":
-                pdf_url = link.attrib.get("href", "")
+        pdf_url = next(
+            (link.attrib.get("href", "")
+             for link in entry.findall("atom:link", ns)
+             if link.attrib.get("title") == "pdf"),
+            "",
+        )
         # arXiv source tarball is at arxiv.org/e-print/{id}
         source_url = f"http://arxiv.org/e-print/{arxiv_id}"
 
@@ -247,37 +249,37 @@ def convert_paper(meta: PaperMeta, tarball: Path, out_dir: Path) -> ConversionRe
     work_dir = out_dir / meta.arxiv_id
     work_dir.mkdir(parents=True, exist_ok=True)
 
-    # Fast-path detection: some arXiv /e-print URLs return a PDF (withdrawn
-    # LaTeX source). tarfile.open raises a cryptic ReadError in that case.
+    # Fast-path: some arXiv /e-print URLs return a PDF (withdrawn LaTeX
+    # source). tarfile.open raises a cryptic ReadError in that case, so
+    # sniff the magic bytes first.
     try:
         with open(tarball, "rb") as f:
-            head = f.read(8)
-        if head[:4] == b"%PDF":
-            result.error_category = "source-is-pdf"
-            result.error_detail = "arXiv /e-print returned a PDF (no LaTeX source)"
-            return result
+            head = f.read(4)
     except OSError as e:
         result.error_category = "tarball-read"
         result.error_detail = str(e)
         return result
+    if head == b"%PDF":
+        result.error_category = "source-is-pdf"
+        result.error_detail = "arXiv /e-print returned a PDF (no LaTeX source)"
+        return result
 
+    # Python 3.12's `filter="data"` enforces the safe-extraction policy
+    # (reject absolute paths, .. segments, device files, symlinks escaping
+    # the destination, etc.) at extract time. See: PEP 706 / CVE-2007-4559.
+    unsafe_tar_errs = (
+        tarfile.FilterError, tarfile.AbsolutePathError,
+        tarfile.OutsideDestinationError, tarfile.SpecialFileError,
+        tarfile.LinkOutsideDestinationError,
+    )
     try:
         with tarfile.open(tarball, "r:*") as tf:
-            # Python 3.12's `filter="data"` enforces the safe-extraction
-            # policy (reject absolute paths, .. segments, device files,
-            # symlinks escaping the destination, etc.) at extract time.
-            # See: PEP 706 / CVE-2007-4559.
             tf.extractall(work_dir, filter="data")
-    except tarfile.ReadError as e:
-        result.error_category = "tarball-extract"
-        result.error_detail = f"tarball read error: {e}"
-        return result
-    except (tarfile.FilterError, tarfile.AbsolutePathError, tarfile.OutsideDestinationError,
-            tarfile.SpecialFileError, tarfile.LinkOutsideDestinationError) as e:
+    except unsafe_tar_errs as e:
         result.error_category = "unsafe-tarball"
         result.error_detail = str(e)
         return result
-    except Exception as e:  # noqa: BLE001 — catch-all for unexpected extract failures
+    except Exception as e:  # noqa: BLE001 — covers ReadError + unexpected extract failures
         result.error_category = "tarball-extract"
         result.error_detail = f"{type(e).__name__}: {e}"
         return result
@@ -341,50 +343,46 @@ def convert_paper(meta: PaperMeta, tarball: Path, out_dir: Path) -> ConversionRe
     # currently interactive and unsuitable for batch; a non-interactive
     # `mdz create --from-markdown <path>` is a Phase 2 follow-up.
     mdz_path = work_dir / f"{meta.arxiv_id}.mdz"
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    manifest = {
+        "mdx_version": "2.0.0",
+        "document": {
+            "id": str(uuid.uuid4()),
+            "title": meta.title,
+            "created": now,
+            "modified": now,
+            "language": "en-US",
+            "authors": [{"name": a} for a in meta.authors],
+            "keywords": meta.categories,
+            "license": meta.license or "arxiv-perpetual",
+        },
+        "content": {
+            "entry_point": "document.md",
+            "encoding": "UTF-8",
+            "markdown_variant": "CommonMark",
+            "extensions": ["tables", "attributes", "cite", "cross-reference"],
+        },
+        "custom": {
+            "import_source": {
+                "kind": "arxiv",
+                "arxiv_id": meta.arxiv_id,
+                "source_url": meta.source_url,
+                "converted_at": now,
+                "tool": "mdz-corpus-fetcher/0.1",
+            },
+        },
+    }
     try:
-        import zipfile
-        import uuid
-        from datetime import datetime, timezone
-
-        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        manifest = {
-            "mdx_version": "2.0.0",
-            "document": {
-                "id": str(uuid.uuid4()),
-                "title": meta.title,
-                "created": now,
-                "modified": now,
-                "language": "en-US",
-                "authors": [{"name": a} for a in meta.authors],
-                "keywords": meta.categories,
-                "license": meta.license or "arxiv-perpetual",
-            },
-            "content": {
-                "entry_point": "document.md",
-                "encoding": "UTF-8",
-                "markdown_variant": "CommonMark",
-                "extensions": ["tables", "attributes", "cite", "cross-reference"],
-            },
-            "custom": {
-                "import_source": {
-                    "kind": "arxiv",
-                    "arxiv_id": meta.arxiv_id,
-                    "source_url": meta.source_url,
-                    "converted_at": now,
-                    "tool": "mdz-corpus-fetcher/0.1",
-                },
-            },
-        }
         with zipfile.ZipFile(mdz_path, "w", zipfile.ZIP_DEFLATED) as zf:
             zf.writestr("manifest.json", json.dumps(manifest, indent=2, ensure_ascii=False))
             zf.writestr("document.md", md_text)
-        result.mdz_size_bytes = mdz_path.stat().st_size
-        result.succeeded = True
-        return result
-    except Exception as e:
+    except OSError as e:
         result.error_category = "mdz-packaging"
         result.error_detail = str(e)
         return result
+    result.mdz_size_bytes = mdz_path.stat().st_size
+    result.succeeded = True
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -405,32 +403,32 @@ def write_report(results: list[ConversionResult], out_path: Path) -> None:
     for r in failed:
         by_error[r.error_category] = by_error.get(r.error_category, 0) + 1
 
-    summary_path = out_path.with_suffix(".md")
+    total = max(len(results), 1)
     lines = [
-        f"# arXiv corpus conversion summary",
-        f"",
+        "# arXiv corpus conversion summary",
+        "",
         f"- Papers attempted: **{len(results)}**",
-        f"- Succeeded: **{len(succeeded)}** ({len(succeeded) * 100 // max(len(results), 1)}%)",
+        f"- Succeeded: **{len(succeeded)}** ({len(succeeded) * 100 // total}%)",
         f"- Failed: **{len(failed)}**",
-        f"",
-        f"## Failure breakdown",
-        f"",
+        "",
+        "## Failure breakdown",
+        "",
     ]
-    for cat, n in sorted(by_error.items(), key=lambda kv: -kv[1]):
-        lines.append(f"- `{cat}`: {n}")
+    lines += [f"- `{cat}`: {n}" for cat, n in sorted(by_error.items(), key=lambda kv: -kv[1])]
     if succeeded:
-        avg_size = sum(r.mdz_size_bytes for r in succeeded) // len(succeeded)
-        avg_cells = sum(r.cell_count for r in succeeded) / len(succeeded)
-        avg_cites = sum(r.citation_count for r in succeeded) / len(succeeded)
+        n = len(succeeded)
+        avg_size_kb = sum(r.mdz_size_bytes for r in succeeded) // n // 1024
+        avg_cells = sum(r.cell_count for r in succeeded) / n
+        avg_cites = sum(r.citation_count for r in succeeded) / n
         lines += [
-            f"",
-            f"## Successful conversions — distribution",
-            f"",
-            f"- Average MDZ size: {avg_size // 1024} KB",
+            "",
+            "## Successful conversions — distribution",
+            "",
+            f"- Average MDZ size: {avg_size_kb} KB",
             f"- Average `::cell` count: {avg_cells:.1f}",
             f"- Average `::cite` count: {avg_cites:.1f}",
         ]
-    summary_path.write_text("\n".join(lines), encoding="utf-8")
+    out_path.with_suffix(".md").write_text("\n".join(lines), encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------

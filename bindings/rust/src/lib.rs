@@ -435,15 +435,12 @@ impl Archive {
             // `file.size()` is the declared uncompressed size from the ZIP central
             // directory — attacker-controlled metadata. A ZIP-bomb can declare
             // `size=1` and inflate to gigabytes. Measure the *actual* inflated
-            // length by reading through a bounded adapter and refuse anything
-            // larger than the remaining budget.
+            // length by reading through a bounded adapter; reading `remaining+1`
+            // lets us detect overrun via a single length check.
             use std::io::Read;
             let remaining = MAX_TOTAL_INFLATED_BYTES.saturating_sub(total_bytes);
-            // Read up to `remaining + 1` bytes; if we hit remaining+1, the entry
-            // would push us over the ceiling.
             let budget = remaining.saturating_add(1);
-            let cap = budget.min(1024 * 1024) as usize; // cap initial alloc at 1 MiB
-            let mut buf = Vec::with_capacity(cap);
+            let mut buf = Vec::with_capacity(budget.min(1024 * 1024) as usize);
             let read_bytes = (&mut file).take(budget).read_to_end(&mut buf)? as u64;
             if read_bytes > remaining {
                 return Err(ArchiveError::SizeExceeded {
@@ -518,26 +515,22 @@ impl Archive {
     }
 
     fn resolve_entry_point(&self, preferred: &[&str]) -> String {
-        if let Some(locales) = &self.manifest.content.locales {
-            for pref in preferred {
-                if let Some(entry) = locales.available.iter().find(|a| a.tag == *pref) {
-                    return entry.entry_point.clone();
-                }
-            }
-            for fb in &locales.fallback {
-                if let Some(entry) = locales.available.iter().find(|a| &a.tag == fb) {
-                    return entry.entry_point.clone();
-                }
-            }
-            if let Some(entry) = locales
+        let Some(locales) = &self.manifest.content.locales else {
+            return self.manifest.content.entry_point.clone();
+        };
+        let find_tag = |tag: &str| {
+            locales
                 .available
                 .iter()
-                .find(|a| a.tag == locales.default)
-            {
-                return entry.entry_point.clone();
-            }
-        }
-        self.manifest.content.entry_point.clone()
+                .find(|a| a.tag == tag)
+                .map(|a| a.entry_point.clone())
+        };
+        preferred
+            .iter()
+            .find_map(|p| find_tag(p))
+            .or_else(|| locales.fallback.iter().find_map(|f| find_tag(f)))
+            .or_else(|| find_tag(&locales.default))
+            .unwrap_or_else(|| self.manifest.content.entry_point.clone())
     }
 
     /// Verify `security.integrity.manifest_checksum` against the SHA-256 of
@@ -548,56 +541,30 @@ impl Archive {
     /// Available only with the `verify` feature (default).
     #[cfg(feature = "verify")]
     pub fn verify_integrity(&self) -> Result<(), Error> {
-        let security = match &self.manifest.security {
-            Some(s) => s,
-            None => return Ok(()),
+        let Some(declared) = self
+            .manifest
+            .security
+            .as_ref()
+            .and_then(|s| s.integrity.as_ref())
+            .and_then(|i| i.manifest_checksum.as_ref())
+        else {
+            return Ok(());
         };
-        let integrity = match &security.integrity {
-            Some(i) => i,
-            None => return Ok(()),
-        };
-        let declared = match &integrity.manifest_checksum {
-            Some(d) => d,
-            None => return Ok(()),
-        };
-        let (algo, expected) = parse_hash(declared)?;
-        let actual = hash_bytes(&algo, &self.manifest_raw)?;
-        if actual == expected {
-            Ok(())
-        } else {
-            Err(IntegrityError::Mismatch {
-                kind: "manifest_checksum",
-                declared: expected[..expected.len().min(16)].to_string(),
-                computed: actual[..actual.len().min(16)].to_string(),
-            }
-            .into())
-        }
+        check_hash("manifest_checksum", declared, &self.manifest_raw)
     }
 
     /// Verify `document.content_id` against the entry-point bytes.
     #[cfg(feature = "verify")]
     pub fn verify_content_id(&self) -> Result<(), Error> {
-        let declared = match &self.manifest.document.content_id {
-            Some(d) => d,
-            None => return Ok(()),
+        let Some(declared) = &self.manifest.document.content_id else {
+            return Ok(());
         };
-        let (algo, expected) = parse_hash(declared)?;
         let entry_point = &self.manifest.content.entry_point;
         let bytes = self
             .entries
             .get(entry_point)
             .ok_or_else(|| ArchiveError::EntryNotFound(entry_point.clone()))?;
-        let actual = hash_bytes(&algo, bytes)?;
-        if actual == expected {
-            Ok(())
-        } else {
-            Err(IntegrityError::Mismatch {
-                kind: "content_id",
-                declared: expected[..expected.len().min(16)].to_string(),
-                computed: actual[..actual.len().min(16)].to_string(),
-            }
-            .into())
-        }
+        check_hash("content_id", declared, bytes)
     }
 
     /// Check the structural integrity of the signature chain.
@@ -608,40 +575,30 @@ impl Archive {
     /// and is Phase 3.2 work (same caveat as the Node reference verifier).
     #[cfg(feature = "verify")]
     pub fn verify_signature_chain(&self) -> Result<(), Error> {
-        let security = match &self.manifest.security {
-            Some(s) => s,
-            None => return Ok(()),
+        let Some(security) = &self.manifest.security else {
+            return Ok(());
         };
+        let sigs = &security.signatures;
         // Root signer (signatures[0]) MUST NOT carry prev_signature — it is the
         // chain anchor. A present value means corruption, a mid-chain entry
         // placed as root, or a re-rooting attack.
-        if let Some(first) = security.signatures.first() {
-            if first.prev_signature.is_some() {
-                return Err(IntegrityError::SignatureChain(
-                    "signatures[0] must not have prev_signature (chain root)".into(),
-                )
-                .into());
-            }
+        if sigs.first().is_some_and(|s| s.prev_signature.is_some()) {
+            return Err(IntegrityError::SignatureChain(
+                "signatures[0] must not have prev_signature (chain root)".into(),
+            )
+            .into());
         }
-        for (i, entry) in security.signatures.iter().enumerate().skip(1) {
-            let prev = &security.signatures[i - 1];
-            let expected_prev_hash = format!("sha256:{}", sha256_hex(prev.signature.as_bytes()));
+        for (i, entry) in sigs.iter().enumerate().skip(1) {
+            let expected = format!("sha256:{}", sha256_hex(sigs[i - 1].signature.as_bytes()));
             match &entry.prev_signature {
-                Some(ps) if ps == &expected_prev_hash => continue,
-                Some(ps) => {
-                    return Err(IntegrityError::SignatureChain(format!(
-                        "signatures[{}].prev_signature '{}' does not match sha256 of signatures[{}]",
-                        i, ps, i - 1
-                    ))
-                    .into())
-                }
-                None => {
-                    return Err(IntegrityError::SignatureChain(format!(
-                        "signatures[{}] missing prev_signature (breaks chain)",
-                        i
-                    ))
-                    .into())
-                }
+                Some(ps) if ps == &expected => {}
+                Some(ps) => return Err(IntegrityError::SignatureChain(format!(
+                    "signatures[{}].prev_signature '{}' does not match sha256 of signatures[{}]",
+                    i, ps, i - 1
+                )).into()),
+                None => return Err(IntegrityError::SignatureChain(format!(
+                    "signatures[{}] missing prev_signature (breaks chain)", i
+                )).into()),
             }
         }
         Ok(())
@@ -667,15 +624,11 @@ fn sanitize_archive_path(raw: &str) -> Option<String> {
     if bytes.len() >= 2 && bytes[1] == b':' && bytes[0].is_ascii_alphabetic() {
         return None;
     }
-    let segments: Vec<&str> = norm.split('/').collect();
-    for seg in &segments {
-        if *seg == ".." {
-            return None;
-        }
+    if norm.split('/').any(|seg| seg == "..") {
+        return None;
     }
     Some(
-        segments
-            .into_iter()
+        norm.split('/')
             .filter(|s| !s.is_empty() && *s != ".")
             .collect::<Vec<_>>()
             .join("/"),
@@ -688,6 +641,23 @@ fn parse_hash(declared: &str) -> Result<(String, String), Error> {
         .split_once(':')
         .ok_or_else(|| IntegrityError::MalformedHashString(declared.to_string()))?;
     Ok((algo.to_ascii_lowercase(), expected.to_ascii_lowercase()))
+}
+
+/// Parse `declared`, hash `bytes`, compare. Shared body of
+/// `verify_integrity` / `verify_content_id`.
+#[cfg(feature = "verify")]
+fn check_hash(kind: &'static str, declared: &str, bytes: &[u8]) -> Result<(), Error> {
+    let (algo, expected) = parse_hash(declared)?;
+    let actual = hash_bytes(&algo, bytes)?;
+    if actual == expected {
+        return Ok(());
+    }
+    Err(IntegrityError::Mismatch {
+        kind,
+        declared: expected[..expected.len().min(16)].to_string(),
+        computed: actual[..actual.len().min(16)].to_string(),
+    }
+    .into())
 }
 
 #[cfg(feature = "verify")]

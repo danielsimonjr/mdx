@@ -56,40 +56,35 @@ local function string_starts_with(s, prefix)
 end
 
 local function tokenize_attrs(body)
-  -- Split `body` into whitespace-separated tokens, but preserve quoted
-  -- values containing spaces (e.g. `title="Two words"`). The previous
+  -- Split `body` into whitespace-separated tokens, preserving quoted
+  -- values that contain spaces (e.g. `title="Two words"`). A prior
   -- `string.gmatch(body, '%S+')` implementation broke quoted spans.
   local tokens = {}
-  local i = 1
-  local n = #body
+  local i, n = 1, #body
   while i <= n do
     local c = string.sub(body, i, i)
     if c == " " or c == "\t" then
       i = i + 1
     else
       local start = i
-      local in_quote = nil
+      local quote = nil
       while i <= n do
         local ch = string.sub(body, i, i)
-        if in_quote then
-          if ch == in_quote then
-            in_quote = nil
-            i = i + 1
+        if quote then
+          if ch == quote then
+            quote = nil
           elseif ch == "\\" and i < n then
             -- Preserve backslash-escaped next char inside quotes.
-            i = i + 2
-          else
             i = i + 1
           end
+          i = i + 1
+        elseif ch == '"' or ch == "'" then
+          quote = ch
+          i = i + 1
+        elseif ch == " " or ch == "\t" then
+          break
         else
-          if ch == '"' or ch == "'" then
-            in_quote = ch
-            i = i + 1
-          elseif ch == " " or ch == "\t" then
-            break
-          else
-            i = i + 1
-          end
+          i = i + 1
         end
       end
       table.insert(tokens, string.sub(body, start, i - 1))
@@ -283,6 +278,28 @@ end
 -- Cell-source merging (Blocks-level)
 -- ---------------------------------------------------------------------------
 
+local function cell_attr(attrs, extra_classes)
+  local lang = attrs.language or ""
+  local classes = { "mdz-cell" }
+  for _, c in ipairs(extra_classes or {}) do
+    table.insert(classes, c)
+  end
+  table.insert(classes, "language-" .. lang)
+  return pandoc.Attr(
+    attrs.id or "",
+    classes,
+    {
+      { "data-language", lang },
+      { "data-kernel", attrs.kernel or "" },
+      { "data-execution-count", attrs.execution_count or "" },
+    }
+  )
+end
+
+local function is_marker(block, cls)
+  return block.t == "Div" and block.classes and block.classes[1] == cls
+end
+
 function Blocks(blocks)
   -- Merge ::cell-marker Div + following CodeBlock + ::output-marker Div
   -- into a single CodeBlock with mdz-cell class so downstream writers
@@ -291,36 +308,32 @@ function Blocks(blocks)
   local i = 1
   while i <= #blocks do
     local block = blocks[i]
-    if block.t == "Div" and block.classes and block.classes[1] == "mdz-cell-marker" then
+    if not is_marker(block, "mdz-cell-marker") then
+      table.insert(out, block)
+      i = i + 1
+    else
       local attrs = block.attributes or {}
-      local lang = attrs.language or ""
-      local kernel = attrs.kernel or ""
-      local exec_count = attrs.execution_count or ""
-
-      -- Look ahead for the source CodeBlock.
-      if i + 1 <= #blocks and blocks[i + 1].t == "CodeBlock" then
-        local source = blocks[i + 1]
-        local cell_attrs = pandoc.Attr(
-          attrs.id or "",
-          { "mdz-cell", "language-" .. lang },
-          {
-            { "data-language", lang },
-            { "data-kernel", kernel },
-            { "data-execution-count", exec_count },
-          }
-        )
-        table.insert(out, pandoc.CodeBlock(source.text, cell_attrs))
+      local source = blocks[i + 1]
+      if not source or source.t ~= "CodeBlock" then
+        -- ::cell marker without a following CodeBlock. Emit an empty
+        -- CodeBlock with mdz-cell-empty so downstream writers can flag
+        -- the missing source visibly (instead of a plain Div that
+        -- renders as "[mdz-cell]" stray text).
+        io.stderr:write("[mdz-filter] WARN ::cell at block " .. i
+          .. " has no fenced source; emitting empty cell\n")
+        table.insert(out, pandoc.CodeBlock("", cell_attr(attrs, { "mdz-cell-empty" })))
+        i = i + 1
+      else
+        table.insert(out, pandoc.CodeBlock(source.text, cell_attr(attrs)))
         i = i + 2
         -- Collect ::output markers that follow.
-        while i <= #blocks and blocks[i].t == "Div"
-              and blocks[i].classes and blocks[i].classes[1] == "mdz-output-marker" do
+        while i <= #blocks and is_marker(blocks[i], "mdz-output-marker") do
           local out_attrs = blocks[i].attributes or {}
-          local out_type = out_attrs.type or "text"
-          -- Look ahead for an output body.
-          if i + 1 <= #blocks and blocks[i + 1].t == "CodeBlock" then
-            local body = blocks[i + 1]
+          local next_block = blocks[i + 1]
+          if next_block and next_block.t == "CodeBlock" then
+            local out_type = out_attrs.type or "text"
             table.insert(out, pandoc.CodeBlock(
-              body.text,
+              next_block.text,
               pandoc.Attr("", { "mdz-output", "mdz-output-" .. out_type }, kv_to_list(out_attrs))
             ))
             i = i + 2
@@ -334,33 +347,11 @@ function Blocks(blocks)
             )))
             i = i + 1
           else
-            -- Malformed output without body or src — skip with warning.
             io.stderr:write("[mdz-filter] dropping malformed ::output without body or src\n")
             i = i + 1
           end
         end
-      else
-        -- ::cell marker without a following CodeBlock. Emit an empty
-        -- CodeBlock with mdz-cell-empty so downstream writers can flag
-        -- the missing source visibly (instead of a plain Div that
-        -- renders as "[mdz-cell]" stray text).
-        local cell_attrs = pandoc.Attr(
-          attrs.id or "",
-          { "mdz-cell", "mdz-cell-empty", "language-" .. lang },
-          {
-            { "data-language", lang },
-            { "data-kernel", kernel },
-            { "data-execution-count", exec_count },
-          }
-        )
-        io.stderr:write("[mdz-filter] WARN ::cell at block " .. i
-          .. " has no fenced source; emitting empty cell\n")
-        table.insert(out, pandoc.CodeBlock("", cell_attrs))
-        i = i + 1
       end
-    else
-      table.insert(out, block)
-      i = i + 1
     end
   end
   return out
