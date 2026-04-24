@@ -23,10 +23,30 @@ sys.path.insert(0, str(REPO_ROOT / "implementations" / "python"))
 if sys.platform == "win32" and hasattr(sys.stdout, "buffer"):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
-from hypothesis import given, settings, strategies as st, HealthCheck, seed  # noqa: E402
+from hypothesis import example, given, settings, strategies as st, HealthCheck, seed  # noqa: E402
 
 from alignment_parser import parse as legacy_parse  # noqa: E402
 from mdz_parser import parse as lark_parse, ParseError  # noqa: E402
+
+# Conformance-suite seed corpus. Every positive / edge / roundtrip
+# fixture under tests/conformance/ is loaded once at import time and
+# fed to the property tests as explicit `@example` cases. This realizes
+# ROADMAP §1.4 "Corpus seeded from the conformance suite": hypothesis
+# starts from known-valid inputs and mutates outward, so a regression
+# that breaks a fixture is caught by the property runner *and* by the
+# conformance runner.
+_CONFORMANCE_DIR = REPO_ROOT / "tests" / "conformance"
+_SEED_CATEGORIES = ("positive", "edge", "roundtrip")
+CONFORMANCE_SEEDS: list[str] = []
+for _cat in _SEED_CATEGORIES:
+    _cat_dir = _CONFORMANCE_DIR / _cat
+    if _cat_dir.is_dir():
+        for _md in sorted(_cat_dir.glob("*.md")):
+            try:
+                CONFORMANCE_SEEDS.append(_md.read_text(encoding="utf-8"))
+            except OSError:
+                # Skip unreadable fixtures rather than fail import.
+                continue
 
 # Pinned hypothesis seed for reproducibility across runs. Without this, a
 # CI failure finds a different counterexample each invocation, making
@@ -171,12 +191,28 @@ document = _document_strategy(labeled_block)
 # ---------------------------------------------------------------------------
 
 
+def _apply_conformance_examples(fn):
+    """Decorate `fn` with one `@example(text=<seed>)` per loaded fixture.
+
+    Applied at decorator-stack time so hypothesis sees them all.
+    """
+    for seed_text in CONFORMANCE_SEEDS:
+        fn = example(text=seed_text)(fn)
+    return fn
+
+
+@_apply_conformance_examples
 @given(text=document)
 @seed(HYPOTHESIS_SEED)
 @settings(max_examples=500, deadline=None, suppress_health_check=[HealthCheck.too_slow])
 def test_parser_never_crashes_on_random_input(text: str) -> None:
     """For any generated document-shaped input, the parser must terminate
     with either a list result or a ParseError — never an uncaught exception.
+
+    The conformance corpus (positive / edge / roundtrip) is fed as
+    explicit `@example` cases via :data:`CONFORMANCE_SEEDS`, so this
+    property exercises both the random-input space AND every shipped
+    fixture on every run.
     """
     try:
         result = lark_parse(text)

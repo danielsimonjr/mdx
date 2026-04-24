@@ -1,18 +1,32 @@
-# MDX Format Specification
+# MDZ Format Specification (Markdown Zipped Container)
 
 ## Version 2.0.0 — Draft
 
 **Status**: Draft Specification
-**Media Type**: `application/vnd.mdx-container+zip`
-**File Extension**: `.mdx` (alternate: `.mdxc`)
+**Media Type**: `application/vnd.mdz-container+zip` (legacy: `application/vnd.mdx-container+zip` — readers MUST accept both through 2027-01-01)
+**File Extension**: `.mdz` (legacy: `.mdx` — readers MUST accept both through 2027-01-01)
 **Magic Bytes**: Standard ZIP header (`PK\x03\x04`)
 **Supersedes**: [v1.1.0](MDX_FORMAT_SPECIFICATION_v1.1.md)
+
+> **Note on the rename:** This specification was originally titled "MDX
+> Format Specification" (Markdown eXtended Container). It was renamed
+> to MDZ (Markdown Zipped Container) on 2026-04-24 to disambiguate from
+> the React ecosystem's MDX (Markdown + JSX). Existing `.mdx` archives
+> remain valid and readable; new archives SHOULD use `.mdz`. The legacy
+> `MDX*` class/type names in reference implementations are retained as
+> deprecated aliases through 2027-01-01.
+>
+> **In the body of this document, treat "MDX" and "MDZ" as synonyms.**
+> The full body-text rename is deferred to the v2.1 spec landing along
+> with the parser rebuild (see `ROADMAP.md` Phase 1.2). All examples
+> showing `.mdx` paths or `vnd.mdx-container+zip` MIME types remain
+> normative; readers MUST accept both forms.
 
 ---
 
 ## 1. Overview
 
-MDX (Markdown eXtended Container) is an open document format that packages
+MDZ (Markdown Zipped Container, formerly "MDX — Markdown eXtended Container") is an open document format that packages
 Markdown content with embedded media assets into a single, portable, self-
 contained archive. The format is designed to be universally readable,
 gracefully degradable, streamable, and capable of rich interactivity when

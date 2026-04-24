@@ -177,7 +177,7 @@ The v2.0 spec bundled too much. Core stays minimal; advanced features move out.
 
 - [x] Create `spec/profiles/mdz-advanced-v1.json` — ships (JCS, multi-sig, DIDs, revocation, content-hash aliases, provenance DAG).
 - [x] Core spec keeps: v1.1 alignment + attributes, `::cell` + `::output` + `::include`, basic accessibility, simple signatures, basic i18n — spec body reflects this scoping.
-- [ ] Add conformance levels: **Core** (required) / **Advanced** (opt-in) — profile files exist; formal level enforcement in the conformance runner is not yet explicit. Unverified on 2026-04-24.
+- [x] Add conformance levels: **Core** (required) / **Advanced** (opt-in) — `mdz validate --profile <id>` enforces profile-level requirements. Built-ins: `mdz-core`, `mdz-advanced`, `scientific-paper-v1`, `api-reference-v1`. Profile-required manifest fields surface as Errors; recommended fields surface as Warnings; required extensions checked against `content.extensions[]`.
 
 ---
 
@@ -192,7 +192,7 @@ etc.). Replace it.
 - [x] Define the block-attribute + directive grammar in ABNF (RFC 5234 style) — ships at `spec/grammar/mdz-directives.abnf`.
 - [x] Provide a PEG grammar — ships at `spec/grammar/mdz-directives.lark` (Lark PEG, not `.pegjs`; the filename deviates from the roadmap because the Python parser consumes it directly; functionally equivalent for porting to peg/ohm/tree-sitter).
 - [x] Publish a tree-sitter grammar `tree-sitter-mdz` — alpha ships at `tree-sitter-mdz/grammar.js`.
-- [ ] Remove the prose grammar from the spec body; keep only ABNF + examples — unverified on 2026-04-24; some prose grammar may still live in the v2.0 spec.
+- [x] Remove the prose grammar from the spec body; keep only ABNF + examples — verified 2026-04-24: zero `ABNF`/`EBNF`/grammar-section headings in `spec/MDX_FORMAT_SPECIFICATION_v2.0.md`, `_v1.1.md`, or the v1.0 spec. Directive examples are present (illustrative); the formal grammar lives only in `spec/grammar/mdz-directives.abnf` + `.lark`.
 
 ### 1.2 Rebuild the reference parser
 
@@ -221,7 +221,7 @@ Use actively-maintained tooling instead:
 - [x] **Python:** `hypothesis` — ships at `tests/property/test_parser_properties.py`; CI runs it in the v2.0 job.
 - [x] **TypeScript:** `fast-check` — ships at `implementations/typescript/mdx_format.property.test.ts`; CI runs it in the TypeScript Unit Tests job.
 - [x] CI job property tests — CI runs property tests on every PR (v2.0 job has a dedicated step).
-- [ ] Corpus seeded from the conformance suite — unverified whether the property-test corpus is explicitly seeded from the 52 fixtures or uses hypothesis-generated inputs only.
+- [x] Corpus seeded from the conformance suite — `tests/property/test_parser_properties.py` loads every `.md` under `tests/conformance/{positive,edge,roundtrip}/` at module import (`CONFORMANCE_SEEDS`) and feeds them via `@example` to `test_parser_never_crashes_on_random_input`. Hypothesis starts from known-valid fixtures and mutates outward.
 
 ### 1.5 Content-addressing: evolve, don't restart
 
@@ -393,7 +393,7 @@ enforcement. Fix this before any real adoption.
 
 - [x] CSP profile — `docs/security/CSP.md` ships.
 - [ ] `::include` external-URL permissions enforcement in reference impls — partial; spec requires it, runtime enforcement in viewer unverified.
-- [ ] Signature trust model docs (DID resolution / revocation / rotation) — not yet documented as a standalone piece; the Node verifier covers DID lookup at CLI level.
+- [x] Signature trust model docs (DID resolution / revocation / rotation) — `docs/security/SIGNATURE_TRUST.md` ships. Covers signer identity, key-discovery resolution chain (did:web / did:key / trust file / certificate fallback), trust-decision policies (default / strict / offline), revocation per DID method, key rotation patterns (forward chain / historical verification / co-signed rotation), and what viewers MUST surface to users.
 - [x] Reference verifier `mdz verify archive.mdz` — ships at `cli/src/commands/verify.js` with structural chain + trust-file support (tests at `cli/test/verify.test.js`). Full cryptographic signature verification (Ed25519/RS256/ES256 over resolved DID keys) is still Phase 3.2 per both the Node and Rust verifier caveats.
 - [x] Threat model doc at `docs/security/THREAT_MODEL.md` — ships.
 

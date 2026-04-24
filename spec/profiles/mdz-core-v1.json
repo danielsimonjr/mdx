@@ -1,0 +1,30 @@
+{
+  "$schema": "https://mdz-format.org/schemas/profile.schema.json",
+  "id": "https://mdz-format.org/profiles/mdz-core/v1",
+  "name": "MDZ Core",
+  "version": "1.0.0",
+  "description": "Core conformance profile for MDZ documents — the minimal manifest surface that every conformant archive MUST declare. A document that validates against mdz-core makes the strongest portability promise: it parses in every reference implementation, renders in every Capability Level >= 0 viewer, and survives JATS/EPUB export without data loss. Advanced features (signatures, content-addressing, provenance DAGs, multi-locale, etc.) are layered as separate profiles.",
+
+  "required_manifest_fields": [
+    "mdx_version",
+    "document.id",
+    "document.title",
+    "document.created",
+    "document.modified",
+    "content.entry_point"
+  ],
+
+  "recommended_manifest_fields": [
+    "document.language",
+    "document.authors",
+    "document.license"
+  ],
+
+  "required_extensions": [],
+
+  "forbidden_extensions": [],
+
+  "viewer_capability_level": 0,
+
+  "notes": "v1.0 of the Core profile. Deliberately minimal — anything beyond these six required fields is opt-in. A document that validates against mdz-advanced-v1 also validates against mdz-core (mdz-advanced is a strict superset)."
+}

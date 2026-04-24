@@ -491,7 +491,20 @@ impl Archive {
             use std::io::Read;
             let remaining = MAX_TOTAL_INFLATED_BYTES.saturating_sub(total_bytes);
             let budget = remaining.saturating_add(1);
-            let mut buf = Vec::with_capacity(budget.min(1024 * 1024) as usize);
+            // Initial-allocation cap. The 1 MiB constant fits in usize on
+            // every supported target (16-bit pointer targets are not
+            // supported); on 32-bit targets the budget itself is u64 and
+            // would truncate on cast, but the .min() bounds it well below
+            // u32::MAX so the cast is lossless. The debug_assert! pins
+            // that invariant — if a future MAX_TOTAL_INFLATED_BYTES bump
+            // pushes the cap above u32::MAX, this fires under cargo test.
+            let cap_u64 = budget.min(1024 * 1024);
+            debug_assert!(
+                cap_u64 <= usize::MAX as u64,
+                "Vec::with_capacity initial-cap u64->usize cast would truncate (cap_u64={})",
+                cap_u64
+            );
+            let mut buf = Vec::with_capacity(cap_u64 as usize);
             let read_bytes = (&mut file).take(budget).read_to_end(&mut buf)? as u64;
             if read_bytes > remaining {
                 return Err(ArchiveError::SizeExceeded {

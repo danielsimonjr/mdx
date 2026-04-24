@@ -328,6 +328,107 @@ class MDXValidator {
         return iso8601Regex.test(dateString) && !isNaN(Date.parse(dateString));
     }
 
+    /**
+     * Resolve a dotted path against `this.manifest`. Returns `undefined`
+     * if any segment is missing. Used by validateProfile() to check the
+     * `required_manifest_fields` list against the loaded manifest.
+     */
+    getManifestPath(dottedPath) {
+        const segments = dottedPath.split('.');
+        let cur = this.manifest;
+        for (const seg of segments) {
+            if (cur == null || typeof cur !== 'object') return undefined;
+            cur = cur[seg];
+        }
+        return cur;
+    }
+
+    /**
+     * Validate the loaded manifest against a profile JSON. Profiles
+     * declare `required_manifest_fields` (dotted paths) and
+     * `required_extensions` (entries that MUST appear in
+     * `manifest.content.extensions`). Missing requirements surface as
+     * Level.ERROR; missing recommendations surface as Level.WARNING.
+     *
+     * Built-in profiles: `core`, `mdz-core`, `advanced`, `mdz-advanced`,
+     * `scientific-paper`, `api-reference`. Pass `path/to/profile.json`
+     * for a custom profile.
+     */
+    validateProfile(profileSpec) {
+        const profile = this.loadProfile(profileSpec);
+        if (!profile) {
+            this.addIssue(Level.ERROR, `Profile not found: ${profileSpec}`);
+            return;
+        }
+        for (const field of profile.required_manifest_fields ?? []) {
+            const value = this.getManifestPath(field);
+            if (value === undefined || value === null) {
+                this.addIssue(
+                    Level.ERROR,
+                    `Profile '${profile.name}' requires manifest field '${field}'`
+                );
+            }
+        }
+        for (const field of profile.recommended_manifest_fields ?? []) {
+            if (this.getManifestPath(field) === undefined) {
+                this.addIssue(
+                    Level.WARNING,
+                    `Profile '${profile.name}' recommends manifest field '${field}'`
+                );
+            }
+        }
+        const declaredExtensions = (this.manifest?.content?.extensions ?? []);
+        for (const ext of profile.required_extensions ?? []) {
+            if (!declaredExtensions.includes(ext)) {
+                this.addIssue(
+                    Level.ERROR,
+                    `Profile '${profile.name}' requires extension '${ext}' in content.extensions`
+                );
+            }
+        }
+        this.addIssue(
+            Level.INFO,
+            `Validated against profile: ${profile.name} (${profile.id ?? 'no id'})`
+        );
+    }
+
+    /**
+     * Resolve a profile spec to a profile object. Accepts:
+     *   - Built-in profile name (`mdz-core`, `mdz-advanced`,
+     *     `scientific-paper-v1`, `api-reference-v1`).
+     *   - Filesystem path to a profile JSON.
+     */
+    loadProfile(spec) {
+        // Map short profile names to their canonical filenames. Core is
+        // a strict SUBSET of Advanced — every Advanced-conformant doc is
+        // Core-conformant, but not vice-versa. Aliasing them to the same
+        // file is wrong: it would force Core users to declare advanced
+        // features (signatures, content-addressing) that Core doesn't
+        // require. Each name resolves to its own profile file.
+        const builtins = {
+            'core': 'mdz-core-v1.json',
+            'mdz-core': 'mdz-core-v1.json',
+            'mdz-core-v1': 'mdz-core-v1.json',
+            'advanced': 'mdz-advanced-v1.json',
+            'mdz-advanced': 'mdz-advanced-v1.json',
+            'mdz-advanced-v1': 'mdz-advanced-v1.json',
+            'scientific-paper': 'scientific-paper-v1.json',
+            'scientific-paper-v1': 'scientific-paper-v1.json',
+            'api-reference': 'api-reference-v1.json',
+            'api-reference-v1': 'api-reference-v1.json',
+        };
+        const repoRoot = path.resolve(__dirname, '..', '..', '..');
+        const candidate = builtins[spec]
+            ? path.join(repoRoot, 'spec', 'profiles', builtins[spec])
+            : path.resolve(spec);
+        if (!fs.existsSync(candidate)) return null;
+        try {
+            return JSON.parse(fs.readFileSync(candidate, 'utf8'));
+        } catch {
+            return null;
+        }
+    }
+
     getResults() {
         return {
             valid: this.errors.length === 0,
@@ -349,7 +450,27 @@ async function validateCommand(file, options) {
     try {
         const filePath = path.resolve(file);
         const validator = new MDXValidator(filePath);
-        const results = await validator.validate();
+        // Resolve a `--profile` flag up-front so a bogus name surfaces
+        // even when manifest.json is malformed (a typo in `--profile`
+        // is a CLI-input error, not contingent on archive validity).
+        let profile = null;
+        if (options?.profile) {
+            profile = validator.loadProfile(options.profile);
+            if (!profile) {
+                validator.addIssue(
+                    Level.ERROR,
+                    `Profile not found: ${options.profile}`,
+                );
+            }
+        }
+        await validator.validate();
+        // Field-existence checks need a parsed manifest. Skip silently
+        // when manifest parse failed — the structural-validation error
+        // already explains why.
+        if (profile && validator.manifest) {
+            validator.validateProfile(options.profile);
+        }
+        const results = validator.getResults();
 
         spinner.stop();
 

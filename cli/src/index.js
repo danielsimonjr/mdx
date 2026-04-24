@@ -115,6 +115,7 @@ program
   .description('Validate MDZ file structure and manifest')
   .option('-v, --verbose', 'Show detailed information including info-level messages')
   .option('--no-exit', 'Do not exit with error code on validation failure')
+  .option('--profile <id-or-path>', 'Enforce conformance against a profile (e.g., mdz-core, mdz-advanced, scientific-paper-v1, or a path to a profile JSON)')
   .action(validateCommand);
 
 // Default action when file is passed directly
