@@ -33,12 +33,18 @@
 
   Install:
 
+    # Linux / macOS
     mkdir -p ~/.local/share/pandoc/filters/
     cp mdz-filter.lua ~/.local/share/pandoc/filters/
 
+    # Windows (PowerShell)
+    New-Item -ItemType Directory -Force -Path "$env:APPDATA\pandoc\filters"
+    Copy-Item mdz-filter.lua "$env:APPDATA\pandoc\filters\"
+
   Or invoke directly with --lua-filter=/path/to/mdz-filter.lua.
 
-  Compat: pandoc ≥ 3.0. Tested against pandoc 3.1.x.
+  Compat: targets pandoc ≥ 3.0. Pre-3.0 users must update — the AST
+  helpers (pandoc.Blocks, pandoc.Div attr shape) changed in 3.0.
 --]]
 
 -- ---------------------------------------------------------------------------
@@ -49,24 +55,68 @@ local function string_starts_with(s, prefix)
   return string.sub(s, 1, #prefix) == prefix
 end
 
+local function tokenize_attrs(body)
+  -- Split `body` into whitespace-separated tokens, but preserve quoted
+  -- values containing spaces (e.g. `title="Two words"`). The previous
+  -- `string.gmatch(body, '%S+')` implementation broke quoted spans.
+  local tokens = {}
+  local i = 1
+  local n = #body
+  while i <= n do
+    local c = string.sub(body, i, i)
+    if c == " " or c == "\t" then
+      i = i + 1
+    else
+      local start = i
+      local in_quote = nil
+      while i <= n do
+        local ch = string.sub(body, i, i)
+        if in_quote then
+          if ch == in_quote then
+            in_quote = nil
+            i = i + 1
+          elseif ch == "\\" and i < n then
+            -- Preserve backslash-escaped next char inside quotes.
+            i = i + 2
+          else
+            i = i + 1
+          end
+        else
+          if ch == '"' or ch == "'" then
+            in_quote = ch
+            i = i + 1
+          elseif ch == " " or ch == "\t" then
+            break
+          else
+            i = i + 1
+          end
+        end
+      end
+      table.insert(tokens, string.sub(body, start, i - 1))
+    end
+  end
+  return tokens
+end
+
 local function parse_attrs(body)
-  -- Minimal attr-body parser: handles .class, #id, key="value", bool-flag.
+  -- Attr-body parser: handles .class, #id, key="value" (quotes may contain
+  -- whitespace), key='value', key=bareword, and bare boolean flags.
   -- Mirrors the grammar in spec/grammar/mdz-directives.abnf.
   local classes = {}
   local identifier = ""
   local kv = {}
-  for token in string.gmatch(body or "", '%S+') do
+  for _, token in ipairs(tokenize_attrs(body or "")) do
     if string.sub(token, 1, 1) == "." then
       table.insert(classes, string.sub(token, 2))
     elseif string.sub(token, 1, 1) == "#" then
       identifier = string.sub(token, 2)
     else
-      local k, v = string.match(token, '^([%w_%-]+)="(.-)"$')
+      local k, v = string.match(token, '^([%w_%-]+)="(.*)"$')
       if not k then
-        k, v = string.match(token, "^([%w_%-]+)='(.-)'$")
+        k, v = string.match(token, "^([%w_%-]+)='(.*)'$")
       end
       if not k then
-        k, v = string.match(token, '^([%w_%-]+)=([%w_%-%.]+)$')
+        k, v = string.match(token, '^([%w_%-]+)=(.+)$')
       end
       if k then
         kv[k] = v
@@ -75,6 +125,8 @@ local function parse_attrs(body)
         local bare = string.match(token, "^([%w_%-]+)$")
         if bare then
           kv[bare] = "true"
+        else
+          io.stderr:write("[mdz-filter] unparseable attribute token: " .. token .. "\n")
         end
       end
     end
@@ -288,9 +340,22 @@ function Blocks(blocks)
           end
         end
       else
-        -- ::cell marker without a following CodeBlock — unusual. Keep as-is.
-        io.stderr:write("[mdz-filter] ::cell without fenced source block at position " .. i .. "\n")
-        table.insert(out, block)
+        -- ::cell marker without a following CodeBlock. Emit an empty
+        -- CodeBlock with mdz-cell-empty so downstream writers can flag
+        -- the missing source visibly (instead of a plain Div that
+        -- renders as "[mdz-cell]" stray text).
+        local cell_attrs = pandoc.Attr(
+          attrs.id or "",
+          { "mdz-cell", "mdz-cell-empty", "language-" .. lang },
+          {
+            { "data-language", lang },
+            { "data-kernel", kernel },
+            { "data-execution-count", exec_count },
+          }
+        )
+        io.stderr:write("[mdz-filter] WARN ::cell at block " .. i
+          .. " has no fenced source; emitting empty cell\n")
+        table.insert(out, pandoc.CodeBlock("", cell_attrs))
         i = i + 1
       end
     else

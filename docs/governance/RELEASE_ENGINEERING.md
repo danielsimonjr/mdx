@@ -132,7 +132,9 @@ When a feature is deprecated:
   - GitHub Releases: tarballs signed with the release manager's key.
 - Reproducible builds for the Firefox extension (AMO requires).
 - Lock files committed to the repo; dependabot monitors for CVEs.
-- SBOM (Software Bill of Materials) published with each major release.
+- SBOM (Software Bill of Materials) published with each major release
+  (CycloneDX or SPDX; generation job planned for 1.0, not yet wired into
+  `.github/workflows/`).
 
 ## Release manager
 

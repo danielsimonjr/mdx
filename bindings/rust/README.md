@@ -58,9 +58,15 @@ fn main() -> Result<(), mdz::Error> {
 
 ## Security posture
 
-Matches the TypeScript viewer's defensive defaults:
+Matches the TypeScript viewer's **hard** limits. The TS viewer also
+defines a soft 50 MB `WARN_INFLATED_BYTES` threshold — this crate
+exposes it as a `pub const` but does not take a logging dependency;
+integrate with `tracing` or `log` on the caller side.
 
-- **ZIP-bomb limits:** rejects archives >500 MB inflated or >10,000 entries.
+- **ZIP-bomb limits:** rejects archives >500 MB inflated or >10,000
+  entries. Inflation is measured by actual bytes read (bounded reader),
+  not by the ZIP central directory's declared size — so a forged
+  `size=1` header cannot bypass the ceiling.
 - **Path traversal:** rejects the whole archive if any entry has `..`,
   absolute path, drive letter, or NUL byte. No silent strip.
 - **Hash verification:** only `sha256` and `sha512` are implemented;
@@ -93,7 +99,7 @@ cargo test
 
 ## Minimum supported Rust version
 
-1.70.
+1.73. Pinned by `zip 2.2` (requires `let…else` and `time 0.3.36` features).
 
 ## License
 

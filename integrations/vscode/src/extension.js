@@ -23,12 +23,16 @@
 'use strict';
 
 const vscode = require('vscode');
-const { exec } = require('child_process');
+const { execFile } = require('child_process');
 const path = require('path');
 
 // ---------------------------------------------------------------------------
 // Activation
 // ---------------------------------------------------------------------------
+
+// Tracks in-flight `mdz <sub> <path>` invocations so we don't interleave
+// output from two concurrent runs in the OUTPUT channel.
+const inFlight = new Map();
 
 function activate(context) {
     const out = vscode.window.createOutputChannel('MDZ');
@@ -62,19 +66,30 @@ function runCli(subcommand, uri, out) {
         vscode.window.showWarningMessage(`MDZ: ${subcommand} needs a file — right-click an archive in the Explorer.`);
         return;
     }
+    const key = `${subcommand}:${filePath}`;
+    if (inFlight.has(key)) {
+        vscode.window.showWarningMessage(`MDZ: ${subcommand} is already running for this file.`);
+        return;
+    }
     const cli = getCliPath();
     out.show(true);
     out.appendLine(`$ ${cli} ${subcommand} ${filePath}`);
-    exec(`${cli} ${subcommand} "${filePath}"`, (err, stdout, stderr) => {
+    // execFile with an argv array — the file path is NEVER passed through a
+    // shell, so paths containing spaces, quotes, `;`, `&&`, `$()`, etc. cannot
+    // be re-interpreted as shell metacharacters.
+    const child = execFile(cli, [subcommand, filePath], { shell: false }, (err, stdout, stderr) => {
+        inFlight.delete(key);
         if (stdout) out.append(stdout);
         if (stderr) out.append(stderr);
         if (err) {
-            out.appendLine(`[exit ${err.code}]`);
-            vscode.window.showErrorMessage(`MDZ ${subcommand} failed (exit ${err.code}) — see OUTPUT panel.`);
+            const exitInfo = err.code ?? err.message;
+            out.appendLine(`[exit ${exitInfo}]`);
+            vscode.window.showErrorMessage(`MDZ ${subcommand} failed (${exitInfo}) — see OUTPUT panel.`);
         } else {
             out.appendLine('[OK]');
         }
     });
+    inFlight.set(key, child);
 }
 
 function viewArchive(uri, out) {
@@ -87,8 +102,8 @@ function viewArchive(uri, out) {
     // than reinventing a browser launcher.
     const cli = getCliPath();
     out.show(true);
-    out.appendLine(`$ ${cli} view "${filePath}"`);
-    exec(`${cli} view "${filePath}"`, (err) => {
+    out.appendLine(`$ ${cli} view ${filePath}`);
+    execFile(cli, ['view', filePath], { shell: false }, (err) => {
         if (err) {
             vscode.window.showErrorMessage(`MDZ view failed — is the CLI installed? (${err.message})`);
         }
@@ -101,6 +116,7 @@ function previewDocument(context) {
         vscode.window.showInformationMessage('MDZ preview: open a Markdown file first.');
         return;
     }
+    const sourceUri = editor.document.uri.toString();
     const panel = vscode.window.createWebviewPanel(
         'mdz-preview',
         'MDZ Preview',
@@ -114,12 +130,18 @@ function previewDocument(context) {
     panel.webview.html = buildPreviewHtml(editor.document.getText(), theme);
 
     // Keep the preview in sync with edits — debounced to avoid thrash.
+    // Re-resolve the source document by URI each tick so a closed-and-
+    // reopened file still updates, and a closed source gracefully freezes.
     let timer;
     const subscription = vscode.workspace.onDidChangeTextDocument((e) => {
-        if (e.document !== editor.document) return;
+        if (e.document.uri.toString() !== sourceUri) return;
         clearTimeout(timer);
         timer = setTimeout(() => {
-            panel.webview.html = buildPreviewHtml(editor.document.getText(), theme);
+            const live = vscode.workspace.textDocuments.find(
+                (d) => d.uri.toString() === sourceUri,
+            );
+            if (!live) return; // source was closed; freeze at last snapshot
+            panel.webview.html = buildPreviewHtml(live.getText(), theme);
         }, 300);
     });
     panel.onDidDispose(() => {
@@ -138,9 +160,10 @@ async function importIpynb(out) {
     });
     if (!picked || picked.length === 0) return;
     const cli = getCliPath();
+    const ipynbPath = picked[0].fsPath;
     out.show(true);
-    out.appendLine(`$ ${cli} import-ipynb "${picked[0].fsPath}"`);
-    exec(`${cli} import-ipynb "${picked[0].fsPath}"`, (err, stdout, stderr) => {
+    out.appendLine(`$ ${cli} import-ipynb ${ipynbPath}`);
+    execFile(cli, ['import-ipynb', ipynbPath], { shell: false }, (err, stdout, stderr) => {
         if (stdout) out.append(stdout);
         if (stderr) out.append(stderr);
         if (!err) {
@@ -159,12 +182,25 @@ function resolveFileUri(uri) {
     return active ? active.document.uri.fsPath : null;
 }
 
+// Cap preview payload — HTML-escaping a 100 MB markdown file produces >400 MB
+// of DOM and hangs the webview. Truncate to 1 MB with a visible banner.
+const PREVIEW_MAX_BYTES = 1_000_000;
+
 function buildPreviewHtml(markdown, theme) {
     // Minimal preview: dumps markdown into a <pre> block with a note that
     // full rendering requires the bundled <mdz-viewer>. That bundle isn't
     // yet shipped with the extension (Phase 2.5 build pipeline is a
     // separate deliverable — see browser-extension/vendor/).
-    const esc = escapeHtml(markdown);
+    const originalLen = markdown.length;
+    const truncated = originalLen > PREVIEW_MAX_BYTES;
+    const body = truncated ? markdown.slice(0, PREVIEW_MAX_BYTES) : markdown;
+    const esc = escapeHtml(body);
+    const truncationNote = truncated
+        ? `<div class="banner" style="background:#fee2e2;border-left-color:#dc2626;">
+            Preview truncated: showing first ${Math.round(PREVIEW_MAX_BYTES / 1024)} KB of ${Math.round(originalLen / 1024)} KB.
+            Use <code>mdz view</code> for full rendering.
+          </div>`
+        : '';
     return `<!DOCTYPE html>
 <html>
 <head>
@@ -187,6 +223,7 @@ function buildPreviewHtml(markdown, theme) {
     MDZ preview is a raw-Markdown view in this alpha; full rendering via the
     &lt;mdz-viewer&gt; web component ships with the first stable release.
   </div>
+  ${truncationNote}
   <pre>${esc}</pre>
 </body>
 </html>`;

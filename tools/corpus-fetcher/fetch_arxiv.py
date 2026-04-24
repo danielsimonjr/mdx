@@ -28,7 +28,7 @@ Ethics:
 
 Dependencies:
     - pandoc (3.0+) on PATH
-    - Python 3.11+
+    - Python 3.12+ (required for `tarfile.extractall(..., filter="data")`)
     - urllib.request (stdlib)
 
 Status:
@@ -44,6 +44,7 @@ import argparse
 import io
 import json
 import re
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -153,22 +154,35 @@ def search_papers(category: str, count: int) -> list[PaperMeta]:
     ns = {"atom": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
     root = ET.fromstring(xml_bytes)
 
+    def _text(el: ET.Element | None, path: str) -> str:
+        if el is None:
+            return ""
+        node = el.find(path, ns)
+        return (node.text or "").strip() if node is not None else ""
+
     papers: list[PaperMeta] = []
     for entry in root.findall("atom:entry", ns):
         license_el = entry.find("atom:rights", ns) or entry.find("arxiv:license", ns)
         license_url = (license_el.text or "").strip() if license_el is not None else ""
-        if license_url and license_url not in PERMISSIVE_LICENSES:
+        # Reject both missing licenses and non-permissive ones. A missing
+        # license on arXiv means "all rights reserved" — not a safe default.
+        if license_url not in PERMISSIVE_LICENSES:
             continue
-        arxiv_id_raw = entry.find("atom:id", ns).text or ""
+        arxiv_id_raw = _text(entry, "atom:id")
+        if not arxiv_id_raw:
+            # Malformed feed entry (outage-response, etc.) — skip rather than
+            # crash the whole batch.
+            continue
         arxiv_id = arxiv_id_raw.rsplit("/", 1)[-1]
-        title = (entry.find("atom:title", ns).text or "").strip()
-        summary = (entry.find("atom:summary", ns).text or "").strip()
+        title = _text(entry, "atom:title")
+        summary = _text(entry, "atom:summary")
         authors = [
             (a.find("atom:name", ns).text or "").strip()
             for a in entry.findall("atom:author", ns)
+            if a.find("atom:name", ns) is not None
         ]
-        published = (entry.find("atom:published", ns).text or "").strip()
-        updated = (entry.find("atom:updated", ns).text or "").strip()
+        published = _text(entry, "atom:published")
+        updated = _text(entry, "atom:updated")
         categories = [
             c.attrib.get("term", "") for c in entry.findall("atom:category", ns)
         ]
@@ -232,18 +246,40 @@ def convert_paper(meta: PaperMeta, tarball: Path, out_dir: Path) -> ConversionRe
     # Extract source tarball.
     work_dir = out_dir / meta.arxiv_id
     work_dir.mkdir(parents=True, exist_ok=True)
+
+    # Fast-path detection: some arXiv /e-print URLs return a PDF (withdrawn
+    # LaTeX source). tarfile.open raises a cryptic ReadError in that case.
+    try:
+        with open(tarball, "rb") as f:
+            head = f.read(8)
+        if head[:4] == b"%PDF":
+            result.error_category = "source-is-pdf"
+            result.error_detail = "arXiv /e-print returned a PDF (no LaTeX source)"
+            return result
+    except OSError as e:
+        result.error_category = "tarball-read"
+        result.error_detail = str(e)
+        return result
+
     try:
         with tarfile.open(tarball, "r:*") as tf:
-            # Safety: reject tarballs with absolute paths or .. segments.
-            for member in tf.getmembers():
-                if member.name.startswith("/") or ".." in member.name.split("/"):
-                    result.error_category = "unsafe-tarball"
-                    result.error_detail = f"tarball contains path: {member.name}"
-                    return result
-            tf.extractall(work_dir)
-    except Exception as e:
+            # Python 3.12's `filter="data"` enforces the safe-extraction
+            # policy (reject absolute paths, .. segments, device files,
+            # symlinks escaping the destination, etc.) at extract time.
+            # See: PEP 706 / CVE-2007-4559.
+            tf.extractall(work_dir, filter="data")
+    except tarfile.ReadError as e:
         result.error_category = "tarball-extract"
+        result.error_detail = f"tarball read error: {e}"
+        return result
+    except (tarfile.FilterError, tarfile.AbsolutePathError, tarfile.OutsideDestinationError,
+            tarfile.SpecialFileError, tarfile.LinkOutsideDestinationError) as e:
+        result.error_category = "unsafe-tarball"
         result.error_detail = str(e)
+        return result
+    except Exception as e:  # noqa: BLE001 — catch-all for unexpected extract failures
+        result.error_category = "tarball-extract"
+        result.error_detail = f"{type(e).__name__}: {e}"
         return result
 
     # Find the main .tex file. Heuristic: the one with `\documentclass` and
@@ -301,22 +337,11 @@ def convert_paper(meta: PaperMeta, tarball: Path, out_dir: Path) -> ConversionRe
     result.cell_count = md_text.count("::cell{")
     result.citation_count = md_text.count("::cite[")
 
-    # Package into MDZ via the CLI (defer MDZ assembly to the real tool
-    # so we exercise the actual adoption path).
+    # Package into MDZ directly via zipfile. The `mdz create` CLI is
+    # currently interactive and unsuitable for batch; a non-interactive
+    # `mdz create --from-markdown <path>` is a Phase 2 follow-up.
     mdz_path = work_dir / f"{meta.arxiv_id}.mdz"
-    cli_path = REPO_ROOT / "cli" / "src" / "index.js"
     try:
-        proc = subprocess.run(
-            ["node", str(cli_path), "create", meta.arxiv_id, "-o", str(mdz_path)],
-            capture_output=True,
-            timeout=30,
-            input=b"\n" * 20,  # accept all interactive defaults
-            encoding=None,
-        )
-        # Interactive CLI isn't ideal for batch; as a workaround, synthesize
-        # the archive directly via zipfile for corpus purposes. A non-
-        # interactive `mdz create --from-markdown <path>` command is a
-        # Phase 2 follow-up that would simplify this.
         import zipfile
         import uuid
         from datetime import datetime, timezone
@@ -441,33 +466,48 @@ def main() -> int:
     )
     args = ap.parse_args()
 
+    # Preflight: pandoc must be on PATH before we spend arXiv quota.
+    if shutil.which("pandoc") is None:
+        print(
+            "ERROR: pandoc not on PATH. Install from https://pandoc.org/installing.html "
+            "and retry.",
+            file=sys.stderr,
+        )
+        return 2
+
+    # Create report directory up-front so a crash mid-loop can still persist
+    # whatever partial progress we have.
+    args.report.parent.mkdir(parents=True, exist_ok=True)
+
     print(f"Fetching {args.count} papers from category {args.category}...")
     papers = search_papers(args.category, args.count)
     print(f"Got {len(papers)} papers after license filter.")
 
     results: list[ConversionResult] = []
-    for i, paper in enumerate(papers, 1):
-        print(f"[{i}/{len(papers)}] {paper.arxiv_id} — {paper.title[:60]}")
-        tarball = download_source_tarball(paper, args.cache_dir)
-        if not tarball:
-            results.append(
-                ConversionResult(
-                    arxiv_id=paper.arxiv_id,
-                    title=paper.title,
-                    succeeded=False,
-                    error_category="download-failed",
+    try:
+        for i, paper in enumerate(papers, 1):
+            print(f"[{i}/{len(papers)}] {paper.arxiv_id} — {paper.title[:60]}")
+            tarball = download_source_tarball(paper, args.cache_dir)
+            if not tarball:
+                results.append(
+                    ConversionResult(
+                        arxiv_id=paper.arxiv_id,
+                        title=paper.title,
+                        succeeded=False,
+                        error_category="download-failed",
+                    )
                 )
-            )
-            continue
-        result = convert_paper(paper, tarball, args.out_dir)
-        status = "OK" if result.succeeded else f"FAIL ({result.error_category})"
-        print(f"    {status}")
-        results.append(result)
-
-    args.report.parent.mkdir(parents=True, exist_ok=True)
-    write_report(results, args.report)
-    print(f"\nReport: {args.report}")
-    print(f"Summary: {args.report.with_suffix('.md')}")
+                continue
+            result = convert_paper(paper, tarball, args.out_dir)
+            status = "OK" if result.succeeded else f"FAIL ({result.error_category})"
+            print(f"    {status}")
+            results.append(result)
+    finally:
+        # Always persist whatever results we have — arXiv rate-limit means a
+        # crashed run without this finally block wastes 3s × N of quota.
+        write_report(results, args.report)
+        print(f"\nReport: {args.report}")
+        print(f"Summary: {args.report.with_suffix('.md')}")
     return 0
 
 

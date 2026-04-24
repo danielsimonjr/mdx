@@ -83,8 +83,8 @@ history/
         └── v2.1.0.patch    # unified diff against v2.0.0
 ```
 
-Each `deltas/<version>.patch` is a **unified diff** (RFC 2822 / GNU diff
-`-u` format) against the *previous* version in a chain. Chains start at
+Each `deltas/<version>.patch` is a **unified diff** (GNU diffutils
+`diff -u` format; no RFC) against the *previous* version in a chain. Chains start at
 a `base/<version>.md` file — a snapshot stored verbatim. An author /
 tool MAY create multiple bases (e.g., one per calendar year) to cap
 worst-case patch-chain traversal.

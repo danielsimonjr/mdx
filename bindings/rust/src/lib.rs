@@ -74,9 +74,10 @@ use sha2::Digest;
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// The archive could not be parsed as a ZIP file, or a required entry
-    /// is missing.
+    /// is missing. Pair kinds so callers can `match` on the cause instead
+    /// of substring-matching the message.
     #[error("archive: {0}")]
-    Archive(String),
+    Archive(#[from] ArchiveError),
 
     /// `manifest.json` did not conform to the expected shape.
     #[error("manifest: {0}")]
@@ -85,12 +86,23 @@ pub enum Error {
     /// A declared hash (content_id, manifest_checksum) did not match the
     /// actual file contents.
     #[error("integrity: {0}")]
-    Integrity(String),
+    Integrity(#[from] IntegrityError),
 
     /// An archive entry had an unsafe path (`..`, absolute, drive letter,
     /// NUL byte). The whole archive is rejected, not silently stripped.
     #[error("path traversal attempt: {0}")]
     UnsafePath(String),
+
+    /// A method was called whose implementation is gated behind a Cargo
+    /// feature that the current build does not enable. Keeps the API
+    /// surface stable across feature sets.
+    #[error("feature `{feature}` disabled — cannot call `{method}`")]
+    FeatureDisabled {
+        /// The Cargo feature that would enable this method.
+        feature: &'static str,
+        /// The method the caller invoked.
+        method: &'static str,
+    },
 
     /// IO error (bubbling up from `std::io`).
     #[error(transparent)]
@@ -103,6 +115,69 @@ pub enum Error {
     /// ZIP decode error (from the `zip` crate).
     #[error(transparent)]
     Zip(#[from] zip::result::ZipError),
+}
+
+/// Structured detail for [`Error::Archive`] — lets callers react to
+/// specific archive-level failures (e.g. retry on missing manifest,
+/// reject hard on size-exceeded) without substring matching.
+#[derive(Debug, thiserror::Error)]
+pub enum ArchiveError {
+    /// `manifest.json` is missing from the archive.
+    #[error("missing manifest.json")]
+    MissingManifest,
+    /// The archive declares more than `MAX_ENTRY_COUNT` entries.
+    #[error("archive has {got} entries, exceeds max {max}")]
+    EntryCountExceeded {
+        /// Observed count.
+        got: usize,
+        /// Compile-time cap.
+        max: usize,
+    },
+    /// Inflated content exceeded `MAX_TOTAL_INFLATED_BYTES`.
+    #[error("archive inflates past {max} bytes")]
+    SizeExceeded {
+        /// Compile-time cap.
+        max: u64,
+    },
+    /// The named entry was not present in the archive.
+    #[error("entry '{0}' not present in archive")]
+    EntryNotFound(String),
+    /// An entry expected to be UTF-8 text was not.
+    #[error("entry '{path}' is not valid UTF-8: {detail}")]
+    EntryNotUtf8 {
+        /// Path of the offending entry.
+        path: String,
+        /// Detail from the underlying decode error.
+        detail: String,
+    },
+}
+
+/// Structured detail for [`Error::Integrity`].
+#[derive(Debug, thiserror::Error)]
+pub enum IntegrityError {
+    /// A declared hash does not match the computed hash.
+    #[error("{kind} mismatch: declared {declared}, computed {computed}")]
+    Mismatch {
+        /// Which hash (`"manifest_checksum"`, `"content_id"`, `"content_hash"`).
+        kind: &'static str,
+        /// Declared (truncated to 16 chars for readability).
+        declared: String,
+        /// Computed (truncated to 16 chars).
+        computed: String,
+    },
+    /// A hash algorithm was declared that this crate does not implement.
+    #[error("unsupported hash algorithm: {0}")]
+    UnsupportedAlgorithm(String),
+    /// The hash string was malformed (not `<algo>:<hex>`).
+    #[error("malformed hash string: {0}")]
+    MalformedHashString(String),
+    /// Something required was missing (e.g. `content_id` when the caller
+    /// invoked `verify_content_id`).
+    #[error("required field missing: {0}")]
+    Missing(&'static str),
+    /// A signature-chain structural invariant failed.
+    #[error("signature chain: {0}")]
+    SignatureChain(String),
 }
 
 // ---------------------------------------------------------------------------
@@ -156,12 +231,33 @@ pub struct DocumentInfo {
     pub created: String,
     /// ISO 8601 modification timestamp.
     pub modified: String,
-    /// Declared license (SPDX identifier or `{type, url}` object).
+    /// Declared license — SPDX identifier string OR a structured
+    /// `{type, url}` object. Matches the spec's string-OR-object branch.
     #[serde(default)]
-    pub license: Option<serde_json::Value>,
+    pub license: Option<License>,
     /// Declared authors.
     #[serde(default)]
     pub authors: Vec<Author>,
+}
+
+/// License declaration — either a bare SPDX identifier string or a
+/// structured `{type, url}` object. `#[serde(untagged)]` handles the
+/// spec's string-OR-object branch at parse time, so callers can `match`
+/// exhaustively instead of re-parsing a `serde_json::Value`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum License {
+    /// Bare SPDX identifier (e.g. `"MIT"`, `"Apache-2.0"`).
+    Spdx(String),
+    /// Structured license with type tag and optional URL.
+    Structured {
+        /// License type tag (SPDX or custom).
+        #[serde(rename = "type")]
+        kind: String,
+        /// Optional URL to the full license text.
+        #[serde(default)]
+        url: Option<String>,
+    },
 }
 
 /// Document author / signer identity.
@@ -283,9 +379,15 @@ pub struct Archive {
 }
 
 /// Conservative inflation ceiling — matches the TypeScript viewer's
-/// MAX_TOTAL_INFLATED_BYTES. Archives larger than this are rejected to
+/// `MAX_TOTAL_INFLATED_BYTES`. Archives larger than this are rejected to
 /// prevent ZIP-bomb DoS in consumers that don't bound memory themselves.
 pub const MAX_TOTAL_INFLATED_BYTES: u64 = 500 * 1024 * 1024; // 500 MB
+
+/// Soft-warn threshold — matches the TypeScript viewer's
+/// `WARN_INFLATED_BYTES`. Exposed so callers can emit their own warning
+/// when inflation crosses this line (this crate does not take a logging
+/// dependency; integrate with `tracing`/`log` on the caller side).
+pub const WARN_INFLATED_BYTES: u64 = 50 * 1024 * 1024; // 50 MB
 
 /// Max entries in an archive — prevents the "many tiny files" ZIP-bomb variant.
 pub const MAX_ENTRY_COUNT: usize = 10_000;
@@ -310,11 +412,11 @@ impl Archive {
         let mut zip = zip::ZipArchive::new(Cursor::new(bytes))?;
 
         if zip.len() > MAX_ENTRY_COUNT {
-            return Err(Error::Archive(format!(
-                "archive has {} entries, exceeds max {}",
-                zip.len(),
-                MAX_ENTRY_COUNT
-            )));
+            return Err(ArchiveError::EntryCountExceeded {
+                got: zip.len(),
+                max: MAX_ENTRY_COUNT,
+            }
+            .into());
         }
 
         let mut entries = std::collections::BTreeMap::new();
@@ -330,23 +432,33 @@ impl Archive {
             let clean = sanitize_archive_path(&raw_name)
                 .ok_or_else(|| Error::UnsafePath(raw_name.clone()))?;
 
-            total_bytes = total_bytes.saturating_add(file.size());
-            if total_bytes > MAX_TOTAL_INFLATED_BYTES {
-                return Err(Error::Archive(format!(
-                    "archive inflates to {} bytes, exceeds max {}",
-                    total_bytes, MAX_TOTAL_INFLATED_BYTES
-                )));
+            // `file.size()` is the declared uncompressed size from the ZIP central
+            // directory — attacker-controlled metadata. A ZIP-bomb can declare
+            // `size=1` and inflate to gigabytes. Measure the *actual* inflated
+            // length by reading through a bounded adapter and refuse anything
+            // larger than the remaining budget.
+            use std::io::Read;
+            let remaining = MAX_TOTAL_INFLATED_BYTES.saturating_sub(total_bytes);
+            // Read up to `remaining + 1` bytes; if we hit remaining+1, the entry
+            // would push us over the ceiling.
+            let budget = remaining.saturating_add(1);
+            let cap = budget.min(1024 * 1024) as usize; // cap initial alloc at 1 MiB
+            let mut buf = Vec::with_capacity(cap);
+            let read_bytes = (&mut file).take(budget).read_to_end(&mut buf)? as u64;
+            if read_bytes > remaining {
+                return Err(ArchiveError::SizeExceeded {
+                    max: MAX_TOTAL_INFLATED_BYTES,
+                }
+                .into());
             }
-
-            let mut buf = Vec::with_capacity(file.size() as usize);
-            std::io::copy(&mut file, &mut buf)?;
+            total_bytes = total_bytes.saturating_add(read_bytes);
             entries.insert(clean, buf);
         }
 
         // Manifest must be present.
         let manifest_raw = entries
             .get("manifest.json")
-            .ok_or_else(|| Error::Archive("missing manifest.json".into()))?
+            .ok_or(ArchiveError::MissingManifest)?
             .clone();
         let manifest: Manifest = serde_json::from_slice(&manifest_raw)
             .map_err(|e| Error::Manifest(format!("manifest.json parse error: {}", e)))?;
@@ -393,14 +505,16 @@ impl Archive {
     /// 4. Top-level `content.entry_point`.
     pub fn document_content(&self, preferred: &[&str]) -> Result<String, Error> {
         let entry_point = self.resolve_entry_point(preferred);
-        let bytes = self.entries.get(&entry_point).ok_or_else(|| {
-            Error::Archive(format!(
-                "entry_point '{}' not present in archive",
-                entry_point
-            ))
-        })?;
-        String::from_utf8(bytes.clone())
-            .map_err(|e| Error::Archive(format!("entry_point is not valid UTF-8: {}", e)))
+        let bytes = self
+            .entries
+            .get(&entry_point)
+            .ok_or_else(|| ArchiveError::EntryNotFound(entry_point.clone()))?;
+        String::from_utf8(bytes.clone()).map_err(|e| {
+            Error::Archive(ArchiveError::EntryNotUtf8 {
+                path: entry_point.clone(),
+                detail: e.to_string(),
+            })
+        })
     }
 
     fn resolve_entry_point(&self, preferred: &[&str]) -> String {
@@ -451,11 +565,12 @@ impl Archive {
         if actual == expected {
             Ok(())
         } else {
-            Err(Error::Integrity(format!(
-                "manifest_checksum mismatch: declared {}, computed {}",
-                &expected[..expected.len().min(16)],
-                &actual[..actual.len().min(16)]
-            )))
+            Err(IntegrityError::Mismatch {
+                kind: "manifest_checksum",
+                declared: expected[..expected.len().min(16)].to_string(),
+                computed: actual[..actual.len().min(16)].to_string(),
+            }
+            .into())
         }
     }
 
@@ -468,21 +583,20 @@ impl Archive {
         };
         let (algo, expected) = parse_hash(declared)?;
         let entry_point = &self.manifest.content.entry_point;
-        let bytes = self.entries.get(entry_point).ok_or_else(|| {
-            Error::Integrity(format!(
-                "content_id cannot be verified — entry_point '{}' missing",
-                entry_point
-            ))
-        })?;
+        let bytes = self
+            .entries
+            .get(entry_point)
+            .ok_or_else(|| ArchiveError::EntryNotFound(entry_point.clone()))?;
         let actual = hash_bytes(&algo, bytes)?;
         if actual == expected {
             Ok(())
         } else {
-            Err(Error::Integrity(format!(
-                "content_id mismatch: declared {}, computed {}",
-                &expected[..expected.len().min(16)],
-                &actual[..actual.len().min(16)]
-            )))
+            Err(IntegrityError::Mismatch {
+                kind: "content_id",
+                declared: expected[..expected.len().min(16)].to_string(),
+                computed: actual[..actual.len().min(16)].to_string(),
+            }
+            .into())
         }
     }
 
@@ -498,22 +612,35 @@ impl Archive {
             Some(s) => s,
             None => return Ok(()),
         };
+        // Root signer (signatures[0]) MUST NOT carry prev_signature — it is the
+        // chain anchor. A present value means corruption, a mid-chain entry
+        // placed as root, or a re-rooting attack.
+        if let Some(first) = security.signatures.first() {
+            if first.prev_signature.is_some() {
+                return Err(IntegrityError::SignatureChain(
+                    "signatures[0] must not have prev_signature (chain root)".into(),
+                )
+                .into());
+            }
+        }
         for (i, entry) in security.signatures.iter().enumerate().skip(1) {
             let prev = &security.signatures[i - 1];
             let expected_prev_hash = format!("sha256:{}", sha256_hex(prev.signature.as_bytes()));
             match &entry.prev_signature {
                 Some(ps) if ps == &expected_prev_hash => continue,
                 Some(ps) => {
-                    return Err(Error::Integrity(format!(
+                    return Err(IntegrityError::SignatureChain(format!(
                         "signatures[{}].prev_signature '{}' does not match sha256 of signatures[{}]",
                         i, ps, i - 1
-                    )))
+                    ))
+                    .into())
                 }
                 None => {
-                    return Err(Error::Integrity(format!(
+                    return Err(IntegrityError::SignatureChain(format!(
                         "signatures[{}] missing prev_signature (breaks chain)",
                         i
-                    )))
+                    ))
+                    .into())
                 }
             }
         }
@@ -557,9 +684,9 @@ fn sanitize_archive_path(raw: &str) -> Option<String> {
 
 #[cfg(feature = "verify")]
 fn parse_hash(declared: &str) -> Result<(String, String), Error> {
-    let (algo, expected) = declared.split_once(':').ok_or_else(|| {
-        Error::Integrity(format!("hash '{}' missing ':' separator", declared))
-    })?;
+    let (algo, expected) = declared
+        .split_once(':')
+        .ok_or_else(|| IntegrityError::MalformedHashString(declared.to_string()))?;
     Ok((algo.to_ascii_lowercase(), expected.to_ascii_lowercase()))
 }
 
@@ -572,13 +699,11 @@ fn hash_bytes(algo: &str, bytes: &[u8]) -> Result<String, Error> {
             hasher.update(bytes);
             Ok(hex::encode(hasher.finalize()))
         }
-        "blake3" => Err(Error::Integrity(
-            "blake3 verification not implemented in this binding (spec'd but deferred)".into(),
-        )),
-        other => Err(Error::Integrity(format!(
-            "unsupported hash algorithm: {}",
-            other
-        ))),
+        "blake3" => Err(IntegrityError::UnsupportedAlgorithm(
+            "blake3 (spec'd but deferred in this binding)".into(),
+        )
+        .into()),
+        other => Err(IntegrityError::UnsupportedAlgorithm(other.to_string()).into()),
     }
 }
 

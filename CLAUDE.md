@@ -109,7 +109,27 @@ mdx/                                    # (directory name deferred-rename)
 │   ├── FUNDING.md       PARTNERSHIPS.md
 │   ├── for-authors/SUBMITTING.md
 │   ├── for-journals/EDITORIAL.md
-│   └── for-reviewers/REPRODUCING.md
+│   ├── for-reviewers/REPRODUCING.md
+│   ├── proposals/                                  # Phase 4.4 design docs
+│   │   └── streaming.md                            # HTTP-Range streaming
+│   └── governance/                                 # Phase 5 CG scaffolding
+│       ├── CHARTER.md                              # W3C CG charter draft
+│       ├── RFC_PROCESS.md                          # change-management
+│       ├── TRADEMARK.md                            # nominative-use policy
+│       └── RELEASE_ENGINEERING.md                  # versioning + releases
+├── bindings/                                       # Phase 4.1 host-lang bindings
+│   └── rust/                                       # mdz crate (alpha)
+│       ├── Cargo.toml   README.md
+│       └── src/lib.rs                              # Archive / Manifest types
+├── integrations/                                   # Phase 4.2 editor / tool hooks
+│   ├── pandoc/mdz-filter.lua                       # LaTeX → MDZ pipeline
+│   └── vscode/                                     # MDZ VS Code extension
+│       ├── package.json  src/extension.js
+│       └── syntaxes/mdz.tmLanguage.json
+├── tools/                                          # Phase 4.3 corpus tooling
+│   └── corpus-fetcher/fetch_arxiv.py               # arXiv → MDZ benchmark
+├── spec/extensions/                                # Phase 4.5 extension specs
+│   └── delta-snapshots-v1.md                       # git-style packfiles
 ├── ROADMAP.md           # phased plan
 ├── CHANGELOG.md
 ├── CLAUDE.md            # (this file)
@@ -168,7 +188,7 @@ tsc implementations/typescript/mdx_format.ts --target es2020 --module esnext
 - Open `.mdx` files with any ZIP utility to inspect contents
 
 ### CI Validation
-The GitHub Actions workflow (`.github/workflows/ci.yml`) runs 9 jobs:
+The GitHub Actions workflow (`.github/workflows/ci.yml`) runs 14 jobs:
 - Validate TypeScript (type-check via `tsc --noEmit`)
 - TypeScript Unit Tests (vitest; includes fast-check property tests)
 - Validate Python (py_compile + example generation)
@@ -178,6 +198,11 @@ The GitHub Actions workflow (`.github/workflows/ci.yml`) runs 9 jobs:
   conformance suite, hypothesis property tests)
 - Validate JSON Schema (ajv-cli + schema negative-rejection tests)
 - Validate CLI Tool (info/validate/extract against example-document.mdx)
+- Phase 2/3 Tests (viewer sanitizer XSS + accessibility)
+- Validate Rust Binding (Phase 4.1 — cargo build+test, default + no-default)
+- Validate Pandoc Lua Filter (Phase 4.2 — smoke + fixture pack if present)
+- Validate VS Code Extension (Phase 4.2 — JSON + syntax check)
+- Validate Corpus Fetcher (Phase 4.3 — py_compile + import smoke)
 - Lint Markdown (DavidAnson/markdownlint-cli2-action)
 
 ## Architecture

@@ -263,8 +263,10 @@ Before writing this into the spec as a normative "readers SHOULD
 support streaming for archives > N MB" clause:
 
 - Which preprint servers would support HTTP Range for uploaded
-  archives? (Zenodo: yes. arXiv: yes. OSF: yes. Institutional repos:
-  varies.)
+  archives? (Zenodo: yes, confirmed via `curl -I`. arXiv `/e-print/`:
+  mirror-dependent; most return `Accept-Ranges: none`. OSF: depends on
+  the Waterbutler storage backend. Institutional repos: varies widely.
+  Phase 4.3 corpus work will verify each server empirically.)
 - Are there any archives in active use today that would break under
   streaming? (None known; the reference example is 6KB, a test corpus
   is the next step.)

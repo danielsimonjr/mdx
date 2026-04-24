@@ -326,6 +326,112 @@ jobs:
         # would still validate).
         run: python tests/v2.0/test_schema_negatives.py
 
+  validate-rust-binding:
+    name: Validate Rust Binding (Phase 4.1)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (MSRV 1.73)
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.73'
+
+      - name: Cargo build (default features)
+        run: |
+          cd bindings/rust
+          cargo build --locked || cargo build
+
+      - name: Cargo test (default features)
+        run: |
+          cd bindings/rust
+          cargo test
+
+      - name: Cargo build (no default features)
+        # Ensures the `verify`-gated methods still compile when the
+        # feature is disabled — catches accidental hard dependencies.
+        run: |
+          cd bindings/rust
+          cargo build --no-default-features
+
+  validate-pandoc-filter:
+    name: Validate Pandoc Lua Filter (Phase 4.2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pandoc 3.x
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
+          pandoc --version | head -1
+
+      - name: Smoke-test filter loads
+        # Running pandoc with an empty input + the filter must exit 0
+        # — any Lua parse error in the filter surfaces here.
+        run: |
+          echo "" | pandoc --lua-filter=integrations/pandoc/mdz-filter.lua \
+            --from=markdown --to=markdown
+
+      - name: Run golden-output fixtures (if any)
+        # Phase 4.2 fixture pack lives in integrations/pandoc/tests/.
+        # Missing directory is not a failure — the job just smoke-tests
+        # the filter until fixtures ship.
+        run: |
+          if [ -d integrations/pandoc/tests ]; then
+            bash integrations/pandoc/tests/run.sh
+          else
+            echo "No pandoc fixtures yet — skipping."
+          fi
+
+  validate-vscode-extension:
+    name: Validate VS Code Extension (Phase 4.2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Validate package.json
+        run: |
+          cd integrations/vscode
+          node -e "JSON.parse(require('fs').readFileSync('package.json', 'utf8'))"
+
+      - name: Syntax-check extension.js
+        run: node --check integrations/vscode/src/extension.js
+
+      - name: Validate TextMate grammar JSON
+        run: |
+          cd integrations/vscode
+          node -e "JSON.parse(require('fs').readFileSync('syntaxes/mdz.tmLanguage.json', 'utf8'))"
+
+  validate-corpus-fetcher:
+    name: Validate Corpus Fetcher (Phase 4.3)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Syntax check
+        run: python -m py_compile tools/corpus-fetcher/fetch_arxiv.py
+
+      - name: Import smoke test
+        # Ensures the module loads and the CLI surface is intact. We
+        # don't hit the arXiv API from CI — that's a Phase 4.3 manual
+        # benchmark, not a gate.
+        run: |
+          python -c "import sys; sys.path.insert(0, 'tools/corpus-fetcher'); import fetch_arxiv; assert hasattr(fetch_arxiv, 'main')"
+
+      - name: --help runs
+        run: python tools/corpus-fetcher/fetch_arxiv.py --help
+
   markdown-lint:
     name: Lint Markdown
     runs-on: ubuntu-latest

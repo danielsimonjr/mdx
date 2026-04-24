@@ -11,7 +11,13 @@
   "keywords": ["mdz", "mdx", "markdown", "scientific", "preview"],
   "icon": "icon.png",
   "activationEvents": [
-    "onLanguage:mdz"
+    "onLanguage:mdz",
+    "onCommand:mdz.view",
+    "onCommand:mdz.preview",
+    "onCommand:mdz.validate",
+    "onCommand:mdz.importIpynb",
+    "onCommand:mdz.exportJats",
+    "onCommand:mdz.verify"
   ],
   "main": "./src/extension.js",
   "contributes": {
@@ -19,7 +25,7 @@
       {
         "id": "mdz",
         "aliases": ["MDZ", "Markdown Zipped", "mdz"],
-        "extensions": [".mdz-md"],
+        "filenamePatterns": ["*.mdz.md", "*.mdx.md"],
         "configuration": "./language-configuration.json"
       }
     ],

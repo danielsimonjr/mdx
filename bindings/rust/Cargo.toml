@@ -8,7 +8,7 @@ repository = "https://github.com/danielsimonjr/mdx"
 keywords = ["mdz", "mdx", "markdown", "scientific", "archive"]
 categories = ["parser-implementations", "science"]
 readme = "README.md"
-rust-version = "1.70"
+rust-version = "1.73"
 
 [lib]
 name = "mdz"
@@ -30,6 +30,9 @@ thiserror = "1.0"
 [dev-dependencies]
 # Test-only: example generation + roundtrip fixtures.
 tempfile = "3"
+# Test-only: synthesize ZIP archives for integration tests. The main crate
+# consumes ZIPs in read-only mode; we only need the writer for tests.
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
 
 [features]
 default = ["verify"]

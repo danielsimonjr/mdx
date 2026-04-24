@@ -3,8 +3,8 @@
 Formal process for proposing, discussing, and merging changes to the
 MDZ specification, reference implementations, and tooling.
 
-Patterned on the Rust / TC39 RFC workflows, adapted for a solo-to-
-small-team project. Two-way: low-friction for minor changes, structured
+Patterned on the Rust RFC process (and, loosely, on the TC39
+stage-process for proposals), adapted for a solo-to-small-team project. Two-way: low-friction for minor changes, structured
 for anything touching the format's surface.
 
 ---
