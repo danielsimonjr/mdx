@@ -1,0 +1,17 @@
+[
+  {
+    "type": "ordered_item",
+    "text": "First",
+    "classes": []
+  },
+  {
+    "type": "ordered_item",
+    "text": "Second",
+    "classes": []
+  },
+  {
+    "type": "ordered_item",
+    "text": "Third",
+    "classes": []
+  }
+]

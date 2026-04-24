@@ -1,0 +1,18 @@
+[
+  {
+    "type": "directive",
+    "name": "note",
+    "label": "",
+    "classes": []
+  },
+  {
+    "type": "paragraph",
+    "text": "Just a note.",
+    "classes": []
+  },
+  {
+    "type": "paragraph",
+    "text": ":::",
+    "classes": []
+  }
+]

@@ -1,0 +1,2 @@
+{.highlight}
+Some paragraph.

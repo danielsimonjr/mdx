@@ -1,0 +1,17 @@
+[
+  {
+    "type": "paragraph",
+    "text": "Outer.",
+    "classes": [
+      "outer"
+    ]
+  },
+  {
+    "type": "paragraph",
+    "text": "Inner.",
+    "classes": [
+      "inner",
+      "outer"
+    ]
+  }
+]

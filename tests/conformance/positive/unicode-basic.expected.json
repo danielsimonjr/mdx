@@ -1,0 +1,13 @@
+[
+  {
+    "type": "heading",
+    "level": 1,
+    "text": "日本語 — 한글 — العربية",
+    "classes": []
+  },
+  {
+    "type": "paragraph",
+    "text": "Paragraph with emoji 🎉 and math ∀.",
+    "classes": []
+  }
+]

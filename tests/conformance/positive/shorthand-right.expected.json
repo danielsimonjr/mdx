@@ -1,0 +1,9 @@
+[
+  {
+    "type": "paragraph",
+    "text": "Right-aligned.",
+    "classes": [
+      "align-right"
+    ]
+  }
+]

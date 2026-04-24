@@ -1,0 +1,2 @@
+{:.center}
+Centered paragraph.

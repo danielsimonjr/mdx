@@ -2274,6 +2274,10 @@ export class MDZDocument {
   private _versions: VersionEntry[];
   private _annotations: Annotation[];
 
+  // Guards the once-per-process deprecation warning on toHTML(); see §2.1
+  // roadmap item on replacing this with the <mdz-viewer> web component.
+  private static _toHtmlWarningEmitted = false;
+
   /**
    * Creates a new MDZDocument instance.
    * This constructor is private; use static factory methods instead.
@@ -3155,21 +3159,34 @@ export class MDZDocument {
   /**
    * Exports the document as standalone HTML.
    *
-   * This produces a basic HTML representation. For full-featured
-   * rendering, use a dedicated MDX viewer.
+   * @deprecated This produces a toy HTML representation powered by a
+   * regex-based Markdown converter that is NOT production-safe. It exists
+   * for quick dev preview only. For real rendering, use the Phase 2
+   * `<mdz-viewer>` web component. Will emit a console warning on first
+   * call and is scheduled for removal once the viewer ships.
+   *
+   * Scheduled removal: 2027-01-01, or first viewer release, whichever is
+   * earlier.
    *
    * @param options - Export options
-   * @returns HTML string
+   * @returns HTML string (best-effort, not spec-compliant)
    */
   toHTML(options: HTMLExportOptions = {}): string {
-    // This is a simplified implementation
-    // A full implementation would use a proper Markdown parser
+    if (!MDZDocument._toHtmlWarningEmitted) {
+      MDZDocument._toHtmlWarningEmitted = true;
+      // eslint-disable-next-line no-console
+      console.warn(
+        "[MDZ] MDZDocument.toHTML is a toy renderer — regex-based Markdown " +
+          "conversion, not CommonMark-compliant. Use the Phase 2 <mdz-viewer> " +
+          "web component or export via mdz-to-html (Phase 2) instead.",
+      );
+    }
     const escapedTitle = this.escapeHTML(this.title);
 
     let processedContent = this._content;
 
-    // Basic Markdown to HTML conversion (very simplified)
-    // In production, use a library like marked or markdown-it
+    // Toy Markdown → HTML. Will be replaced by a real parser call or
+    // removed entirely in Phase 2.
     processedContent = this.basicMarkdownToHTML(processedContent);
 
     const customCSS = options.customCSS || "";

@@ -1,0 +1,9 @@
+[
+  {
+    "type": "paragraph",
+    "text": "Some paragraph.",
+    "classes": [
+      "highlight"
+    ]
+  }
+]

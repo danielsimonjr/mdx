@@ -1,0 +1,16 @@
+[
+  {
+    "type": "cell",
+    "language": "r",
+    "kernel": "r4",
+    "source": "x <- 1",
+    "outputs": [
+      {
+        "type": "text",
+        "body": "x = 1"
+      }
+    ],
+    "frozen": true,
+    "classes": []
+  }
+]

@@ -1,0 +1,8 @@
+[
+  {
+    "type": "include",
+    "target": "chapter.md",
+    "fragment": "#conclusion",
+    "classes": []
+  }
+]

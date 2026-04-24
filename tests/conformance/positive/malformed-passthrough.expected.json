@@ -1,0 +1,12 @@
+[
+  {
+    "type": "paragraph",
+    "text": "{bareword}",
+    "classes": []
+  },
+  {
+    "type": "paragraph",
+    "text": "This paragraph follows.",
+    "classes": []
+  }
+]

@@ -1,0 +1,120 @@
+// MDZ Directive Grammar (Lark / PEG)
+// ====================================
+//
+// Derived from spec/grammar/mdz-directives.abnf (normative).
+// If this file and the ABNF diverge, the ABNF wins and this file is wrong.
+//
+// Scope: this grammar parses INDIVIDUAL DIRECTIVE LINES (block-attr,
+// shorthand, container open/close, cell-open, output-open, include, inline
+// directive). Document-level structure (block order, container nesting,
+// cell-with-outputs grouping) is handled by the state machine in
+// implementations/python/mdz_parser/parser.py that calls this grammar
+// per line.
+//
+// Why per-line and not whole-document: CommonMark paragraphs/lists/code
+// blocks are line-sensitive and interact with indentation rules that
+// aren't worth re-specifying here. Delegating prose to a real CommonMark
+// parser (or the passthrough layer) is cleaner than modeling it in PEG.
+
+// ---------------------------------------------------------------------------
+// Entry points — the state machine calls one of these per line
+// ---------------------------------------------------------------------------
+
+// Any directive line the state machine recognizes.
+directive_line: shorthand_align
+              | block_attr
+              | container_open
+              | container_close
+              | cell_open
+              | output_open
+              | include_directive
+              | labeled_block_open
+              | inline_directive
+
+// ---------------------------------------------------------------------------
+// Shorthand alignment
+// ---------------------------------------------------------------------------
+
+shorthand_align: "{:" "." IDENT "}"
+
+// ---------------------------------------------------------------------------
+// Block attributes
+// ---------------------------------------------------------------------------
+
+block_attr: "{" attr_body "}"
+
+// ---------------------------------------------------------------------------
+// Attribute body — shared by block-attr, container, cell, output, include,
+// inline directive
+// ---------------------------------------------------------------------------
+
+// Items are separated by whitespace which is auto-ignored by %ignore WS.
+attr_body: attr_item+
+attr_item: class_item | id_item | kv_item | bool_item
+
+class_item: "." IDENT           -> class_item
+id_item:    "#" IDENT           -> id_item
+kv_item:    IDENT "=" value     -> kv_item
+// Bare HTML-style boolean attribute — `controls`, `autoplay`, etc. Equivalent
+// to kv_item with value="true" for semantic consumers.
+bool_item:  IDENT               -> bool_item
+
+value: QUOTED_STR | UNQUOTED_VALUE
+
+// ---------------------------------------------------------------------------
+// Container blocks
+// ---------------------------------------------------------------------------
+
+// `:::name{attrs}` or `:::{attrs}` or `:::name`
+container_open: CONTAINER_COLONS [IDENT] ["{" attr_body "}"]
+container_close: CONTAINER_COLONS
+
+CONTAINER_COLONS: /:{3,}/
+
+// ---------------------------------------------------------------------------
+// Computational cells
+// ---------------------------------------------------------------------------
+
+cell_open: "::cell" ["{" attr_body "}"]
+
+// ---------------------------------------------------------------------------
+// Cell output blocks
+// ---------------------------------------------------------------------------
+
+output_open: "::output" "{" attr_body "}"
+
+// ---------------------------------------------------------------------------
+// Transclusion
+// ---------------------------------------------------------------------------
+
+include_directive: "::include" "[" attr_body "]" ["{" attr_body "}"]
+
+// ---------------------------------------------------------------------------
+// Labelable blocks (v2.1)
+// ---------------------------------------------------------------------------
+
+labeled_block_open: ("::fig" | "::eq" | "::tab") "{" attr_body "}"
+
+// ---------------------------------------------------------------------------
+// Inline directives on own line
+// ---------------------------------------------------------------------------
+
+inline_directive: "::" IDENT ["[" label "]"] ["{" attr_body "}"]
+
+label: LABEL_BODY
+LABEL_BODY: /[^\]\n]*/
+
+// ---------------------------------------------------------------------------
+// Tokens
+// ---------------------------------------------------------------------------
+
+IDENT: /[a-zA-Z][a-zA-Z0-9_\-]*/
+
+// Quoted string — double- or single-quoted, backslash-escaped.
+QUOTED_STR: /"([^"\\\n]|\\.)*"|'([^'\\\n]|\\.)*'/
+
+// Unquoted value — alphanumerics + - _ . (no whitespace, no quotes)
+UNQUOTED_VALUE: /[A-Za-z0-9_][A-Za-z0-9_\-.]*/
+
+%import common.WS
+%ignore WS

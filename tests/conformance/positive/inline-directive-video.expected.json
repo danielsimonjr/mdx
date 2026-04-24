@@ -1,0 +1,9 @@
+[
+  {
+    "type": "directive",
+    "name": "video",
+    "label": "Demo",
+    "src": "demo.mp4",
+    "classes": []
+  }
+]

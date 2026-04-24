@@ -1,0 +1,2 @@
+{bareword}
+This paragraph follows.

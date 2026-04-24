@@ -1,0 +1,13 @@
+[
+  {
+    "type": "heading",
+    "level": 1,
+    "text": "Heading",
+    "classes": []
+  },
+  {
+    "type": "paragraph",
+    "text": "Paragraph.",
+    "classes": []
+  }
+]

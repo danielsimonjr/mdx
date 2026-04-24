@@ -1,0 +1,6 @@
+:::{.outer}
+Outer.
+:::{.inner}
+Inner.
+:::
+:::

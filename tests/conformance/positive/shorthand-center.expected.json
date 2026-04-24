@@ -1,0 +1,9 @@
+[
+  {
+    "type": "paragraph",
+    "text": "Centered paragraph.",
+    "classes": [
+      "align-center"
+    ]
+  }
+]

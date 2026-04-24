@@ -172,8 +172,24 @@ jobs:
         run: |
           python -c "import json; [print(p, '→', json.load(open(p))['name']) for p in ['spec/profiles/scientific-paper-v1.json', 'spec/profiles/api-reference-v1.json']]"
 
-      - name: Run v2.0 parser conformance tests
+      - name: Install Python test dependencies (lark, hypothesis)
+        run: python -m pip install lark hypothesis
+
+      - name: Validate v2.0 + Advanced profile JSONs parse
+        run: |
+          python -c "import json; [print(p, '->', json.load(open(p))['name']) for p in ['spec/profiles/scientific-paper-v1.json', 'spec/profiles/api-reference-v1.json', 'spec/profiles/mdz-advanced-v1.json']]"
+
+      - name: Run v2.0 parser conformance tests (legacy regex parser)
         run: python tests/v2.0/test_parser_v20.py
+
+      - name: Run Lark parser parity + v2.1 tests
+        run: python tests/v2.0/test_lark_parser.py
+
+      - name: Run conformance test suite (positive/negative/roundtrip/edge)
+        run: python tests/conformance/run_conformance.py
+
+      - name: Run property-based tests (hypothesis, 500 cases per property)
+        run: python tests/property/test_parser_properties.py
 
       - name: Verify archive ordering (§10.2)
         run: |

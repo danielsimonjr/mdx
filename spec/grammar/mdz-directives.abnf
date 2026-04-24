@@ -1,0 +1,274 @@
+; ============================================================================
+; MDZ Directive Grammar (ABNF, RFC 5234)
+; ============================================================================
+;
+; Formal grammar for the MDZ-specific syntax layered on top of CommonMark.
+; This document is normative; conflicts between this grammar and prose in
+; MDZ_FORMAT_SPECIFICATION_v2.0.md are resolved in favor of this grammar.
+;
+; Scope:
+;   - block-attribute markers ({.class #id key="value"})
+;   - shorthand alignment ({:.center})
+;   - container blocks (:::name{attrs} ... :::)
+;   - inline directive blocks (::name[label]{attrs})
+;   - computational cells (::cell{attrs} + fenced source + ::output{attrs})
+;   - transclusion (::include[target=... fragment=...])
+;   - cross-reference and citation (::ref[id], ::cite[key])
+;   - labelable blocks (::fig{id}, ::eq{id}, ::tab{id})
+;
+; Out of scope (inherited from CommonMark):
+;   - paragraphs, headings, lists, fenced code, raw HTML
+;   - inline emphasis, links, images, code spans
+;
+; Versioning: this grammar is MDZ v2.1. v2.0 lacked ::cite / ::ref / ::fig /
+; ::eq / ::tab as labelable blocks; v2.1 adds them. Parsers MUST reject
+; unknown directives under v2.1 conformance (unlike v1.1 which degraded to
+; paragraphs).
+;
+; ============================================================================
+
+; ----------------------------------------------------------------------------
+; Top level — a document is a stream of blocks
+; ----------------------------------------------------------------------------
+
+document      = *block
+
+block         = container-block
+              / cell-block
+              / output-block         ; illegal at top level, valid inside cell-block
+              / include-directive
+              / labeled-block
+              / inline-directive
+              / shorthand-align
+              / block-attr
+              / commonmark-block      ; headings, paragraphs, lists, code fences — delegated
+
+; ----------------------------------------------------------------------------
+; Block-attribute markers
+; ----------------------------------------------------------------------------
+
+; A standalone line of the form `{.class #id key="value" key2="v2"}` that
+; applies to the IMMEDIATELY FOLLOWING block.
+block-attr    = WS "{" attr-body "}" WS LF
+              ; semantic constraint: attr-body MUST contain at least one
+              ; class or id (pure key="value" is ambiguous with shorthand).
+
+; Shorthand alignment: {:.name}
+shorthand-align = WS "{:." ident "}" WS LF
+                ; desugars to a block-attr adding class "align-<ident>" to
+                ; the next block.
+
+; ----------------------------------------------------------------------------
+; Attribute body grammar (shared by block-attr and directive brace bodies)
+; ----------------------------------------------------------------------------
+
+attr-body     = attr-item *( 1*WS attr-item )
+
+attr-item     = class-item / id-item / kv-item
+
+class-item    = "." ident
+id-item       = "#" ident
+kv-item       = key "=" value
+
+key           = ident
+value         = quoted-string / unquoted-value
+
+quoted-string = DQUOTE *qchar DQUOTE
+              / SQUOTE *schar SQUOTE
+
+qchar         = %x20-21 / %x23-5B / %x5D-7E / escape   ; no raw "
+schar         = %x20-26 / %x28-5B / %x5D-7E / escape   ; no raw '
+
+escape        = "\" ( DQUOTE / SQUOTE / "\" / "/" / "b" / "f" / "n" / "r" / "t" )
+
+unquoted-value = unquoted-char *unquoted-char
+               ; allows alphanumeric + - _ .  no whitespace, no quotes, no braces
+unquoted-char  = ALPHA / DIGIT / "-" / "_" / "."
+
+ident          = ALPHA *( ALPHA / DIGIT / "-" / "_" )
+
+; ----------------------------------------------------------------------------
+; Container blocks
+; ----------------------------------------------------------------------------
+
+; Opens with `:::` (3+) optionally followed by a name and brace body.
+; Closes with `:::` alone on a line (3+ colons).
+; Contents are arbitrary blocks (including nested containers).
+
+container-block = container-open *block container-close
+
+container-open  = WS 3*":" [ ident ] [ "{" attr-body "}" ] WS LF
+container-close = WS 3*":" WS LF
+
+; ----------------------------------------------------------------------------
+; Computational cells (v2.0 §11)
+; ----------------------------------------------------------------------------
+
+; A cell opens with `::cell{attrs}`, requires a fenced source block
+; immediately after (ignoring blank lines), then zero or more ::output
+; blocks, each of which may have its own fenced block or rely on `src`.
+
+cell-block     = cell-open blank-lines fenced-source blank-lines *output-block
+
+cell-open      = WS "::cell" [ "{" attr-body "}" ] WS LF
+
+; The fenced source block is a CommonMark fenced code block.
+fenced-source  = fence-open *content-line fence-close
+
+fence-open     = WS "```" [ ident ] WS LF          ; language optional
+fence-close    = WS "```" WS LF
+
+content-line   = *VCHAR LF
+
+; ----------------------------------------------------------------------------
+; Cell output blocks (valid only after a cell's fenced-source)
+; ----------------------------------------------------------------------------
+
+output-block   = output-open [ blank-lines fenced-source ]
+
+output-open    = WS "::output" "{" output-attrs "}" WS LF
+
+; Constraint (not expressible in pure ABNF): output-attrs MUST contain
+; `type="..."` with a non-empty value. Missing type is a parse error.
+; Semantic: if no fenced-source follows, `src="..."` MUST be present.
+output-attrs   = attr-body
+
+; ----------------------------------------------------------------------------
+; Transclusion (::include)
+; ----------------------------------------------------------------------------
+
+; ::include[target="..." fragment="..."]
+; ::include[path="..."]{content_hash="..."}      ; optional brace-attrs
+;
+; Note the `[...]` bracket body uses the same attr-body grammar as `{...}`,
+; which is a v2.0 departure from standard CommonMark directive labels
+; (normally a label is a plain string). Rationale: transclusion targets
+; carry multiple attributes (target, fragment, path) and shoehorning them
+; into a single opaque label was worse than accepting the grammar departure.
+
+include-directive = WS "::include" "[" attr-body "]" [ "{" attr-body "}" ] WS LF
+
+; Constraint: combined (bracket + brace) attr-body MUST contain at least
+; one of `target=...` or `path=...` with a non-empty value.
+
+; ----------------------------------------------------------------------------
+; Labelable blocks (v2.1)
+; ----------------------------------------------------------------------------
+
+; ::fig{id="f1"} — figure container, body is a single image or cell output
+; ::eq{id="e1"} — equation container, body is inline or block math
+; ::tab{id="t1"} — table container, body is a CommonMark table
+;
+; Each carries an `id` which is the target of ::ref[id].
+
+labeled-block  = fig-block / eq-block / tab-block
+
+fig-block      = WS "::fig" "{" attr-body "}" WS LF
+                 blank-lines commonmark-block   ; typically an image or ::cell output
+
+eq-block       = WS "::eq" "{" attr-body "}" WS LF
+                 blank-lines math-content
+
+tab-block      = WS "::tab" "{" attr-body "}" WS LF
+                 blank-lines commonmark-table
+
+; math-content and commonmark-table are inherited from CommonMark + math
+; extensions; not defined here.
+math-content   = commonmark-block
+commonmark-table = commonmark-block
+
+; Constraint: the `id` attribute is REQUIRED on fig/eq/tab. Without it the
+; block is a parse error.
+
+; ----------------------------------------------------------------------------
+; Inline directives (on their own line)
+; ----------------------------------------------------------------------------
+
+; General form: ::name[label]{attrs} on a line by itself.
+; Specific well-known names: video, audio, model, embed, data, figure, note,
+; details, toc, ref, cite. Unknown names: reject in v2.1 strict mode, emit
+; as placeholder in v2.0 compat mode.
+
+inline-directive = WS "::" ident [ "[" label "]" ] [ "{" attr-body "}" ] WS LF
+
+label            = *( ALPHA / DIGIT / SP / "-" / "_" / "." / "," / ":" )
+
+; ----------------------------------------------------------------------------
+; Cross-references and citations (v2.1 — also appear inline in paragraphs)
+; ----------------------------------------------------------------------------
+
+; ::ref[id]        — renders as "Figure N" / "Equation N" / "Table N" based
+;                    on the referenced block's type.
+; ::cite[key]      — renders as a citation token (e.g., "[1]" or "(Smith
+;                    2020)") resolved against references.json (CSL-JSON).
+; ::cite[key, key2] — multi-citation, comma-separated keys.
+;
+; These are inline forms; the standalone-line variants are handled by
+; inline-directive.
+
+inline-ref     = "::ref[" ident "]"
+inline-cite    = "::cite[" cite-keys "]"
+
+cite-keys      = ident *( "," WS ident )
+
+; ----------------------------------------------------------------------------
+; CommonMark delegation
+; ----------------------------------------------------------------------------
+
+; Everything not matched by the productions above is delegated to the
+; CommonMark parser. This grammar does not re-specify CommonMark.
+
+commonmark-block = *VCHAR LF   ; placeholder; real parser delegates
+
+; ----------------------------------------------------------------------------
+; Whitespace / helpers
+; ----------------------------------------------------------------------------
+
+WS             = *SP                  ; horizontal whitespace only
+blank-lines    = *( WS LF )           ; zero or more blank lines
+SP             = %x20 / %x09          ; space or tab
+LF             = %x0A / %x0D.0A       ; LF or CRLF
+
+ALPHA          = %x41-5A / %x61-7A
+DIGIT          = %x30-39
+VCHAR          = %x21-7E              ; visible ASCII
+DQUOTE         = %x22                 ; "
+SQUOTE         = %x27                 ; '
+
+; ============================================================================
+; Normative constraints not expressible in ABNF
+; ============================================================================
+;
+; 1. An unclosed fenced code block inside ::cell or ::output MUST raise a
+;    parse error with a line number. Silent absorption to EOF is forbidden.
+;
+; 2. ::cell MUST have a non-empty source (fenced code block with ≥1 content
+;    line). Empty cells are a parse error.
+;
+; 3. ::output MUST have a `type="..."` attribute. Missing or empty type is
+;    a parse error; silent defaulting is forbidden.
+;
+; 4. ::output with no fenced body MUST have `src="..."`. An ::output with
+;    neither is a parse error.
+;
+; 5. ::cell{execution_count=N} — N MUST parse as a non-negative integer.
+;    Non-integer values are a parse error. Silent string-coercion is forbidden.
+;
+; 6. ::include target/path MUST be a non-empty string after attr resolution.
+;    Empty targets are a parse error.
+;
+; 7. ::ref[id] / ::fig{id} / ::eq{id} / ::tab{id} — id is REQUIRED and MUST
+;    match ident grammar. Duplicate ids within a document are a validator
+;    warning (not a parse error).
+;
+; 8. ::cite[key] keys MUST resolve against entries in references.json.
+;    Unresolved citations are a validator error (not a parse error, because
+;    references.json is out-of-band).
+;
+; 9. Precedence for block attributes: inline > block > container.
+;
+; 10. Malformed attribute markers ({word} without . or #, unclosed {) degrade
+;     to plain-text paragraphs for v1.1 / v2.0 compat; v2.1 strict mode
+;     upgrades these to warnings (still not errors).
+;
+; ============================================================================

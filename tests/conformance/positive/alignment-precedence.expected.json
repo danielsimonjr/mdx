@@ -1,0 +1,9 @@
+[
+  {
+    "type": "paragraph",
+    "text": "Should be right (inline wins).",
+    "classes": [
+      "align-right"
+    ]
+  }
+]

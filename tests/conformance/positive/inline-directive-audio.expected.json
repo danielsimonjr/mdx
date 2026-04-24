@@ -1,0 +1,9 @@
+[
+  {
+    "type": "directive",
+    "name": "audio",
+    "label": "Theme",
+    "src": "theme.mp3",
+    "classes": []
+  }
+]

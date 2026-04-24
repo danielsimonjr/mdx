@@ -1,0 +1,10 @@
+[
+  {
+    "type": "paragraph",
+    "text": "A paragraph.",
+    "classes": [
+      "callout"
+    ],
+    "id": "intro"
+  }
+]

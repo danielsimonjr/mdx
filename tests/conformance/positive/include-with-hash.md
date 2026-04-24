@@ -1,0 +1,1 @@
+::include[target="mdx://urn:mdx:doc:shared/content.md"]{content_hash="sha256:abc"}

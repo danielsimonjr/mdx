@@ -1,0 +1,38 @@
+[
+  {
+    "type": "heading",
+    "level": 1,
+    "text": "L1",
+    "classes": []
+  },
+  {
+    "type": "heading",
+    "level": 2,
+    "text": "L2",
+    "classes": []
+  },
+  {
+    "type": "heading",
+    "level": 3,
+    "text": "L3",
+    "classes": []
+  },
+  {
+    "type": "heading",
+    "level": 4,
+    "text": "L4",
+    "classes": []
+  },
+  {
+    "type": "heading",
+    "level": 5,
+    "text": "L5",
+    "classes": []
+  },
+  {
+    "type": "heading",
+    "level": 6,
+    "text": "L6",
+    "classes": []
+  }
+]
