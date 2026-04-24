@@ -23,7 +23,7 @@ jobs:
         run: npm install -g typescript
 
       - name: Type check
-        run: tsc implementations/typescript/mdx_format.ts --noEmit --target es2020 --moduleResolution node --skipLibCheck
+        run: tsc implementations/typescript/mdx_format.ts --noEmit --target es2020 --moduleResolution node --skipLibCheck --ignoreDeprecations 6.0
 
   test-typescript:
     name: TypeScript Unit Tests
@@ -177,7 +177,7 @@ jobs:
         run: npm install -g ajv-cli ajv-formats
 
       - name: Validate schema syntax
-        run: ajv compile -s spec/manifest.schema.json --spec=draft2020
+        run: ajv compile -s spec/manifest.schema.json --spec=draft2020 -c ajv-formats
 
       - name: Validate example manifest against schema
         run: |
