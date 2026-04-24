@@ -81,13 +81,18 @@ describe("property: generateUUID", () => {
 });
 
 describe("property: sanitizePath never allows path traversal", () => {
-  it("strips .. segments from any input", () => {
+  // Path-traversal security is about SEGMENTS, not substrings. `...`
+  // (three dots) is a legal filename in both POSIX and Windows; it
+  // contains the substring `..` but is not a parent-directory reference.
+  // The correct property is: no path segment equals `..` or `.`.
+  it("never produces a `..` segment", () => {
     fc.assert(
       fc.property(
         fc.string({ maxLength: 200 }).filter((s) => !s.includes("\0")),
         (input) => {
           const result = sanitizePath(input);
-          return !result.includes("..");
+          const segments = result.split("/");
+          return !segments.includes("..") && !segments.includes(".");
         },
       ),
       { numRuns: 500 },

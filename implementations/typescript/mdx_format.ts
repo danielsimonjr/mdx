@@ -1562,6 +1562,12 @@ type PlainObject<T> = T extends ReadonlyArray<unknown>
 /**
  * Removes undefined and null values from a plain object.
  *
+ * Prototype-pollution safe: keys `__proto__`, `prototype`, and `constructor`
+ * are assigned via `Object.defineProperty` rather than bracket notation to
+ * avoid triggering prototype mutation. This was discovered by a fast-check
+ * property test that generated `{__proto__: value}` and observed the
+ * resulting object's shape was wrong.
+ *
  * @param obj - The plain object to clean
  * @returns A new object with only defined values (same shape as input)
  */
@@ -1573,11 +1579,25 @@ export function cleanObject<T extends object>(obj: PlainObject<T>): Partial<T> {
       `cleanObject expects a plain object, got ${obj.constructor?.name ?? typeof obj}`,
     );
   }
-  const result: Partial<T> = {};
-  for (const [key, value] of Object.entries(obj) as Array<[keyof T, T[keyof T]]>) {
+  // Use a null-prototype object to eliminate prototype-pollution risk
+  // entirely; then copy into a regular object for the return value shape
+  // callers expect. The intermediate null-proto map means `__proto__`
+  // assignment via bracket notation creates an own property rather than
+  // setting the prototype chain.
+  const tmp = Object.create(null) as Record<string, unknown>;
+  for (const [key, value] of Object.entries(obj)) {
     if (value !== undefined && value !== null) {
-      result[key] = value;
+      tmp[key] = value;
     }
+  }
+  const result: Partial<T> = {};
+  for (const key of Object.keys(tmp)) {
+    Object.defineProperty(result, key, {
+      value: tmp[key],
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
   }
   return result;
 }
