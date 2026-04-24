@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "types": ["node"],
+    "lib": ["es2020", "dom"],
+    "noEmit": true
+  },
+  "_comment": "Matches the existing CI typecheck flags (non-strict). Pre-existing TS source has a few type issues under strict mode that are out of scope for this test setup. Enable strict in a future cleanup pass.",
+  "include": ["*.ts"],
+  "exclude": ["node_modules"]
+}

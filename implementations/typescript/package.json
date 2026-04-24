@@ -1,0 +1,21 @@
+{
+  "name": "mdx-format",
+  "version": "1.1.0",
+  "description": "Reference TypeScript implementation of the MDX (Markdown eXtended Container) format",
+  "type": "module",
+  "main": "mdx_format.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.6.0"
+  },
+  "license": "MIT"
+}

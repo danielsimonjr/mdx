@@ -263,6 +263,8 @@ export const EXTENSION_TO_MIME: Record<string, string> = {
   // Default
   ".txt": "text/plain",
   ".md": "text/markdown",
+  // MDX container itself
+  ".mdx": MDX_MIME_TYPE,
 };
 
 // ============================================================================

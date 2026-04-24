@@ -25,6 +25,27 @@ jobs:
       - name: Type check
         run: tsc implementations/typescript/mdx_format.ts --noEmit --target es2020 --moduleResolution node --skipLibCheck
 
+  test-typescript:
+    name: TypeScript Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install test deps (vitest + jszip)
+        run: |
+          cd implementations/typescript
+          npm install
+
+      - name: Run unit tests
+        run: |
+          cd implementations/typescript
+          npm test
+
   validate-python:
     name: Validate Python
     runs-on: ubuntu-latest

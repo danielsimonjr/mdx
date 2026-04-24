@@ -48,3 +48,7 @@ memory.db-*
 # Local generator output (CI regenerates; not source of truth)
 implementations/python/example-document.mdx
 implementations/python/example-extracted/
+
+# TypeScript test infrastructure
+implementations/typescript/node_modules/
+implementations/typescript/package-lock.json
