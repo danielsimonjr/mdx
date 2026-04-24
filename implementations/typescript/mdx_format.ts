@@ -1374,7 +1374,9 @@ export class MDXManifest {
     if (!this._data.document.authors) {
       this._data.document.authors = [];
     }
-    this._data.document.authors.push(cleanObject(author) as Author);
+    this._data.document.authors.push(
+      cleanObject(author as unknown as Record<string, unknown>) as unknown as Author,
+    );
     this.updateModified();
   }
 
@@ -1386,7 +1388,9 @@ export class MDXManifest {
     if (!this._data.document.contributors) {
       this._data.document.contributors = [];
     }
-    this._data.document.contributors.push(cleanObject(contributor) as Author);
+    this._data.document.contributors.push(
+      cleanObject(contributor as unknown as Record<string, unknown>) as unknown as Author,
+    );
     this.updateModified();
   }
 
@@ -1772,7 +1776,7 @@ export class MDXDocument {
     // Load all other files as assets
     const promises: Promise<void>[] = [];
 
-    zip.forEach((relativePath, zipEntry) => {
+    zip.forEach((relativePath: string, zipEntry: JSZip.JSZipObject) => {
       if (relativePath !== "manifest.json" && relativePath !== entryPoint && !zipEntry.dir) {
         promises.push(
           (async () => {
@@ -2123,7 +2127,7 @@ export class MDXDocument {
     const data = this._assets.get(path);
     if (data) {
       const mimeType = getMimeType(path);
-      return new Blob([data], { type: mimeType });
+      return new Blob([data as BlobPart], { type: mimeType });
     }
     return undefined;
   }
