@@ -25,7 +25,7 @@
 const vscode = require('vscode');
 const { execFile } = require('child_process');
 const path = require('path');
-const { buildPreviewHtml } = require('./helpers.js');
+const { buildPreviewHtml, runCliCore } = require('./helpers.js');
 
 // ---------------------------------------------------------------------------
 // Activation
@@ -63,34 +63,18 @@ function getCliPath() {
 /** Run a `mdz <command> <file>` invocation; stream output to the OUTPUT panel. */
 function runCli(subcommand, uri, out) {
     const filePath = resolveFileUri(uri);
-    if (!filePath) {
-        vscode.window.showWarningMessage(`MDZ: ${subcommand} needs a file — right-click an archive in the Explorer.`);
-        return;
-    }
-    const key = `${subcommand}:${filePath}`;
-    if (inFlight.has(key)) {
-        vscode.window.showWarningMessage(`MDZ: ${subcommand} is already running for this file.`);
-        return;
-    }
-    const cli = getCliPath();
-    out.show(true);
-    out.appendLine(`$ ${cli} ${subcommand} ${filePath}`);
-    // execFile with an argv array — the file path is NEVER passed through a
-    // shell, so paths containing spaces, quotes, `;`, `&&`, `$()`, etc. cannot
-    // be re-interpreted as shell metacharacters.
-    const child = execFile(cli, [subcommand, filePath], { shell: false }, (err, stdout, stderr) => {
-        inFlight.delete(key);
-        if (stdout) out.append(stdout);
-        if (stderr) out.append(stderr);
-        if (err) {
-            const exitInfo = err.code ?? err.message;
-            out.appendLine(`[exit ${exitInfo}]`);
-            vscode.window.showErrorMessage(`MDZ ${subcommand} failed (${exitInfo}) — see OUTPUT panel.`);
-        } else {
-            out.appendLine('[OK]');
-        }
-    });
-    inFlight.set(key, child);
+    runCliCore(
+        {
+            execFn: execFile,
+            showWarning: (m) => vscode.window.showWarningMessage(m),
+            showError: (m) => vscode.window.showErrorMessage(m),
+            out,
+            inFlight,
+        },
+        getCliPath(),
+        subcommand,
+        filePath,
+    );
 }
 
 function viewArchive(uri, out) {

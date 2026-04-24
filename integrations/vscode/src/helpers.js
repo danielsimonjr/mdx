@@ -58,4 +58,56 @@ function buildPreviewHtml(markdown, theme) {
 </html>`;
 }
 
-module.exports = { PREVIEW_MAX_BYTES, escapeHtml, buildPreviewHtml };
+/**
+ * Testable core of the runCli command.
+ *
+ * Extracted so we can assert the security-relevant behavior without
+ * booting the VS Code extension host:
+ *   - execFn is called with an argv array (NEVER a shell string), so
+ *     paths containing spaces, quotes, `;`, `&&`, `$()`, etc. cannot
+ *     be re-interpreted as shell metacharacters.
+ *   - concurrent invocations with the same (subcommand, filePath)
+ *     short-circuit via the `inFlight` Map; the first call wins, the
+ *     second returns early without spawning.
+ *   - the inFlight entry is cleared on completion so subsequent calls
+ *     work and the Map doesn't leak memory.
+ *
+ * deps: { execFn, showWarning, showError, out, inFlight }
+ *   execFn(file, args, opts, callback) — shape of child_process.execFile
+ *   showWarning(msg), showError(msg) — user-facing notifications
+ *   out.show(true), out.appendLine(msg), out.append(chunk) — OUTPUT channel
+ *   inFlight — a Map<string, ChildProcess> tracking running invocations
+ *
+ * Returns: the child handle on successful spawn, or null when skipped
+ * (missing filePath or already in-flight).
+ */
+function runCliCore(deps, cli, subcommand, filePath) {
+    const { execFn, showWarning, showError, out, inFlight } = deps;
+    if (!filePath) {
+        showWarning(`MDZ: ${subcommand} needs a file — right-click an archive in the Explorer.`);
+        return null;
+    }
+    const key = `${subcommand}:${filePath}`;
+    if (inFlight.has(key)) {
+        showWarning(`MDZ: ${subcommand} is already running for this file.`);
+        return null;
+    }
+    out.show(true);
+    out.appendLine(`$ ${cli} ${subcommand} ${filePath}`);
+    const child = execFn(cli, [subcommand, filePath], { shell: false }, (err, stdout, stderr) => {
+        inFlight.delete(key);
+        if (stdout) out.append(stdout);
+        if (stderr) out.append(stderr);
+        if (err) {
+            const exitInfo = err.code ?? err.message;
+            out.appendLine(`[exit ${exitInfo}]`);
+            showError(`MDZ ${subcommand} failed (${exitInfo}) — see OUTPUT panel.`);
+        } else {
+            out.appendLine('[OK]');
+        }
+    });
+    inFlight.set(key, child);
+    return child;
+}
+
+module.exports = { PREVIEW_MAX_BYTES, escapeHtml, buildPreviewHtml, runCliCore };

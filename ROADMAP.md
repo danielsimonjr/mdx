@@ -513,12 +513,13 @@ cycle skipped. Items are split by origin so credit + blame are clear.
       that any future lazy-parse optimization must preserve this
       invariant for `verify_integrity` correctness. Flagged by
       type-design-analyzer.
-- [ ] **Rust `FeatureDisabled` actually wired** — the enum variant
-      was added but methods are still `#[cfg(feature = "verify")]`
-      gated. Either remove the cfg and return `Err(FeatureDisabled)`
-      at runtime (stable API surface across feature sets), or add a
-      prominent crate-doc paragraph explaining the gating. Flagged
-      by type-design-analyzer.
+- [x] **Rust `FeatureDisabled` actually wired** (2026-04-24 follow-up
+      commit): `verify_integrity` / `verify_content_id` /
+      `verify_signature_chain` now have `#[cfg(not(feature = "verify"))]`
+      early-return paths that return `Err(FeatureDisabled)`. Methods
+      are always present regardless of feature set. Also: sha2/hex
+      promoted to `optional = true` deps gated by the `verify` feature
+      so a no-default build truly sheds them.
 - [ ] **CHARTER.md CCLA exact name + link** — currently says "W3C
       Community Contributor License Agreement" without the canonical
       URL. Flagged by comment-analyzer (suggestion #13).
@@ -580,8 +581,10 @@ cycle skipped. Items are split by origin so credit + blame are clear.
       Preferred path: downgrade + revisit in Phase 2.3 when the editor
       build needs a real TS parser anyway.
 - [x] **`.expected.json` per conformance fixture** — audit 2026-04-24:
-      52 `.md` fixtures, 52 `.expected*.json` pairs. 100% coverage
-      across positive/negative/roundtrip/edge. Resolved.
+      52 fixtures under `tests/conformance/{positive,negative,roundtrip,
+      edge}` (the 53rd `.md` file under `tests/conformance/` is the
+      `README.md` — a doc, not a fixture). All 52 fixtures paired with
+      `.expected*.json`. 100% coverage. Resolved.
 - [ ] **`basicMarkdownToHTML` retirement** — audit 2026-04-24 found the
       method still present at `implementations/typescript/mdx_format.ts:3363`.
       Currently guarded by a `toHTML()`-level `console.warn` (once per

@@ -230,10 +230,16 @@ fn signature_chain_accepts_valid_multi_entry() {
 #[cfg(feature = "verify")]
 #[test]
 fn signature_chain_rejects_tampered_prev_hash() {
-    let mut manifest = manifest_with_valid_chain(2);
-    // Corrupt entry 1's prev_signature — the `sha256:...` string.
-    let tampered = manifest.replace("sha256:", "sha256:00");
-    manifest = tampered;
+    // Compute the legitimate prev_signature hash for entry 1, then
+    // replace THAT specific substring with a synthetic bad hash. A
+    // blanket `replace("sha256:", ...)` would also clobber any future
+    // `manifest_checksum` or `content_hash` fields in the fixture —
+    // this version pins the assertion to "chain-specific corruption".
+    use sha2::{Digest, Sha256};
+    let manifest = manifest_with_valid_chain(2);
+    let legit_prev = format!("sha256:{}", hex::encode(Sha256::digest(b"sig-0")));
+    let tampered_prev = "sha256:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
+    let manifest = manifest.replace(&legit_prev, tampered_prev);
     let zip = build_zip(&[
         ("manifest.json", manifest.as_bytes()),
         ("document.md", b"# hi"),
@@ -241,6 +247,8 @@ fn signature_chain_rejects_tampered_prev_hash() {
     let archive = Archive::open(&zip).unwrap();
     match archive.verify_signature_chain() {
         Err(Error::Integrity(IntegrityError::SignatureChain(msg))) => {
+            // Pin that the diagnostic names the offending entry index.
+            assert!(msg.contains("signatures[1]"), "got: {}", msg);
             assert!(msg.contains("does not match"), "got: {}", msg);
         }
         other => panic!("expected tamper-detect, got {:?}", other),
@@ -338,73 +346,93 @@ fn locale_strict_error_when_default_missing_from_available() {
     }
 }
 
-#[test]
-fn role_enum_parses_custom_namespace() {
-    use mdz::Role;
-    let manifest = r#"{
-      "mdx_version": "2.0.0",
-      "document": {
-        "id": "00000000-0000-0000-0000-000000000050",
-        "title": "Custom role",
-        "created": "2026-01-01T00:00:00Z",
-        "modified": "2026-01-01T00:00:00Z"
-      },
-      "content": {"entry_point": "document.md"},
-      "security": {
-        "signatures": [
-          {
-            "role": "custom:review-board",
-            "signer": {"name": "RB", "did": "did:web:example.com"},
-            "algorithm": "ed25519",
-            "signature": "s"
-          }
-        ]
-      }
-    }"#;
-    let zip = build_zip(&[
-        ("manifest.json", manifest.as_bytes()),
-        ("document.md", b"hi"),
-    ]);
-    let archive = Archive::open(&zip).unwrap();
-    let sigs = archive
-        .manifest()
-        .security
-        .as_ref()
-        .map(|s| s.signatures.as_slice())
-        .unwrap_or(&[]);
-    assert_eq!(sigs.len(), 1);
-    assert_eq!(sigs[0].role, Role::Custom("review-board".into()));
+/// Build a single-signature manifest with the given role string.
+fn manifest_with_role(role_str: &str, id_suffix: &str) -> String {
+    format!(
+        r#"{{
+          "mdx_version": "2.0.0",
+          "document": {{
+            "id": "00000000-0000-0000-0000-0000000000{id_suffix}",
+            "title": "Role test",
+            "created": "2026-01-01T00:00:00Z",
+            "modified": "2026-01-01T00:00:00Z"
+          }},
+          "content": {{"entry_point": "document.md"}},
+          "security": {{
+            "signatures": [
+              {{
+                "role": "{role_str}",
+                "signer": {{"name": "S", "did": "did:web:example.com"}},
+                "algorithm": "ed25519",
+                "signature": "s"
+              }}
+            ]
+          }}
+        }}"#
+    )
 }
 
 #[test]
-fn role_enum_rejects_invalid_custom() {
-    let manifest = r#"{
-      "mdx_version": "2.0.0",
-      "document": {
-        "id": "00000000-0000-0000-0000-000000000060",
-        "title": "Bad custom role",
-        "created": "2026-01-01T00:00:00Z",
-        "modified": "2026-01-01T00:00:00Z"
-      },
-      "content": {"entry_point": "document.md"},
-      "security": {
-        "signatures": [
-          {
-            "role": "custom:BAD SPACE",
-            "signer": {"name": "X", "did": "did:web:x"},
-            "algorithm": "ed25519",
-            "signature": "s"
-          }
-        ]
-      }
-    }"#;
+fn role_enum_parses_all_five_closed_variants() {
+    use mdz::Role;
+    let cases = [
+        ("author", Role::Author),
+        ("reviewer", Role::Reviewer),
+        ("editor", Role::Editor),
+        ("publisher", Role::Publisher),
+        ("notary", Role::Notary),
+    ];
+    for (i, (role_str, expected)) in cases.iter().enumerate() {
+        let manifest = manifest_with_role(role_str, &format!("{:02}", 70 + i));
+        let zip = build_zip(&[
+            ("manifest.json", manifest.as_bytes()),
+            ("document.md", b"hi"),
+        ]);
+        let archive = Archive::open(&zip).expect(&format!("'{}' should parse", role_str));
+        let sigs = &archive.manifest().security.as_ref().unwrap().signatures;
+        assert_eq!(&sigs[0].role, expected, "role {} misparsed", role_str);
+    }
+}
+
+#[test]
+fn role_enum_preserves_custom_namespace_and_uri_forms() {
+    use mdz::Role;
+    // Both the conventional `custom:<name>` shorthand and a full URI
+    // per spec §16.2 MUST land in Role::Custom and round-trip verbatim.
+    let cases = [
+        "custom:review-board",
+        "custom:BAD SPACE",
+        "https://example.org/roles/copy-editor",
+        "did:web:journal.example.com#role-translator",
+        "Author",
+    ];
+    for (i, role_str) in cases.iter().enumerate() {
+        let manifest = manifest_with_role(role_str, &format!("{:02}", 80 + i));
+        let zip = build_zip(&[
+            ("manifest.json", manifest.as_bytes()),
+            ("document.md", b"hi"),
+        ]);
+        let archive = Archive::open(&zip).expect(&format!("'{}' should parse as Custom", role_str));
+        let sigs = &archive.manifest().security.as_ref().unwrap().signatures;
+        assert_eq!(
+            sigs[0].role,
+            Role::Custom(role_str.to_string()),
+            "role {} should be Custom with the original string",
+            role_str,
+        );
+    }
+}
+
+#[test]
+fn role_enum_rejects_empty_string() {
+    let manifest = manifest_with_role("", "90");
     let zip = build_zip(&[
         ("manifest.json", manifest.as_bytes()),
         ("document.md", b"hi"),
     ]);
     match Archive::open(&zip) {
-        Err(Error::Manifest(msg)) => assert!(msg.contains("custom role"), "got: {}", msg),
-        other => panic!("expected custom-role rejection, got {:?}", other),
+        Err(Error::Manifest(msg)) => assert!(msg.contains("empty"), "got: {}", msg),
+        other => panic!("expected empty-role rejection, got {:?}", other),
     }
 }
 
@@ -416,11 +444,21 @@ fn verify_methods_return_feature_disabled_without_flag() {
         ("document.md", b"# hi"),
     ]);
     let archive = Archive::open(&zip).unwrap();
-    match archive.verify_integrity() {
-        Err(Error::FeatureDisabled { feature, method }) => {
-            assert_eq!(feature, "verify");
-            assert_eq!(method, "verify_integrity");
+    // All three verify methods must surface FeatureDisabled with the
+    // correct method name. One assertion per method catches copy-paste
+    // regressions that would otherwise only surface in one branch.
+    let cases: &[(fn(&Archive) -> Result<(), Error>, &str)] = &[
+        (|a| a.verify_integrity(), "verify_integrity"),
+        (|a| a.verify_content_id(), "verify_content_id"),
+        (|a| a.verify_signature_chain(), "verify_signature_chain"),
+    ];
+    for (call, expected_method) in cases {
+        match call(&archive) {
+            Err(Error::FeatureDisabled { feature, method }) => {
+                assert_eq!(feature, "verify");
+                assert_eq!(method, *expected_method);
+            }
+            other => panic!("expected FeatureDisabled for {}, got {:?}", expected_method, other),
         }
-        other => panic!("expected FeatureDisabled, got {:?}", other),
     }
 }

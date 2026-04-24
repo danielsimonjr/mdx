@@ -32,11 +32,8 @@ def generate_uuid() -> str:
     return str(uuid.uuid4())
 
 
-_CHECKSUM_DEPRECATION_EMITTED = False
-
-
 def compute_checksum(data: bytes) -> str:
-    """Compute SHA-256 checksum in the legacy v1.x `checksum` format.
+    """Compute SHA-256 checksum in the legacy v1.x ``checksum`` format.
 
     .. deprecated:: 2.0.0
        The ``checksum`` manifest field was renamed to ``content_hash`` in
@@ -46,18 +43,23 @@ def compute_checksum(data: bytes) -> str:
        :func:`compute_content_hash` to compute the v2.0 value.
 
        See ``docs/decisions/content-addressing-evolution.md`` Q3.
+
+    This function uses the stdlib :mod:`warnings` mechanism, which means
+    the warning is emitted once per call site by default and respects
+    :func:`warnings.simplefilter` / filterwarnings configurations
+    (``"always"``, ``"error"``, ``"ignore"``, etc.). Earlier releases of
+    this function used a module-global once-flag that bypassed user
+    filter configuration — that implementation was wrong; this one is
+    standards-conformant.
     """
-    global _CHECKSUM_DEPRECATION_EMITTED
-    if not _CHECKSUM_DEPRECATION_EMITTED:
-        import warnings
-        warnings.warn(
-            "mdx_format.compute_checksum emits the deprecated v1.x `checksum` "
-            "field; use compute_content_hash for new archives (v2.0+). "
-            "Removal target: v3.0.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        _CHECKSUM_DEPRECATION_EMITTED = True
+    import warnings
+    warnings.warn(
+        "mdx_format.compute_checksum emits the deprecated v1.x `checksum` "
+        "field; use compute_content_hash for new archives (v2.0+). "
+        "Removal target: v3.0.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return f"sha256:{hashlib.sha256(data).hexdigest()}"
 
 
@@ -65,6 +67,8 @@ def compute_content_hash(data: bytes) -> str:
     """Compute SHA-256 content hash in the v2.0 ``<algorithm>:<hex>`` format.
 
     Use this for the ``content_hash`` manifest field on v2.0+ archives.
+    This function does NOT emit a DeprecationWarning — it is the
+    replacement for :func:`compute_checksum`.
     """
     return f"sha256:{hashlib.sha256(data).hexdigest()}"
 

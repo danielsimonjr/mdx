@@ -99,8 +99,11 @@ cargo test
 
 ## Minimum supported Rust version
 
-1.85. Pinned by transitive dependencies (`indexmap 2.14+` uses edition
-2024, which requires Rust 1.85+).
+1.85. Pinned empirically — transitive deps under `zip 2.2` +
+`serde_json` pulled in `indexmap 2.x` at CI-install time with an
+edition = "2024" requirement, and edition 2024 was stabilized in
+Rust 1.85. If a future `cargo update` removes that transitive pull,
+MSRV could be dropped; verify before doing so.
 
 ## License
 

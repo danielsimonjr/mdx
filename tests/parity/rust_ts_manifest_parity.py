@@ -65,26 +65,29 @@ def rust_typed_subset(manifest: dict) -> dict:
     return typed
 
 
-def parse_with_rust(archive: Path) -> dict | None:
+def parse_with_rust(archive: Path, allow_skip: bool) -> dict | None:
     """Shell out to a Rust helper binary to parse the archive.
 
-    Returns None if cargo is not available (CI handles this); returns
-    the parsed-and-reserialized typed subset otherwise.
+    Returns None if cargo is not available AND `allow_skip` is set;
+    otherwise exits nonzero on missing cargo (the default). The harness's
+    whole job is to verify the Rust↔TS round-trip — "cargo missing" =
+    "cannot verify" = failure, not success.
     """
     import shutil
     if shutil.which("cargo") is None:
-        print("  cargo not on PATH — skipping Rust parity (CI will catch).")
-        return None
+        if allow_skip:
+            print("  cargo not on PATH — SKIPPED (per --allow-skip).")
+            return None
+        print("  cargo not on PATH — parity cannot be verified.", file=sys.stderr)
+        print("  Pass --allow-skip to downgrade this to a non-failing skip.", file=sys.stderr)
+        sys.exit(2)
 
-    # Compile an ad-hoc example that opens the archive and prints the
-    # typed manifest subset as JSON. Ideally this would be a binary in
-    # the bindings/rust crate; for now we use `cargo run --example`.
     repo_root = Path(__file__).resolve().parents[2]
     rust_dir = repo_root / "bindings" / "rust"
     example = rust_dir / "examples" / "parity_dump.rs"
     if not example.exists():
-        print(f"  parity_dump.rs not found at {example} — add the example first.")
-        return None
+        print(f"  parity_dump.rs not found at {example} — add the example first.", file=sys.stderr)
+        sys.exit(2)
     try:
         proc = subprocess.run(
             ["cargo", "run", "--quiet", "--example", "parity_dump", "--", str(archive)],
@@ -95,23 +98,36 @@ def parse_with_rust(archive: Path) -> dict | None:
             timeout=180,
         )
     except FileNotFoundError:
-        print("  cargo spawn failed — skipping Rust parity.")
-        return None
+        print("  cargo spawn failed.", file=sys.stderr)
+        sys.exit(2)
     if proc.returncode != 0:
-        print(f"  cargo run failed (exit {proc.returncode}):")
-        print(proc.stderr)
+        print(f"  cargo run failed (exit {proc.returncode}):", file=sys.stderr)
+        print(proc.stderr, file=sys.stderr)
         sys.exit(1)
-    return json.loads(proc.stdout)
+    # Slice from the first { to the last } so any cargo pre-amble or
+    # trailing garbage doesn't trip json.loads.
+    stdout = proc.stdout
+    start = stdout.find("{")
+    end = stdout.rfind("}")
+    if start < 0 or end < 0 or end < start:
+        print(f"  cargo run emitted no JSON object:\n{stdout!r}", file=sys.stderr)
+        sys.exit(1)
+    if proc.stderr.strip():
+        # Not fatal, but log it — compile warnings shouldn't be silent.
+        print(f"  (cargo stderr: {proc.stderr.strip()})", file=sys.stderr)
+    return json.loads(stdout[start : end + 1])
 
 
 def main(argv: list[str]) -> int:
     if sys.platform == "win32" and hasattr(sys.stdout, "buffer"):
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
-    if len(argv) != 2:
-        print(f"Usage: {argv[0]} <archive.mdx|mdz>", file=sys.stderr)
+    allow_skip = "--allow-skip" in argv
+    positional = [a for a in argv[1:] if not a.startswith("--")]
+    if len(positional) != 1:
+        print(f"Usage: {argv[0]} [--allow-skip] <archive.mdx|mdz>", file=sys.stderr)
         return 2
-    archive = Path(argv[1]).resolve()
+    archive = Path(positional[0]).resolve()
     if not archive.exists():
         print(f"Archive not found: {archive}", file=sys.stderr)
         return 2
@@ -120,14 +136,17 @@ def main(argv: list[str]) -> int:
     manifest = extract_manifest(archive)
     ts_subset = rust_typed_subset(manifest)
 
-    rust_subset = parse_with_rust(archive)
+    rust_subset = parse_with_rust(archive, allow_skip=allow_skip)
     if rust_subset is None:
-        # Rust not available — run in TS-only smoke mode so the harness
-        # still exercises something.
-        print("  [SKIP] Rust side unavailable; TS-only self-consistency only.")
+        # Only reachable with --allow-skip; exit cleanly but loud.
+        print("  [SKIP] Rust side unavailable; parity NOT verified.", file=sys.stderr)
         return 0
 
-    if ts_subset == rust_subset:
+    # Compare via sort_keys-normalized JSON so nested dict ordering from
+    # the two impls doesn't produce a false mismatch.
+    ts_norm = json.dumps(ts_subset, sort_keys=True)
+    rust_norm = json.dumps(rust_subset, sort_keys=True)
+    if ts_norm == rust_norm:
         print("  [OK] Rust and TS/Python agree on the typed subset.")
         return 0
 

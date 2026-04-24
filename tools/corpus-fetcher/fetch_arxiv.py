@@ -62,8 +62,11 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if sys.platform == "win32" and hasattr(sys.stdout, "buffer"):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
-# arXiv API endpoint + rate-limit policy.
-ARXIV_API = "http://export.arxiv.org/api/query"
+# arXiv API endpoint + rate-limit policy. HTTPS is mandatory — an
+# on-path attacker on HTTP could substitute the Atom feed (forging
+# license/arxiv_id/source_url fields) and subsequently the tarball,
+# bypassing the permissive-license filter entirely.
+ARXIV_API = "https://export.arxiv.org/api/query"
 MIN_INTERVAL_SECONDS = 3  # TOS: "make no more than one request every three seconds"
 
 # Licenses arXiv flags as "permissive enough for downstream redistribution".
@@ -194,8 +197,8 @@ def search_papers(category: str, count: int) -> list[PaperMeta]:
              if link.attrib.get("title") == "pdf"),
             "",
         )
-        # arXiv source tarball is at arxiv.org/e-print/{id}
-        source_url = f"http://arxiv.org/e-print/{arxiv_id}"
+        # arXiv source tarball — HTTPS mandatory (see ARXIV_API comment).
+        source_url = f"https://arxiv.org/e-print/{arxiv_id}"
 
         papers.append(
             PaperMeta(

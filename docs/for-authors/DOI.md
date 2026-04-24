@@ -97,10 +97,13 @@ persistent pointer. Many authors later publish a Zenodo copy (Workflow
 
 When a preprint is revised, you have two choices:
 
-- **Version-stamped DOIs** (Zenodo default): each revision gets its own
-  DOI; the "concept DOI" (e.g. `10.5281/zenodo.1234567`) always
-  redirects to the latest, while version DOIs
-  (`10.5281/zenodo.1234567.v2`) pin the exact revision.
+- **Versioned DOIs** (Zenodo default): Zenodo mints a **separate
+  numeric DOI per version** (e.g. `10.5281/zenodo.1234567` for v1,
+  `10.5281/zenodo.1234568` for v2 — sequential IDs, not a `.v2`
+  suffix). A single **concept DOI** (also of the form
+  `10.5281/zenodo.<id>`, pointing at the first version) always
+  redirects to the latest version. Both forms are numeric Zenodo
+  identifiers — there is no `.vN` suffix in real Zenodo DOIs.
 - **Single mutable DOI** (some journals): the DOI stays constant; the
   `document.version` field and history snapshots in
   `history/snapshots/` (v2.0 §15) track revisions internally.
@@ -112,19 +115,21 @@ versions through `document.derived_from`:
 ```json
 {
   "document": {
-    "doi": "10.5281/zenodo.1234567.v2",
+    "doi": "10.5281/zenodo.1234568",
     "derived_from": [
       {
-        "doi": "10.5281/zenodo.1234567.v1",
-        "relation": "isNewVersionOf"
+        "doi": "10.5281/zenodo.1234567",
+        "relation": "IsNewVersionOf"
       }
     ]
   }
 }
 ```
 
-`relation` values match the DataCite "relationType" vocabulary
-(`IsNewVersionOf`, `IsPreviousVersionOf`, `IsSupplementTo`, etc.).
+`relation` values MUST use DataCite's **PascalCase** "relationType"
+vocabulary (`IsNewVersionOf`, `IsPreviousVersionOf`, `IsSupplementTo`,
+`HasPart`, etc.). Full list at
+<https://datacite-metadata-schema.readthedocs.io/en/4.5/properties/relatedidentifier/#b-relationtype>.
 
 ---
 

@@ -20,25 +20,28 @@ zip = { version = "2.2", default-features = false, features = ["deflate"] }
 # JSON manifest parsing via serde.
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-# SHA-256 / SHA-512 for content_hash and integrity checks.
-sha2 = "0.10"
-# Hex encoding for hash comparison strings.
-hex = "0.4"
 # Structured error handling.
 thiserror = "1.0"
+# Integrity crates — ONLY pulled when the `verify` feature is active, so
+# a downstream that disables default-features truly sheds these deps.
+sha2 = { version = "0.10", optional = true }
+hex = { version = "0.4", optional = true }
 
 [dev-dependencies]
 # Test-only: example generation + roundtrip fixtures.
 tempfile = "3"
-# Test-only: synthesize ZIP archives for integration tests. The main crate
-# consumes ZIPs in read-only mode; we only need the writer for tests.
+# Test-only: synthesize ZIP archives for integration tests. The main
+# crate consumes ZIPs in read-only mode; the writer API is test-only.
 zip = { version = "2.2", default-features = false, features = ["deflate"] }
-# Test-only: compute expected chain hashes in integration tests.
+# Test-only: integration tests compute expected chain hashes. These are
+# dev-deps (not main deps) because the main crate gates sha2/hex behind
+# the `verify` feature; dev-deps are independent of feature resolution
+# and available in tests regardless of which feature set is active.
 sha2 = "0.10"
 hex = "0.4"
 
 [features]
 default = ["verify"]
-# Opt-in features — gate optional functionality behind compile flags so
-# downstream consumers can shrink their binary.
-verify = []        # integrity + content_hash + signature-chain checks
+# Integrity + content_hash + signature-chain checks. Gates both the
+# methods and their crypto dependencies.
+verify = ["dep:sha2", "dep:hex"]

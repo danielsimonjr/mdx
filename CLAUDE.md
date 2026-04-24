@@ -101,8 +101,10 @@ mdx/                                    # (directory name deferred-rename)
 │   ├── property/test_parser_properties.py          # hypothesis
 │   ├── v2.0/                                       # parser + schema + Lark
 │   ├── cli/test_cli_dual_extension.py              # Phase 0: .mdz/.mdx parity
+│   ├── parity/rust_ts_manifest_parity.py           # Phase 4.1 Rust↔TS harness
+│   ├── python/test_deprecation.py                  # checksum → content_hash
 │   └── accessibility/                              # Phase 3.3 scaffold
-│       ├── fixtures/ (5 starter categories)
+│       ├── fixtures/ (23 categories across 4 WCAG rule families)
 │       └── run_accessibility.py
 ├── docs/                                           # strategic documents
 │   ├── POSITIONING.md   COMPETITIVE.md
@@ -120,16 +122,25 @@ mdx/                                    # (directory name deferred-rename)
 ├── bindings/                                       # Phase 4.1 host-lang bindings
 │   └── rust/                                       # mdz crate (alpha)
 │       ├── Cargo.toml   README.md
-│       └── src/lib.rs                              # Archive / Manifest types
+│       ├── src/lib.rs                              # Archive / Manifest / Role / License
+│       ├── tests/archive_integration.rs            # integration tests
+│       └── examples/parity_dump.rs                 # cross-impl parity helper
 ├── integrations/                                   # Phase 4.2 editor / tool hooks
-│   ├── pandoc/mdz-filter.lua                       # LaTeX → MDZ pipeline
+│   ├── pandoc/
+│   │   ├── mdz-filter.lua                          # LaTeX → MDZ pipeline
+│   │   └── tests/                                  # golden-output fixtures
 │   └── vscode/                                     # MDZ VS Code extension
-│       ├── package.json  src/extension.js
+│       ├── package.json
+│       ├── src/extension.js  src/helpers.js        # pure helpers extracted for tests
+│       ├── test/helpers.test.js                    # node:test unit tests
 │       └── syntaxes/mdz.tmLanguage.json
 ├── tools/                                          # Phase 4.3 corpus tooling
 │   └── corpus-fetcher/fetch_arxiv.py               # arXiv → MDZ benchmark
-├── spec/extensions/                                # Phase 4.5 extension specs
-│   └── delta-snapshots-v1.md                       # git-style packfiles
+├── spec/
+│   ├── extensions/delta-snapshots-v1.md            # git-style packfiles (Phase 4.5)
+│   └── directives/                                 # Phase 2.1 directive specs
+│       ├── references-csl.md                       # CSL-JSON bibliography
+│       └── peer-review-annotations.md              # W3C Web Annotation extension
 ├── ROADMAP.md           # phased plan
 ├── CHANGELOG.md
 ├── CLAUDE.md            # (this file)

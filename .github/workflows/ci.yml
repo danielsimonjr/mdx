@@ -81,6 +81,9 @@ jobs:
           test -f example-document.mdx
           unzip -t example-document.mdx
 
+      - name: Test deprecation contract
+        run: python tests/python/test_deprecation.py
+
   validate-examples:
     name: Validate Example Documents
     runs-on: ubuntu-latest

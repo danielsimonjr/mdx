@@ -64,6 +64,7 @@
 use std::io::Cursor;
 
 use serde::Deserialize;
+#[cfg(feature = "verify")]
 use sha2::Digest;
 
 // ---------------------------------------------------------------------------
@@ -354,9 +355,18 @@ pub struct SignatureEntry {
     pub prev_signature: Option<String>,
 }
 
-/// Signer role. The spec defines five closed variants plus a custom
-/// namespace (`custom:<name>`); the enum rejects anything else at parse
-/// time, catching typos / spec drift before a signature is written.
+/// Signer role. The spec §16.2 defines five closed variants plus a
+/// "custom URI" open class (for organizational / journal-specific
+/// roles the core vocabulary doesn't cover). The enum parses any of
+/// the five closed strings to a typed variant and preserves anything
+/// else as `Custom(String)` — readers MUST be permissive about custom
+/// forms per spec, so the enum is intentionally open.
+///
+/// Parse-time discipline catches typos of the five closed variants
+/// (`"Author"`, `"reivewer"`, etc.) indirectly: any string that does
+/// not case-sensitively match one of the five lands in `Custom`, so
+/// a typo of "author" shows up as `Custom("Author")` — obvious at
+/// match-site, not silently conflated with `Role::Author`.
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(try_from = "String")]
 pub enum Role {
@@ -370,7 +380,11 @@ pub enum Role {
     Publisher,
     /// Trusted-timestamp notary (e.g. `did:web:timestamp.example.com`).
     Notary,
-    /// Custom role — must match `^custom:[a-z0-9_-]+$` per spec §16.
+    /// Custom role — any non-empty string that is not one of the five
+    /// closed variants. Per spec §16.2 the expected form is a URI
+    /// (e.g. `https://example.org/roles/copy-editor`) or the
+    /// conventional `custom:<name>` shorthand; this binding accepts
+    /// either and hands the raw string back to the caller to interpret.
     Custom(String),
 }
 
@@ -378,31 +392,13 @@ impl std::convert::TryFrom<String> for Role {
     type Error = String;
     fn try_from(s: String) -> Result<Self, Self::Error> {
         match s.as_str() {
+            "" => Err("signer role cannot be empty".into()),
             "author" => Ok(Role::Author),
             "reviewer" => Ok(Role::Reviewer),
             "editor" => Ok(Role::Editor),
             "publisher" => Ok(Role::Publisher),
             "notary" => Ok(Role::Notary),
-            other if other.starts_with("custom:") => {
-                let tail = &other[7..];
-                if !tail.is_empty()
-                    && tail.chars().all(|c| c.is_ascii_lowercase()
-                        || c.is_ascii_digit()
-                        || c == '_'
-                        || c == '-')
-                {
-                    Ok(Role::Custom(tail.to_string()))
-                } else {
-                    Err(format!(
-                        "invalid custom role '{}' — must match custom:[a-z0-9_-]+",
-                        s
-                    ))
-                }
-            }
-            _ => Err(format!(
-                "unknown signer role '{}' — expected author/reviewer/editor/publisher/notary or custom:<name>",
-                s
-            )),
+            _ => Ok(Role::Custom(s)),
         }
     }
 }
@@ -527,13 +523,18 @@ impl Archive {
         &self.manifest
     }
 
-    /// Raw bytes of `manifest.json` (for re-hashing during integrity checks).
+    /// Raw bytes of the inflated `manifest.json` entry (for re-hashing
+    /// during integrity checks).
     ///
-    /// **Invariant:** the returned slice is byte-identical to the bytes
-    /// passed to [`Archive::open`]. This is load-bearing for
-    /// [`Archive::verify_integrity`] — a future lazy-parse optimization
-    /// MUST preserve this exact-bytes guarantee or integrity-hash
-    /// verification will silently drift.
+    /// **Invariant:** the returned slice is byte-identical to the
+    /// *inflated* `manifest.json` entry as produced by the ZIP inflater
+    /// at [`Archive::open`] time — NOT to any subrange of the caller's
+    /// input buffer (the manifest lives inside the ZIP, typically
+    /// DEFLATE-compressed). This is load-bearing for
+    /// [`Archive::verify_integrity`]: the spec defines the integrity
+    /// checksum over the uncompressed manifest bytes. A future
+    /// lazy-parse optimization MUST preserve this exact-bytes guarantee
+    /// or integrity-hash verification will silently drift.
     pub fn manifest_bytes(&self) -> &[u8] {
         &self.manifest_raw
     }
