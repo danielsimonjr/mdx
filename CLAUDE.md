@@ -23,37 +23,77 @@ extensions and both MIME types (`application/vnd.mdx-container+zip` and
 
 ## Repository Structure
 
+Note on paths: the repo root directory is still `mdx/` and the TypeScript /
+Python implementation files are still `mdx_format.ts` / `mdx_format.py`.
+Renaming the files would churn every import statement in one PR; deferred
+to the Phase 1 parser-rebuild landing. Class/type names inside those files
+are now `MDZ*` with `MDX*` deprecated aliases.
+
 ```
-mdx/
-├── spec/                              # Specification documents
-│   ├── MDX_FORMAT_SPECIFICATION.md   # v1.0 formal specification
-│   ├── MDX_FORMAT_SPECIFICATION_v1.1.md  # v1.1 with alignment features
-│   └── manifest.schema.json          # JSON Schema for manifest validation
-├── implementations/                   # Reference implementations
+mdx/                                    # (directory name deferred-rename)
+├── spec/
+│   ├── MDX_FORMAT_SPECIFICATION.md                 # v1.0 formal spec
+│   ├── MDX_FORMAT_SPECIFICATION_v1.1.md            # v1.1 alignment
+│   ├── MDX_FORMAT_SPECIFICATION_v2.0.md            # v2.0 draft (current)
+│   ├── manifest.schema.json                        # v1.1 JSON Schema
+│   ├── manifest-v2.schema.json                     # v2.0 JSON Schema
+│   ├── grammar/                                    # Phase 1 formal grammar
+│   │   ├── mdz-directives.abnf                     # RFC 5234 normative
+│   │   ├── mdz-directives.lark                     # PEG for Python parser
+│   │   └── README.md
+│   └── profiles/
+│       ├── scientific-paper-v1.json                # tightened v1.1
+│       ├── api-reference-v1.json
+│       └── mdz-advanced-v1.json                    # opt-in enterprise
+├── implementations/
 │   ├── typescript/
-│   │   └── mdx_format.ts             # TypeScript implementation (2,700+ lines)
+│   │   ├── mdx_format.ts                           # MDZDocument / MDZManifest
+│   │   ├── mdx_format.test.ts                      # vitest units
+│   │   ├── mdx_format.integration.test.ts          # v1.1 roundtrip
+│   │   ├── mdx_format.v20.integration.test.ts      # v2.0 roundtrip
+│   │   └── mdx_format.property.test.ts             # fast-check
 │   └── python/
-│       └── mdx_format.py             # Python implementation
-├── cli/                               # Command-line tool (Node.js)
+│       ├── mdx_format.py                           # generator example
+│       ├── alignment_parser.py                     # legacy regex parser
+│       ├── create_v20_example.py
+│       └── mdz_parser/                             # Phase 1 Lark parser
+│           ├── __init__.py
+│           ├── parser.py
+│           ├── ast.py
+│           └── errors.py
+├── cli/                                            # Node.js CLI
 │   ├── src/
-│   │   ├── index.js                  # CLI entry point
-│   │   └── commands/                 # Command implementations
-│   └── dist/                         # Built executables
-├── editor/
-│   └── index.html                    # Web-based WYSIWYG editor
-├── viewer/
-│   └── index.html                    # Web-based MDX viewer (read-only)
-├── chrome-extension/                  # Chrome browser extension
-│   └── manifest.json
-├── examples/                          # Example MDX documents
-│   ├── example-document.mdx          # Basic working example
-│   ├── alignment-basic.mdx           # v1.1 basic alignment
-│   ├── alignment-directives.mdx      # v1.1 alignment with media
-│   ├── alignment-complex.mdx         # v1.1 nested containers
-│   └── technical-doc.mdx             # v1.1 technical documentation
+│   │   ├── index.js                                # program: mdz
+│   │   └── commands/
+│   └── dist/
+├── editor/index.html                               # WYSIWYG demo
+├── viewer/index.html                               # read-only demo
+├── chrome-extension/
+├── tree-sitter-mdz/                                # alpha grammar
+├── examples/
+│   ├── example-document.mdx                        # v1.x basic
+│   ├── alignment-*.mdx                             # v1.1 fixtures
+│   ├── technical-doc.mdx
+│   └── v2/
+│       ├── comprehensive.mdx                       # v2.0 full feature demo
+│       └── parser-fixtures/                        # directive fixtures
 ├── tests/
-│   └── alignment/                    # v1.1 conformance tests
-└── .github/                          # GitHub templates & CI
+│   ├── alignment/                                  # v1.1 conformance
+│   ├── conformance/                                # Phase 1, 52 fixtures
+│   │   ├── positive/ negative/ roundtrip/ edge/
+│   │   └── run_conformance.py
+│   ├── property/test_parser_properties.py          # hypothesis
+│   └── v2.0/                                       # parser + schema + Lark
+├── docs/                                           # strategic documents
+│   ├── POSITIONING.md   COMPETITIVE.md
+│   ├── FUNDING.md       PARTNERSHIPS.md
+│   ├── for-authors/SUBMITTING.md
+│   ├── for-journals/EDITORIAL.md
+│   └── for-reviewers/REPRODUCING.md
+├── ROADMAP.md           # phased plan
+├── CHANGELOG.md
+├── CLAUDE.md            # (this file)
+└── .github/
 ```
 
 ## Development Commands
@@ -108,13 +148,17 @@ tsc implementations/typescript/mdx_format.ts --target es2020 --module esnext
 - Open `.mdx` files with any ZIP utility to inspect contents
 
 ### CI Validation
-The GitHub Actions workflow (`ci.yml`) runs:
-- TypeScript type checking
-- Python syntax validation and example generation
-- MDX structure validation (manifest.json, document.md present)
-- JSON Schema validation of manifests
-- CLI command tests (info, validate, extract)
-- Markdown linting
+The GitHub Actions workflow (`.github/workflows/ci.yml`) runs 9 jobs:
+- Validate TypeScript (type-check via `tsc --noEmit`)
+- TypeScript Unit Tests (vitest; includes fast-check property tests)
+- Validate Python (py_compile + example generation)
+- Validate Example Documents (v1.x structural checks)
+- Validate v1.1 Examples (alignment fixtures + v1.1 parser conformance)
+- Validate v2.0 Examples and Parser (includes Lark parity, 52-fixture
+  conformance suite, hypothesis property tests)
+- Validate JSON Schema (ajv-cli + schema negative-rejection tests)
+- Validate CLI Tool (info/validate/extract against example-document.mdx)
+- Lint Markdown (DavidAnson/markdownlint-cli2-action)
 
 ## Architecture
 
@@ -139,16 +183,29 @@ document.mdx (ZIP container)
 
 ### TypeScript Implementation
 
-**Key Classes:**
-- `MDXDocument` - Main class for creating/reading MDX files
+**Key Classes** (renamed 2026-04-24; `MDX*` names retained as deprecated
+aliases through 2027-01-01):
+
+- `MDZDocument` (alias `MDXDocument`) — main class for creating/reading MDZ files
   - Factory methods: `create()`, `open()`, `openFile()`
   - Content: `setContent()`, `appendContent()`, `getContent()`
   - Assets: `addImage()`, `addVideo()`, `add3DModel()`, `addData()`, `getAsset()`
-  - Export: `save()`, `saveAsArrayBuffer()`, `toHTML()`
+  - Export: `save()`, `saveAsArrayBuffer()`, `toHTML()` (deprecated — toy renderer)
 
-- `MDXManifest` - Document metadata and configuration
+- `MDZManifest` (alias `MDXManifest`) — document metadata and configuration
   - Properties: `title`, `subtitle`, `version`, `language`, `created`, `modified`
-  - Methods: `addAuthor()`, `addAsset()`, `validate()`
+  - Methods: `addAuthor()`, `addAsset()`, `addLocale()`, `addInclude()`,
+    `addVariant()`, `setProfile()`, `setAccessibility()`, `addDerivedFrom()`,
+    `addSignature()`, `addKernel()`, `validate()`
+
+**Constants:**
+- Current: `MDZ_VERSION`, `MDZ_MIME_TYPE`, `MDZ_EXTENSION`
+- Legacy preserved: `MDX_MIME_TYPE_LEGACY` (`application/vnd.mdx-container+zip`),
+  `MDX_EXTENSION_LEGACY` (`.mdx`)
+- Deprecated aliases: `MDX_VERSION` → `MDZ_VERSION`; `MDX_MIME_TYPE` →
+  `MDX_MIME_TYPE_LEGACY` (NOT the new MIME); `MDX_EXTENSION` →
+  `MDX_EXTENSION_LEGACY`. Pre-rename callers that compare MIME strings
+  continue to match legacy archives.
 
 **Enumerations:**
 - `AssetCategory`: IMAGES, VIDEO, AUDIO, MODELS, DOCUMENTS, DATA, STYLES, SCRIPTS, FONTS, OTHER

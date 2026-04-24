@@ -21,7 +21,9 @@ provenance, and accessibility metadata.
 > format. The file extension `.mdx` and MIME type
 > `application/vnd.mdx-container+zip` remain accepted by readers as legacy
 > aliases through 2027-01-01. New archives should use `.mdz` and
-> `application/vnd.mdz-container+zip`.
+> `application/vnd.mdz-container+zip`. **Both MIME types are proposed —
+> neither is IANA-registered yet.** Registration is planned once the
+> specification leaves draft status.
 
 ## What MDZ is for
 

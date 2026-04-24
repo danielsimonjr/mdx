@@ -1,7 +1,16 @@
 # Partnership outreach plan
 
 **Goal of this document:** turn the vague "find a champion at arXiv" hope into
-a concrete list of people to email, a message template, and a tracking table.
+a concrete list of organizations to contact, a message template, and a
+tracking discipline.
+
+> **Contact verification:** as of the **Last verified** date at the top of
+> each tier table below, the named contacts and titles reflect public-facing
+> information on each organization's website / LinkedIn / conference talks.
+> **Titles and people rotate.** Before sending, re-verify the specific
+> contact is still in the role. If you can't verify, address the message to
+> the role ("Head of Open Research Communication at eLife") rather than the
+> person.
 
 ---
 
@@ -29,6 +38,8 @@ Ranked by fit, not by prestige.
 
 ### Tier 1 — natural fits (contact first)
 
+**Last verified:** 2026-04-24 (titles are provisional; re-verify before outreach).
+
 | Organization | Specific people to target | Ask |
 |-------------|---------------------------|-----|
 | **Zenodo / CERN** | Sünje Dallmeier-Tiessen (head of scientific information service), Jose Benito Gonzalez Lopez (Zenodo tech lead) | Would you accept MDZ uploads? What profile / metadata would you need? |
@@ -38,6 +49,8 @@ Ranked by fit, not by prestige.
 | **Curvenote** | Rowan Cockett (co-founder) | Adoption as *their* export/import format — zero-sum concern addressed upfront |
 
 ### Tier 2 — journal editorial
+
+**Last verified:** 2026-04-24 (titles are provisional; re-verify before outreach).
 
 | Organization | Specific people to target | Ask |
 |-------------|---------------------------|-----|

@@ -4,6 +4,11 @@
   "name": "Scientific Paper",
   "version": "1.1.0",
   "description": "A peer-reviewable, signable, reproducible scientific paper. Requires IMRaD structure, CSL-JSON bibliography, SPDX license, at least one ORCID-resolvable author DID, and declared accessibility baseline. Tightened per the scientific-paper positioning (docs/POSITIONING.md).",
+  "enforcement_status": {
+    "status": "declared-but-not-wired",
+    "note": "This profile's rules are machine-readable but are NOT yet enforced by any code in the repository. The CLI `mdz validate` command today validates manifest structure (required top-level fields, schema) but does not evaluate profile rules. Profile enforcement is a Phase 2 deliverable (see ROADMAP.md §2 + docs/for-journals/EDITORIAL.md). Until then, authoring tools should treat this file as documentation of the TARGET ruleset, not a live validator config.",
+    "planned_enforcer": "cli/src/commands/validate.js + a new validator layer in implementations/python/mdz_validator/ (Phase 2)"
+  },
 
   "required_sections": [
     { "heading_pattern": "^(Abstract|Summary)$", "level": 1 },
@@ -150,8 +155,7 @@
     "math",
     "structural-navigation",
     "long-description",
-    "reading-order",
-    "structural-navigation"
+    "reading-order"
   ],
 
   "signature_requirements": {

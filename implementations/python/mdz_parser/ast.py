@@ -35,17 +35,55 @@ resolver enforces alignment precedence: inline > block > container.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
 
+# Shared identifier pattern — matches the IDENT production in the ABNF
+# grammar. Kept here (rather than imported from parser.py) to avoid a
+# circular import with the parser module.
+_IDENT_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_\-]*$")
+
+
 @dataclass
 class ParsedAttrs:
-    """Parsed contents of a `{...}` or `[...]` attribute body."""
+    """Parsed contents of a `{...}` or `[...]` attribute body.
+
+    Construction validation: `id` and each class name must match the
+    IDENT production (`[A-Za-z][A-Za-z0-9_-]*`). Invalid values raise
+    ValueError at construction time rather than producing an AST that
+    looks valid but references identifiers no cross-referencer can
+    resolve.
+
+    Internal to the parser — callers outside `mdz_parser` should not
+    construct ParsedAttrs directly; use `parse()` and inspect the
+    resulting AST.
+    """
 
     classes: list[str] = field(default_factory=list)
     id: str | None = None
     kv: dict[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        # Validate id format. Empty string is acceptable (treat as "no id");
+        # whitespace-only and ill-formed strings are not.
+        if self.id is not None and self.id != "":
+            if not _IDENT_RE.match(self.id):
+                raise ValueError(
+                    f"ParsedAttrs id={self.id!r} is not a valid identifier "
+                    f"(must match [A-Za-z][A-Za-z0-9_-]*)"
+                )
+        # Validate class names — CSS class semantics are looser than
+        # IDENT in the real world (e.g., Tailwind uses `:`, `/`, `%`),
+        # but our spec's attr-body grammar uses IDENT for classes. Reject
+        # anything that wouldn't parse back.
+        for cls in self.classes:
+            if not _IDENT_RE.match(cls):
+                raise ValueError(
+                    f"ParsedAttrs class={cls!r} is not a valid identifier "
+                    f"(must match [A-Za-z][A-Za-z0-9_-]*)"
+                )
 
     def extend(self, other: "ParsedAttrs") -> "ParsedAttrs":
         """Merge `other` underneath self — self's values win on conflict.

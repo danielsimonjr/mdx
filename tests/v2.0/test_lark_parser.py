@@ -146,6 +146,83 @@ def test_error_empty_output_body() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Lark fallback path — v1.1 block-attrs must degrade gracefully on
+# malformed attr bodies, while v2.0 directives must raise loudly.
+# ---------------------------------------------------------------------------
+
+
+def test_lark_v11_block_attr_degrades_on_malformed_body() -> None:
+    """A v1.1 block-attr line with a body that passes the line-level regex
+    but fails Lark's grammar MUST degrade to an empty ParsedAttrs (the
+    spec's graceful-degradation policy), not raise.
+
+    We simulate this by monkeypatching Lark to raise on a body that would
+    normally parse.
+    """
+    from unittest.mock import patch
+    import mdz_parser.parser as pmod
+
+    # Deliberately construct a BLOCK_ATTR line that the line regex DOES
+    # match (has a `.` prefix) but the Lark grammar would fail on — e.g.,
+    # contains a class-like token followed by garbage the grammar can't
+    # handle. Since the grammar is currently permissive, we force the
+    # failure via monkeypatch to exercise the fallback branch deterministically.
+    class _FakeErr(Exception):
+        pass
+
+    def boom(_body: str) -> None:
+        raise pmod.LarkError("simulated grammar failure")
+
+    text = "{.classname}\nParagraph body.\n"
+    with patch.object(pmod, "_parse_attrs_lark", wraps=pmod._parse_attrs_lark) as wrapped:
+        # First call through the real function verifies normal path works.
+        blocks_ok = lark_parse(text)
+        assert blocks_ok[0]["classes"] == ["classname"]
+
+    # Now force Lark itself to raise and confirm block-attr still degrades.
+    with patch.object(
+        pmod._get_attr_parser(), "parse", side_effect=pmod.LarkError("forced")
+    ):
+        blocks = lark_parse(text)
+    assert blocks[0]["type"] == "paragraph"
+    assert blocks[0]["classes"] == []  # fallback -> empty ParsedAttrs
+
+
+def test_lark_v20_cell_raises_on_malformed_attrs() -> None:
+    """Contrast with the v1.1 behavior above: v2.0 directive paths use
+    strict=True, so a malformed attr body inside `::cell{...}` raises
+    ParseError instead of silently producing an attribute-less cell."""
+    from unittest.mock import patch
+    import mdz_parser.parser as pmod
+
+    text = (
+        '::cell{language="python" kernel="python3"}\n'
+        "```python\nx = 1\n```\n\n"
+        '::output{type="text"}\n'
+        "```\n1\n```\n"
+    )
+    # Force Lark to fail specifically on the cell's attr body.
+    original_parse = pmod._get_attr_parser().parse
+
+    call_count = {"n": 0}
+
+    def selective_fail(body: str) -> Any:
+        call_count["n"] += 1
+        if call_count["n"] == 1:  # fail on the first (cell) attr parse
+            raise pmod.LarkError("forced")
+        return original_parse(body)
+
+    with patch.object(pmod._get_attr_parser(), "parse", side_effect=selective_fail):
+        try:
+            lark_parse(text)
+        except ParseError as e:
+            assert "malformed directive attributes" in str(e)
+            assert e.line >= 1
+            return
+        raise AssertionError("expected ParseError but parse succeeded")
+
+
+# ---------------------------------------------------------------------------
 # v2.1 labeled blocks — Lark-only (legacy doesn't implement these)
 # ---------------------------------------------------------------------------
 
@@ -202,6 +279,9 @@ TESTS = [
     test_error_output_missing_type,
     test_error_bad_execution_count,
     test_error_empty_output_body,
+    # Lark fallback path (v1.1 degrades; v2.0 raises)
+    test_lark_v11_block_attr_degrades_on_malformed_body,
+    test_lark_v20_cell_raises_on_malformed_attrs,
     # v2.1 Lark-only
     test_lark_figure_block,
     test_lark_equation_block,

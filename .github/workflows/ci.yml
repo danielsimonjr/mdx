@@ -211,6 +211,11 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Setup Python (for dual-extension integration test)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Install CLI dependencies
         run: |
           cd cli
@@ -228,6 +233,9 @@ jobs:
           # Verify extracted files
           test -f example-document-extracted/manifest.json
           test -f example-document-extracted/document.md
+
+      - name: Test CLI accepts both .mdz and .mdx (backward-compat)
+        run: python tests/cli/test_cli_dual_extension.py
 
   validate-json-schema:
     name: Validate JSON Schema

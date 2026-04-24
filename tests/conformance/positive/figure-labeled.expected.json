@@ -1,8 +1,8 @@
 [
   {
     "type": "figure",
-    "id": "fig-1",
     "body_source": "![caption](assets/fig.png)",
-    "classes": []
+    "classes": [],
+    "id": "fig-1"
   }
 ]

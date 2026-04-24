@@ -23,10 +23,16 @@ sys.path.insert(0, str(REPO_ROOT / "implementations" / "python"))
 if sys.platform == "win32" and hasattr(sys.stdout, "buffer"):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
-from hypothesis import given, settings, strategies as st, HealthCheck  # noqa: E402
+from hypothesis import given, settings, strategies as st, HealthCheck, seed  # noqa: E402
 
 from alignment_parser import parse as legacy_parse  # noqa: E402
 from mdz_parser import parse as lark_parse, ParseError  # noqa: E402
+
+# Pinned hypothesis seed for reproducibility across runs. Without this, a
+# CI failure finds a different counterexample each invocation, making
+# regressions hard to diagnose. Swap this if you need to re-explore the
+# input space intentionally.
+HYPOTHESIS_SEED = 0x6D647A42  # "mdzB"
 
 
 # ---------------------------------------------------------------------------
@@ -95,7 +101,45 @@ block_attr_line = st.builds(
 # A block = a shorthand/attr marker followed by content (heading, paragraph, list item)
 content_line = st.one_of(heading_line, paragraph, list_item)
 
-# Simple document: list of blocks separated by blank lines
+# -----
+# v2.0+ directive strategies. The original strategy set only generated
+# v1.1-era blocks, which meant the v2.0/v2.1 surface (where bugs are
+# most likely) was never exercised. These strategies cover the most
+# common directive shapes.
+# -----
+
+# Cell source code (deliberately short + simple to stay within Hypothesis's
+# deadline; real-world cells are tested via conformance fixtures).
+cell_source = st.builds(
+    lambda lang, code: f'::cell{{language="{lang}" kernel="{lang}3"}}\n```{lang}\n{code}\n```\n\n::output{{type="text"}}\n```\n{code}\n```\n',
+    lang=st.sampled_from(["python", "r", "julia", "javascript"]),
+    code=st.sampled_from(["x = 1", "print(1)", "y + 1", 'x <- 1']),
+)
+
+# Include directive with a non-empty target.
+include_directive = st.builds(
+    lambda tgt: f'::include[target="{tgt}"]\n',
+    tgt=st.from_regex(r"[a-z][a-z0-9\-_/]*\.md", fullmatch=True),
+)
+
+# Container block with simple contents.
+container = st.builds(
+    lambda attrs, inner: f":::{{{attrs}}}\n{inner}\n:::\n",
+    attrs=st.sampled_from([".note", ".warning", ".align-center"]),
+    inner=paragraph,
+)
+
+# Labeled block (v2.1): ::fig / ::eq / ::tab with a valid id and a
+# following body line.
+labeled_block = st.builds(
+    lambda kind, ident, body: f'::{kind}{{id="{ident}"}}\n\n{body}',
+    kind=st.sampled_from(["fig", "eq", "tab"]),
+    ident=st.from_regex(r"[a-z][a-z0-9\-]{0,10}", fullmatch=True),
+    body=paragraph,
+)
+
+# Simple document: list of blocks separated by blank lines.
+# Now includes v2.0/v2.1 shapes alongside v1.1 content.
 document = st.builds(
     lambda blocks: "\n".join(blocks),
     blocks=st.lists(
@@ -103,9 +147,13 @@ document = st.builds(
             content_line,
             st.builds(lambda s, c: s + c, s=shorthand, c=content_line),
             st.builds(lambda a, c: a + c, a=block_attr_line, c=content_line),
+            cell_source,
+            include_directive,
+            container,
+            labeled_block,
         ),
         min_size=0,
-        max_size=12,
+        max_size=10,
     ),
 )
 
@@ -116,6 +164,7 @@ document = st.builds(
 
 
 @given(text=document)
+@seed(HYPOTHESIS_SEED)
 @settings(max_examples=500, deadline=None, suppress_health_check=[HealthCheck.too_slow])
 def test_parser_never_crashes_on_random_input(text: str) -> None:
     """For any generated document-shaped input, the parser must terminate
@@ -131,6 +180,7 @@ def test_parser_never_crashes_on_random_input(text: str) -> None:
 
 
 @given(text=document)
+@seed(HYPOTHESIS_SEED)
 @settings(max_examples=500, deadline=None, suppress_health_check=[HealthCheck.too_slow])
 def test_ast_is_json_serializable(text: str) -> None:
     """The AST must round-trip through JSON without loss."""
@@ -143,13 +193,39 @@ def test_ast_is_json_serializable(text: str) -> None:
     assert reparsed == ast
 
 
-@given(text=document)
+# Narrower document strategy for the legacy-vs-Lark parity property.
+# Excludes v2.1 labeled blocks (::fig / ::eq / ::tab) because those are
+# Lark-only; legacy parser routes them through the generic-directive path
+# and produces a different AST by design. Removing this property when
+# legacy is retired is a TODO in the docstring below.
+document_v1_only = st.builds(
+    lambda blocks: "\n".join(blocks),
+    blocks=st.lists(
+        st.one_of(
+            content_line,
+            st.builds(lambda s, c: s + c, s=shorthand, c=content_line),
+            st.builds(lambda a, c: a + c, a=block_attr_line, c=content_line),
+            include_directive,
+            container,
+            cell_source,
+        ),
+        min_size=0,
+        max_size=10,
+    ),
+)
+
+
+@given(text=document_v1_only)
+@seed(HYPOTHESIS_SEED)
 @settings(max_examples=200, deadline=None, suppress_health_check=[HealthCheck.too_slow])
 def test_legacy_and_lark_parsers_agree(text: str) -> None:
-    """On any generated document-shaped input, legacy and Lark parsers must
-    produce identical ASTs. This locks their behavior together during the
-    Phase 1 migration — either both accept with the same output, or both
-    reject.
+    """On v1.1 / v2.0 document-shaped input (no v2.1 labeled blocks), legacy
+    and Lark parsers must produce identical ASTs. This locks their behavior
+    together during the Phase 1 migration.
+
+    NOTE: this property weakens as v2.1 features land in Lark but not legacy.
+    Remove this test when the legacy parser is retired (end of Phase 1).
+    Until then, the strategy excludes v2.1 directives explicitly.
     """
     legacy_result = None
     lark_result = None
@@ -179,6 +255,7 @@ def test_legacy_and_lark_parsers_agree(text: str) -> None:
 
 
 @given(text=st.text(max_size=2000))
+@seed(HYPOTHESIS_SEED)
 @settings(max_examples=200, deadline=None, suppress_health_check=[HealthCheck.too_slow])
 def test_parser_tolerates_arbitrary_text(text: str) -> None:
     """Given ANY string (not just document-shaped), the parser must terminate.
@@ -211,6 +288,7 @@ heading_body_text = st.text(
     lvl=st.integers(min_value=1, max_value=6),
     heading_text=heading_body_text,
 )
+@seed(HYPOTHESIS_SEED)
 @settings(max_examples=100, deadline=None)
 def test_heading_roundtrip(lvl: int, heading_text: str) -> None:
     """A heading line parses to exactly one heading block with the right level.

@@ -6,17 +6,20 @@ Run once to generate the initial fixture set; re-run only when the
 catalog below changes or a grammar revision is intentional.
 
 Usage:
-    python tests/conformance/bootstrap_fixtures.py
+    python tests/conformance/bootstrap_fixtures.py           # refuses to overwrite
+    python tests/conformance/bootstrap_fixtures.py --force   # overwrites
 
 Safety: this script writes BOTH the `.md` input AND the `.expected.json`
 from the same run, so `expected.json` always reflects the current parser
-behavior. If the parser regresses later, the existing expected files
-catch it — but DO NOT rerun this script to "fix" a regression. Fix the
-parser instead.
+behavior. Without the --force guard, an accidental rerun after a parser
+regression would silently replace the ground truth with the regressed
+output, erasing the test suite's value. The guard forces an explicit
+opt-in.
 """
 
 from __future__ import annotations
 
+import argparse
 import io
 import json
 import sys
@@ -225,21 +228,43 @@ EDGE_FIXTURES: dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 
-def _write_positive(category: str, name: str, text: str) -> None:
+def _refuse_overwrite(path: Path, force: bool) -> None:
+    """If `path` exists and `force` is False, raise — don't silently
+    overwrite a pinned expected-output file with the current parser's
+    output. If the parser regressed, the regression would become the
+    new ground truth and the test suite would stop catching it."""
+    if path.exists() and not force:
+        raise RuntimeError(
+            f"{path} already exists. Pass --force to overwrite. "
+            f"Do NOT use --force to paper over a parser regression — "
+            f"fix the parser instead, or delete this fixture explicitly "
+            f"if the grammar intentionally changed."
+        )
+
+
+def _write_positive(category: str, name: str, text: str, *, force: bool) -> None:
     dir_ = FIXTURE_DIR / category
     dir_.mkdir(parents=True, exist_ok=True)
-    (dir_ / name).write_text(text, encoding="utf-8")
+    md_path = dir_ / name
+    expected_path = dir_ / (Path(name).stem + ".expected.json")
+    _refuse_overwrite(md_path, force)
+    _refuse_overwrite(expected_path, force)
+    md_path.write_text(text, encoding="utf-8")
     ast = parse(text)
-    (dir_ / (Path(name).stem + ".expected.json")).write_text(
+    expected_path.write_text(
         json.dumps(ast, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
 
 
-def _write_negative(name: str, text: str, needle: str, line: int) -> None:
+def _write_negative(name: str, text: str, needle: str, line: int, *, force: bool) -> None:
     dir_ = FIXTURE_DIR / "negative"
     dir_.mkdir(parents=True, exist_ok=True)
-    (dir_ / name).write_text(text, encoding="utf-8")
+    md_path = dir_ / name
+    err_path = dir_ / (Path(name).stem + ".expected-error.json")
+    _refuse_overwrite(md_path, force)
+    _refuse_overwrite(err_path, force)
+    md_path.write_text(text, encoding="utf-8")
     # Verify the parser actually raises with the expected error
     try:
         parse(text)
@@ -253,33 +278,45 @@ def _write_negative(name: str, text: str, needle: str, line: int) -> None:
             raise RuntimeError(
                 f"{name}: line mismatch; expected {line}, got {e.line}"
             )
-    (dir_ / (Path(name).stem + ".expected-error.json")).write_text(
+    err_path.write_text(
         json.dumps({"error_contains": needle, "line": line}, indent=2),
         encoding="utf-8",
     )
 
 
-def main() -> None:
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Bootstrap conformance fixtures. Refuses to overwrite "
+        "existing files unless --force is passed.",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing fixtures. Only use this when grammar "
+        "changes intentionally; never to paper over a parser regression.",
+    )
+    args = parser.parse_args()
+
     print("Bootstrapping positive fixtures...")
     for name, text in POSITIVE_FIXTURES.items():
-        _write_positive("positive", name, text)
+        _write_positive("positive", name, text, force=args.force)
         print(f"  wrote positive/{name}")
 
     print("\nBootstrapping roundtrip fixtures...")
     # Roundtrip = a curated subset of positive that we want to explicitly
     # lock-in for roundtrip semantics (same inputs, same category as positive).
     for name in ["cell-minimal.md", "include-local.md", "container-nested.md"]:
-        _write_positive("roundtrip", name, POSITIVE_FIXTURES[name])
+        _write_positive("roundtrip", name, POSITIVE_FIXTURES[name], force=args.force)
         print(f"  wrote roundtrip/{name}")
 
     print("\nBootstrapping negative fixtures...")
     for name, text, needle, line in NEGATIVE_FIXTURES:
-        _write_negative(name, text, needle, line)
+        _write_negative(name, text, needle, line, force=args.force)
         print(f"  wrote negative/{name}")
 
     print("\nBootstrapping edge fixtures...")
     for name, text in EDGE_FIXTURES.items():
-        _write_positive("edge", name, text)
+        _write_positive("edge", name, text, force=args.force)
         print(f"  wrote edge/{name}")
 
     total = (
@@ -289,7 +326,8 @@ def main() -> None:
         + 3  # roundtrip
     )
     print(f"\nTotal: {total} fixtures written.")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

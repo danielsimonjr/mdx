@@ -20,10 +20,14 @@
 ;   - paragraphs, headings, lists, fenced code, raw HTML
 ;   - inline emphasis, links, images, code spans
 ;
-; Versioning: this grammar is MDZ v2.1. v2.0 lacked ::cite / ::ref / ::fig /
-; ::eq / ::tab as labelable blocks; v2.1 adds them. Parsers MUST reject
-; unknown directives under v2.1 conformance (unlike v1.1 which degraded to
-; paragraphs).
+; Versioning: this grammar targets the **in-progress v2.1 revision** of
+; the MDZ specification. The current shipped spec is v2.0 (README badge
+; and CHANGELOG); v2.1 is scheduled for Phase 1/2 of ROADMAP.md and adds
+; ::cite / ::ref / ::fig / ::eq / ::tab as labelable blocks. Until v2.1
+; is published, a v2.0-only parser may treat these directives as unknown
+; and fall through per the v2.0 generic-inline-directive path. Parsers
+; advertising v2.1 conformance MUST enforce the normative constraints
+; at the bottom of this file.
 ;
 ; ============================================================================
 
@@ -239,6 +243,13 @@ SQUOTE         = %x27                 ; '
 ; Normative constraints not expressible in ABNF
 ; ============================================================================
 ;
+; Constraints are grouped by layer. "Parser" constraints MUST be enforced
+; by any conformant parser. "Validator" constraints are out-of-band
+; (require access to sibling files like references.json) and are enforced
+; by a separate validator layer, not the parser.
+;
+; ---- PARSER constraints (enforced by implementations/python/mdz_parser) ----
+;
 ; 1. An unclosed fenced code block inside ::cell or ::output MUST raise a
 ;    parse error with a line number. Silent absorption to EOF is forbidden.
 ;
@@ -252,23 +263,44 @@ SQUOTE         = %x27                 ; '
 ;    neither is a parse error.
 ;
 ; 5. ::cell{execution_count=N} — N MUST parse as a non-negative integer.
-;    Non-integer values are a parse error. Silent string-coercion is forbidden.
+;    Non-integer OR negative values are a parse error. Silent string-
+;    coercion is forbidden.
 ;
 ; 6. ::include target/path MUST be a non-empty string after attr resolution.
 ;    Empty targets are a parse error.
 ;
-; 7. ::ref[id] / ::fig{id} / ::eq{id} / ::tab{id} — id is REQUIRED and MUST
-;    match ident grammar. Duplicate ids within a document are a validator
-;    warning (not a parse error).
+; 7. ::fig{id} / ::eq{id} / ::tab{id} — id is REQUIRED, must be non-empty,
+;    and MUST match the IDENT production (`[A-Za-z][A-Za-z0-9_-]*`).
+;    Missing, empty, or ill-formed ids are parse errors.
 ;
-; 8. ::cite[key] keys MUST resolve against entries in references.json.
-;    Unresolved citations are a validator error (not a parse error, because
-;    references.json is out-of-band).
+; 8. v2.0+ directive attr bodies (inside ::cell, ::output, ::include,
+;    :::container, ::fig/eq/tab, inline directives) MUST parse
+;    successfully; malformed attr bodies raise a parse error. This is
+;    STRICTER than v1.1 block-attribute lines, which still degrade
+;    gracefully per rule 11 below.
 ;
-; 9. Precedence for block attributes: inline > block > container.
+; 9. Precedence for `align-*` classes: inline > block > container. Other
+;    classes from all three sources are union'd (not deduplicated by
+;    precedence) to preserve author-declared semantic classes.
 ;
-; 10. Malformed attribute markers ({word} without . or #, unclosed {) degrade
-;     to plain-text paragraphs for v1.1 / v2.0 compat; v2.1 strict mode
-;     upgrades these to warnings (still not errors).
+; 10. Malformed v1.1 block-attribute markers ({word} without . or #,
+;     unclosed {) degrade to plain-text paragraphs; a
+;     MalformedAttributeWarning is emitted so tooling can surface the
+;     likely typo. The AST shape remains a plain paragraph.
+;
+; ---- VALIDATOR constraints (enforced OUTSIDE the parser) --------------
+;
+; V1. Duplicate `id` values within a document are a validator warning.
+;     The parser does not track document-scope id uniqueness; the
+;     validator (cli `mdz validate`, planned Phase 2) reports them.
+;
+; V2. ::cite[key] keys MUST resolve against entries in references.json.
+;     The parser accepts any syntactically-valid citation; validator
+;     rejects unresolved ones. References.json is out-of-band (separate
+;     file in the archive), so this check cannot live in the parser.
+;
+; V3. ::ref[id] MUST resolve to a ::fig / ::eq / ::tab / heading id in
+;     the document or an included file. Validator concern for the same
+;     reason as V2 (cross-file resolution).
 ;
 ; ============================================================================

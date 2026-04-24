@@ -5,7 +5,10 @@ scientific paper" tooling, states what they do well, and identifies MDZ's
 specific differentiators. **If a competitor already ships what we're planning,
 we cut the feature.**
 
-Maintained on a rolling basis. Last updated: 2026-04-24.
+Maintained on a rolling basis. Last updated: 2026-04-24. Competitor feature
+claims reflect public documentation and project activity as of that date;
+subject to drift — verify before relying on any specific claim for external
+comparison.
 
 ---
 
@@ -130,23 +133,33 @@ first-class citizen" principle.
 
 ## Feature matrix
 
-| Capability                      | Quarto | Jupyter Book | Curvenote | Manubot | Stencila | **MDZ**   |
-|---------------------------------|--------|--------------|-----------|---------|----------|-----------|
-| Single-file archive             | no     | no           | no        | no      | partial  | **yes**   |
-| Executable cells (in-browser)   | build  | build+live   | live      | no      | partial  | **live**  |
-| Cryptographic signing           | no     | no           | hosted    | git     | no       | **yes**   |
-| Provenance chain (fork/merge)   | no     | no           | partial   | git     | no       | **yes**   |
-| Content-addressed IDs           | no     | no           | no        | no      | no       | **yes**   |
-| W3C DID signer identity         | no     | no           | no        | no      | no       | **yes**   |
-| Multi-locale bundle             | no     | partial      | no        | no      | no       | **yes**   |
-| Format-level accessibility meta | no     | no           | no        | no      | yes      | **yes**   |
-| CSL bibliography                | yes    | yes          | yes       | yes     | yes      | **planned** |
+Legend: **yes** = ships today • **spec-only** = defined in the specification,
+no tooling yet • **planned** = on the roadmap, not yet spec'd or implemented
+• **no** = not planned.
+
+| Capability                      | Quarto | Jupyter Book | Curvenote | Manubot | Stencila | **MDZ (today)** |
+|---------------------------------|--------|--------------|-----------|---------|----------|-----------------|
+| Single-file archive             | no     | no           | no        | no      | partial  | **yes**         |
+| Executable cells (in-browser)   | build  | build+live   | live      | no      | partial  | **spec-only**   |
+| Cryptographic signing           | no     | no           | hosted    | git     | no       | **spec-only**   |
+| Provenance chain (fork/merge)   | no     | no           | partial   | git     | no       | **spec-only**   |
+| Content-addressed IDs           | no     | no           | no        | no      | no       | **yes**         |
+| W3C DID signer identity         | no     | no           | no        | no      | no       | **spec-only**   |
+| Multi-locale bundle             | no     | partial      | no        | no      | no       | **spec-only**   |
+| Format-level accessibility meta | no     | no           | no        | no      | yes      | **spec-only**   |
+| CSL bibliography                | yes    | yes          | yes       | yes     | yes      | **planned**     |
 | Figure/eq/table numbering       | yes    | yes          | yes       | yes     | yes      | **planned (v2.1)** |
 | JATS export                     | partial| via-pandoc   | yes       | no      | no       | **planned (Phase 2)** |
-| PDF export                      | yes    | yes          | yes       | yes     | yes      | via-JATS→LaTeX |
-| Reflowable reading UI           | yes    | yes          | yes       | yes     | partial  | **yes**   |
-| Open format spec                | yes    | yes          | **no**    | yes     | yes      | **yes**   |
-| Active maintainers (2026)       | yes    | yes          | yes       | yes     | **no**   | ramping   |
+| PDF export                      | yes    | yes          | yes       | yes     | yes      | via-JATS→LaTeX  |
+| Reflowable reading UI           | yes    | yes          | yes       | yes     | partial  | **basic**       |
+| Open format spec                | yes    | yes          | **no**    | yes     | yes      | **yes**         |
+| Active maintainers (2026)       | yes    | yes          | yes       | yes     | **no**   | ramping         |
+
+**Reading the matrix honestly:** today MDZ has one concrete advantage
+(single-file archive) and a long list of spec-only differentiators. The
+value prop *requires* those spec features shipping as working tooling —
+that's what Phase 2 + 3 of the roadmap exist to do. Do not pitch the
+spec-only rows as shipped capabilities.
 
 ## Where MDZ wins, concretely
 

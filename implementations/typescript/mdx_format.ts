@@ -1348,13 +1348,78 @@ export type BuiltInSignerRole =
 export type CustomSignerRole = string & { readonly __customSignerRole: unique symbol };
 
 /**
- * Opt-in constructor for a custom signer role. Making this explicit
- * prevents the `| string` erase-the-union foot-gun: callers must decide
- * "yes, this is a non-standard role" rather than getting it for free
- * from literal string inference.
+ * Built-in role names — re-exported as a runtime-accessible set so the
+ * custom-role constructor can reject values that shadow them.
+ */
+export const BUILT_IN_SIGNER_ROLES: ReadonlySet<BuiltInSignerRole> = new Set([
+  "author",
+  "reviewer",
+  "editor",
+  "publisher",
+  "notary",
+]);
+
+/**
+ * Pattern a custom signer role must match. Supports two forms:
+ *   - reverse-DNS identifier:  `com.example.legal-counsel`
+ *   - URI:                     `https://example.com/roles/translator`
+ * The pattern is intentionally narrow — bare strings like "assistant" or
+ * "contributor" are rejected because they look like (typo'd) built-in
+ * roles and would defeat the point of opting in to a custom role.
+ */
+const CUSTOM_SIGNER_ROLE_PATTERN =
+  /^(?:[a-z0-9]+(?:[-.][a-z0-9]+)+|[a-z][a-z0-9+.\-]*:\/\/.+)$/i;
+
+/**
+ * Opt-in constructor for a custom signer role.
+ *
+ * Making this an explicit function call (not a `| string` union) prevents
+ * callers from accidentally using a typo'd built-in role and having
+ * TypeScript's literal-string inference silently accept it.
+ *
+ * Runtime validation:
+ *   1. Rejects values equal to a built-in role — use those by name.
+ *   2. Requires the custom role to be either a reverse-DNS identifier
+ *      (`com.example.role`) or a URI (`https://example.com/roles/role`).
+ *   3. Rejects bare lowercase words that look like possible built-in
+ *      roles (must contain a `.` or `:` to signal domain-qualification).
+ *
+ * @throws `TypeError` if the value fails any of the above checks. The
+ * compile-time brand is opt-in; the runtime check makes the brand
+ * actually load-bearing.
  */
 export function customSignerRole(value: string): CustomSignerRole {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new TypeError(
+      `customSignerRole: expected non-empty string, got ${typeof value}`,
+    );
+  }
+  if (BUILT_IN_SIGNER_ROLES.has(value as BuiltInSignerRole)) {
+    throw new TypeError(
+      `customSignerRole: "${value}" is a built-in role — use the literal ` +
+        `string directly rather than wrapping it.`,
+    );
+  }
+  if (!CUSTOM_SIGNER_ROLE_PATTERN.test(value)) {
+    throw new TypeError(
+      `customSignerRole: "${value}" must be a reverse-DNS identifier ` +
+        `(e.g. "com.example.role") or a URI (e.g. "https://example.com/roles/x"). ` +
+        `Bare words are rejected to prevent typos of built-in roles from ` +
+        `silently becoming "custom" roles.`,
+    );
+  }
   return value as CustomSignerRole;
+}
+
+/**
+ * Runtime type guard — returns true if `s` is a validated custom signer role.
+ */
+export function isCustomSignerRole(s: unknown): s is CustomSignerRole {
+  return (
+    typeof s === "string" &&
+    !BUILT_IN_SIGNER_ROLES.has(s as BuiltInSignerRole) &&
+    CUSTOM_SIGNER_ROLE_PATTERN.test(s)
+  );
 }
 
 export type SignerRole = BuiltInSignerRole | CustomSignerRole;

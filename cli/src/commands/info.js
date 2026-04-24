@@ -24,7 +24,15 @@ function configureTerminal() {
             })
         });
     } catch (e) {
-        // Fallback: use default marked renderer
+        // Log the fallback to stderr rather than silently degrading — users
+        // seeing raw HTML tags in their terminal deserve a hint about why.
+        // Using stderr (not stdout) keeps the info output clean for pipes.
+        console.error(
+            chalk.yellow('[mdz info] terminal markdown renderer unavailable:'),
+            e.message,
+            '\n  Falling back to raw markdown output. Install marked-terminal',
+            'to enable pretty rendering.'
+        );
     }
     terminalConfigured = true;
 }

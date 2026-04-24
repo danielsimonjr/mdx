@@ -18,6 +18,13 @@ import {
 } from "./mdx_format.js";
 
 // ---------------------------------------------------------------------------
+// Pin seeds for reproducibility — without this, a hypothesis / fast-check
+// failure would reproduce with a different counterexample on each CI run,
+// making regressions hard to diagnose.
+// ---------------------------------------------------------------------------
+fc.configureGlobal({ seed: 0x6d647a42 /* "mdzB" */ });
+
+// ---------------------------------------------------------------------------
 // Strategies
 // ---------------------------------------------------------------------------
 
@@ -123,6 +130,43 @@ describe("property: sanitizePath never allows path traversal", () => {
       ),
       { numRuns: 500 },
     );
+  });
+});
+
+describe("cleanObject runtime guard on non-plain objects", () => {
+  // The PlainObject<T> conditional type excludes Array/Map/Set/Date at
+  // compile time, but if a caller bypasses the type via `any` (or via
+  // untyped JS), the runtime guard is the only thing preventing garbage
+  // output. Exercise each branch of the guard explicitly.
+
+  it("throws TypeError on Array input", () => {
+    expect(() => cleanObject([1, 2, 3] as unknown as object)).toThrow(TypeError);
+    expect(() => cleanObject([1, 2, 3] as unknown as object)).toThrow(
+      /plain object/,
+    );
+  });
+
+  it("throws TypeError on Map input", () => {
+    expect(() => cleanObject(new Map() as unknown as object)).toThrow(TypeError);
+  });
+
+  it("throws TypeError on Set input", () => {
+    expect(() => cleanObject(new Set() as unknown as object)).toThrow(TypeError);
+  });
+
+  it("throws TypeError on Date input", () => {
+    expect(() => cleanObject(new Date() as unknown as object)).toThrow(TypeError);
+  });
+
+  it("accepts plain object literals", () => {
+    expect(() => cleanObject({ a: 1, b: null })).not.toThrow();
+  });
+
+  it("accepts Object.create(null) plain objects", () => {
+    const obj = Object.create(null) as Record<string, unknown>;
+    obj.a = 1;
+    obj.b = null;
+    expect(() => cleanObject(obj)).not.toThrow();
   });
 });
 
@@ -292,6 +336,59 @@ describe("property: signature chain invariant under addSignature", () => {
       ),
       { numRuns: 100 },
     );
+  });
+});
+
+describe("customSignerRole runtime validation", () => {
+  // The compile-time brand on CustomSignerRole is pure type erasure —
+  // nothing at runtime prevents a bare string from being passed into
+  // `role: SignerRole`. The constructor's validation is what enforces
+  // the "custom roles must be explicitly opted in" contract at runtime.
+  // Without this runtime check, the branded type is decorative.
+
+  it("accepts reverse-DNS identifiers", () => {
+    const { customSignerRole } = require("./mdx_format.js") as typeof import("./mdx_format.js");
+    expect(() => customSignerRole("com.example.legal-counsel")).not.toThrow();
+    expect(() => customSignerRole("org.acme.reviewer.senior")).not.toThrow();
+  });
+
+  it("accepts URI-form identifiers", () => {
+    const { customSignerRole } = require("./mdx_format.js") as typeof import("./mdx_format.js");
+    expect(() => customSignerRole("https://example.com/roles/translator")).not.toThrow();
+    expect(() => customSignerRole("urn:mdz:role:reviewer")).not.toThrow();
+  });
+
+  it("rejects built-in role names (use them directly)", () => {
+    const { customSignerRole } = require("./mdx_format.js") as typeof import("./mdx_format.js");
+    expect(() => customSignerRole("author")).toThrow(/built-in/);
+    expect(() => customSignerRole("reviewer")).toThrow(/built-in/);
+    expect(() => customSignerRole("notary")).toThrow(/built-in/);
+  });
+
+  it("rejects bare words that look like possible typos", () => {
+    const { customSignerRole } = require("./mdx_format.js") as typeof import("./mdx_format.js");
+    // "auther" (typo of author), "reviwer" (typo), "contributor" (plausible
+    // built-in that isn't) — all must be rejected because accepting them
+    // would silently make typos into "custom" roles.
+    expect(() => customSignerRole("auther")).toThrow(/reverse-DNS/);
+    expect(() => customSignerRole("reviwer")).toThrow(/reverse-DNS/);
+    expect(() => customSignerRole("contributor")).toThrow(/reverse-DNS/);
+  });
+
+  it("rejects empty or non-string input", () => {
+    const { customSignerRole } = require("./mdx_format.js") as typeof import("./mdx_format.js");
+    expect(() => customSignerRole("")).toThrow();
+    expect(() => customSignerRole(undefined as unknown as string)).toThrow();
+    expect(() => customSignerRole(42 as unknown as string)).toThrow();
+  });
+
+  it("isCustomSignerRole agrees with the constructor", () => {
+    const { customSignerRole, isCustomSignerRole } = require("./mdx_format.js") as typeof import("./mdx_format.js");
+    const good = customSignerRole("com.example.special");
+    expect(isCustomSignerRole(good)).toBe(true);
+    expect(isCustomSignerRole("author")).toBe(false); // built-in
+    expect(isCustomSignerRole("typo")).toBe(false); // bare word
+    expect(isCustomSignerRole(42)).toBe(false); // wrong type
   });
 });
 

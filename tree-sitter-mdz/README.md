@@ -85,7 +85,9 @@ Via `nvim-treesitter`:
 local parser_config = require("nvim-treesitter.parsers").get_parser_configs()
 parser_config.mdz = {
   install_info = {
-    url = "https://github.com/danielsimonjr/mdx/tree/main/tree-sitter-mdz",
+    -- Default branch is `master` (not `main`); repo may rename to `mdz`
+    -- once tooling + adoption warrant it — check the actual repo URL.
+    url = "https://github.com/danielsimonjr/mdx/tree/master/tree-sitter-mdz",
     files = {"src/parser.c"},
   },
   filetype = "mdz",

@@ -7,6 +7,14 @@ journal that accepts MDZ.
 **Assumes:** you have an existing reproducible paper draft in ipynb + tex +
 bib + a folder of supplementary files.
 
+> **Tooling status (2026-04):** Most of the commands in this document don't
+> exist yet. They are the **target UX** for the Phase 2 CLI rebuild
+> (`ROADMAP.md` §2.3). Each block labelled **(planned)** describes the
+> intended workflow; the "What works today" section at the bottom lists the
+> commands that ship in the current CLI. If you need to author MDZ today,
+> hand-assemble the ZIP per the layout below and use
+> `mdz validate your-paper.mdz` (the one command that does exist).
+
 ---
 
 ## The one-archive mental model
@@ -29,9 +37,9 @@ my-paper.mdz   (a ZIP file; rename to .zip and unzip to inspect)
 This is the whole paper. One file. Content-addressable. Sign it; email it;
 upload it.
 
-## Step 1 — Convert your ipynb
+## Step 1 — Convert your ipynb **(planned)**
 
-Use the (planned Phase 2) `ipynb-to-mdz` CLI:
+Use the `ipynb-to-mdz` CLI:
 
 ```bash
 mdz import-ipynb analysis.ipynb --out figure-cells.md
@@ -73,7 +81,9 @@ Then hand-fix:
 
 Most other TeX → CommonMark cleanly via pandoc.
 
-## Step 3 — Assemble the archive
+## Step 3 — Assemble the archive **(planned flags)**
+
+**Target UX:**
 
 ```bash
 mdz create \
@@ -88,16 +98,30 @@ mdz create \
   --out my-paper.mdz
 ```
 
-The CLI populates the manifest, computes content hashes, validates the
-scientific-paper profile, and produces a single `.mdz` file.
+**Today:** `mdz create` exists but is interactive (prompts for title, author,
+etc.) and accepts only `--output` and `--template`. The flags `--profile`,
+`--author-did`, `--bibliography`, `--add-folder` are Phase 2. For now,
+assemble the ZIP manually from the layout above or run the interactive
+wizard and patch the manifest afterward.
 
 ## Step 4 — Validate
+
+**Target UX** (Phase 2 `--profile` flag):
 
 ```bash
 mdz validate my-paper.mdz --profile scientific-paper-v1
 ```
 
-Checks you'll see:
+**Today** (profile validation not yet wired — the command validates
+manifest structure and asset inventory but does not enforce the
+scientific-paper profile's rules like IMRaD sections or CSL-JSON
+bibliography):
+
+```bash
+mdz validate my-paper.mdz
+```
+
+Checks you'll see (Phase 2 target):
 
 - ✓ IMRaD structure (Introduction, Methods, Results, Discussion sections present)
 - ✓ At least one author with a valid ORCID-resolvable DID
@@ -111,7 +135,9 @@ Checks you'll see:
 
 Failed validation = red output + exit code 1. Fix and re-run.
 
-## Step 5 — Sign
+## Step 5 — Sign **(planned — Phase 3)**
+
+Signing is spec'd (v2.0 §16) but no CLI exists yet. Target UX:
 
 ```bash
 mdz sign my-paper.mdz \
@@ -130,10 +156,12 @@ add their own signatures via the same command with different role values.
 
 **Current (as of 2026):** arXiv doesn't natively accept MDZ. Workaround:
 
-1. Upload the JATS-XML conversion (`mdz export jats my-paper.mdz`)
+1. Upload the JATS-XML conversion (`mdz export jats my-paper.mdz` — **planned, Phase 2**; until then, hand-convert via pandoc)
 2. Upload the MDZ as an "ancillary file"
 3. Link to the hosted viewer in your abstract: `View interactive version:
    view.mdz-format.org?url=https://arxiv.org/abs/2612.12345/my-paper.mdz`
+   *(hosted viewer is a Phase 2.2 target — not live as of 2026-04; until
+   it ships, reviewers open the MDZ by downloading and extracting.)*
 
 When arXiv natively renders MDZ (stretch goal end-2027), this becomes
 one-step.
@@ -153,7 +181,9 @@ Configure the Zenodo deposit form:
 
 Per the journal's submission portal. Most accept supplementary ZIP files;
 an MDZ is "just" a ZIP so it uploads cleanly. The journal's production
-team then runs `mdz export jats` to feed their pipeline.
+team then runs `mdz export jats` (Phase 2 target) to feed their pipeline;
+until that ships, the journal can run pandoc or their own converter against
+the extracted `document.md`.
 
 ## Common issues
 
@@ -191,6 +221,28 @@ cross-file reference resolution planned for v2.1.
 - **Declare AI assistance** in the document per journal policy — MDZ does
   not try to detect it, but `document.ai_assistance` is a reserved field
   you can populate with your journal's required disclosure format.
+
+## What works today vs. planned (2026-04 snapshot)
+
+| Command / feature | Status | Notes |
+|-------------------|--------|-------|
+| `mdz view <file>` | ✓ works | Opens MDZ/MDX in browser viewer |
+| `mdz info <file>` | ✓ works | Shows manifest summary |
+| `mdz extract <file> [out]` | ✓ works | Unzips the archive |
+| `mdz edit <file>` | ✓ works | Interactive terminal editor |
+| `mdz create [name]` | ✓ works | Interactive wizard; no `--profile` yet |
+| `mdz validate <file>` | ✓ works | Structural only; no profile rules |
+| `mdz import-ipynb` | ⏳ planned (Phase 2) | Target #1 adoption on-ramp |
+| `mdz sign` | ⏳ planned (Phase 3) | Spec'd in v2.0 §16 |
+| `mdz verify` | ⏳ planned (Phase 3) | Signature + chain verification |
+| `mdz export jats` | ⏳ planned (Phase 2) | For journal ingest pipelines |
+| `mdz export epub` | ⏳ planned (Phase 2) | EPUB 3.3 bridge |
+| `--profile` validation | ⏳ planned (Phase 2) | Enforces scientific-paper rules |
+| `view.mdz-format.org` hosted viewer | ⏳ planned (Phase 2.2) | Domain not yet registered |
+| `@mdz-format/viewer` web component | ⏳ planned (Phase 2.1) | npm scope not yet registered |
+
+Until the planned items ship, hand-assembly + pandoc + manual ZIP
+manipulation cover most of the gap.
 
 ## Get help
 
