@@ -47,6 +47,14 @@ export interface ContentConfig {
   encoding?: string;
   markdown_variant?: string;
   extensions?: string[];
+  /**
+   * CSL style declaration for `::cite` / `::bibliography` rendering.
+   * See `spec/directives/references-csl.md`. Default in absentia is
+   * `chicago-author-date`. Currently the only style implemented in
+   * the in-process viewer; unknown styles fall back with a console
+   * warning.
+   */
+  citation_style?: string;
   locales?: {
     default: string;
     available: Array<{

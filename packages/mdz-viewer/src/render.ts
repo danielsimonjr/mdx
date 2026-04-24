@@ -21,6 +21,9 @@
 
 import { marked } from "marked";
 
+import { processDirectives } from "./directives.js";
+import type { CslEntry } from "./references.js";
+
 // ---------------------------------------------------------------------------
 // Trusted Types policy registration
 // ---------------------------------------------------------------------------
@@ -76,6 +79,18 @@ export interface RenderOptions {
    * to a blob URL or `null` if the asset isn't in the archive.
    */
   resolveAsset: (path: string) => string | null;
+  /**
+   * CSL-JSON references keyed by id (parsed from `references.json` if
+   * present in the archive). Empty / omitted disables citation rendering
+   * — `::cite[key]` will render as a visible `[?key]` missing marker.
+   */
+  references?: Readonly<Record<string, CslEntry>>;
+  /**
+   * Citation style declaration (mirrors `manifest.content.citation_style`).
+   * Currently only `chicago-author-date` is implemented; unknown styles
+   * fall back to it with a console warning.
+   */
+  citationStyle?: string;
 }
 
 /**
@@ -144,14 +159,29 @@ const TAG_ALLOWED_ATTRS: Record<string, readonly string[]> = {
 
 /**
  * Render MDZ markdown to sanitized HTML.
+ *
+ * Pipeline:
+ *   1. `processDirectives` — pre-marked transform that resolves
+ *      `::ref` / `::cite` / `::fig` / `::eq` / `::tab` / `::bibliography`
+ *      to HTML islands. Two-pass: collects ids + citation keys first,
+ *      then substitutes. See `directives.ts`.
+ *   2. `marked.parse` — CommonMark + GFM. The HTML islands from step 1
+ *      pass through marked unchanged.
+ *   3. `sanitizeHtml` — allowlist walk. The directive renderer emits
+ *      only sanitizer-allowed tags + attributes by construction, so
+ *      this pass is a defense-in-depth check, not a transformation.
  */
 export function renderMarkdown(
   md: string,
   opts: RenderOptions,
 ): string {
+  const transformed = processDirectives(md, {
+    references: opts.references ?? {},
+    citationStyle: opts.citationStyle,
+  });
   // marked() is synchronous when `async: false` — but the types allow
   // Promise. Force sync via the synchronous API and coerce the return.
-  const rawHtml = marked.parse(md, { async: false, gfm: true }) as string;
+  const rawHtml = marked.parse(transformed, { async: false, gfm: true }) as string;
   return sanitizeHtml(rawHtml, opts);
 }
 

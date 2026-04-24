@@ -183,6 +183,8 @@ class MDZViewerElement extends HTMLElement {
 
     const html = renderMarkdown(content, {
       resolveAsset: (path) => this.#resolveAsset(path),
+      references: this.#archive.references,
+      citationStyle: manifest.content.citation_style,
     });
     // Render is safe-by-construction (sanitizer in render.ts); direct
     // innerHTML is intentional here. Untrusted HTML in the markdown gets

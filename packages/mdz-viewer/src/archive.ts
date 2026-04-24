@@ -9,6 +9,7 @@
 
 import { unzipSync } from "fflate";
 import type { Manifest } from "./manifest-types.js";
+import { parseReferences, type CslEntry } from "./references.js";
 
 // ---------------------------------------------------------------------------
 // ZIP-bomb + path-traversal defenses (threat-model T3 + T4)
@@ -47,6 +48,13 @@ export interface LoadedArchive {
   localeTags: string[];
   /** The locale tag actually used to resolve `content`. */
   activeLocale: string | null;
+  /**
+   * CSL-JSON references parsed from `references.json` at archive root,
+   * keyed by entry `id`. Empty record when the archive carries no
+   * `references.json` or it failed to parse — citation rendering falls
+   * back to visible `[?key]` markers in that case.
+   */
+  references: Readonly<Record<string, CslEntry>>;
 }
 
 /**
@@ -90,8 +98,13 @@ export async function loadArchive(
     entries,
     opts.preferredLocales ?? [],
   );
+  // references.json is optional. When absent, citations render as
+  // visible `[?key]` markers; this matches the
+  // spec/directives/references-csl.md "visible miss" rule.
+  const referencesBytes = entries.get("references.json");
+  const references = referencesBytes ? parseReferences(referencesBytes) : {};
 
-  return { manifest, entries, content, activeLocale, localeTags };
+  return { manifest, entries, content, activeLocale, localeTags, references };
 }
 
 // ---------------------------------------------------------------------------

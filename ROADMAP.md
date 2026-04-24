@@ -115,17 +115,30 @@ these are not optional for journal acceptance):**
       runs on JATS 1.3. Without this path, MDZ can be authored but cannot be
       published in any mainstream journal. Position this at Phase 2 priority
       alongside the EPUB bridge.
-- [x] **CSL / bibliography support — spec drafted** at
-      `spec/directives/references-csl.md` (v2.1 draft). Defines
-      `references.json` as CSL-JSON v1.0.2, `::cite[key]` grammar,
-      `::bibliography` rendering block, style selection via
-      `content.citation_style`. **Implementation pending** in viewer +
-      CLI (tracked as Phase 2.1 follow-up).
-- [x] **Figure, equation, table numbering + cross-references** — grammar
-      support landed: 19 `::fig`/`::eq`/`::tab`/`::ref`/`::cite`
-      references in `spec/grammar/mdz-directives.abnf`. Parser (Lark)
-      accepts them. **Viewer auto-numbering + "Figure 1"-style rendering
-      still pending** in the Phase 2.1 viewer.
+- [x] **CSL / bibliography support — spec + viewer impl ship.**
+      `spec/directives/references-csl.md` defines the format;
+      `packages/mdz-viewer/src/{directives,references}.ts` ship the
+      runtime. Loads `references.json` from archive root (accepts both
+      CSL-JSON array form AND id-keyed object form per Zotero
+      convention). `::cite[key]` renders `(Author Year)` /
+      `(Author1 & Author2 Year)` / `(Author1 et al. Year)` per
+      chicago-author-date. Multi-key cites group with semicolons.
+      `::bibliography` emits an ordered list of cited references in
+      citation order (uncited refs omitted, matching pandoc-citeproc).
+      Anonymous works render with title-leading. Missing keys surface
+      as visible `[?key]` markers. `manifest.content.citation_style`
+      typed at the viewer's manifest layer; unknown styles fall back
+      to chicago-author-date with a console warning.
+- [x] **Figure, equation, table numbering + cross-references** —
+      grammar + parser + **viewer rendering** all ship. Viewer pipeline
+      adds `packages/mdz-viewer/src/directives.ts` (two-pass id collect
+      + substitution) + `references.ts` (minimal CSL chicago-author-date
+      renderer). `::fig{id=}` / `::eq{id=}` / `::tab{id=}` auto-number
+      sequentially per kind; `::ref[id]` resolves to the target's label
+      ("Figure 1", "Equation 1", "Table 1"); missing refs render as
+      visible `[?id]` markers (spec-compliant "visible miss"). 24
+      directive tests + 10 references tests, 72/72 viewer tests pass,
+      `tsc --noEmit` clean.
 - [x] **DOI minting integration** — `docs/for-authors/DOI.md` ships with
       Zenodo / OSF / Crossref / arXiv workflows, versioned-DOI pattern,
       DataCite `relationType` PascalCase convention.

@@ -196,6 +196,61 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Added — Phase 2.1 viewer: cross-references + citations + bibliography (2026-04-24)
+
+The `<mdz-viewer>` web component now renders the v2.1 directives
+required for real scientific papers:
+
+- **Labeled blocks** — `::fig{id=…}`, `::eq{id=…}`, `::tab{id=…}` open
+  a `<figure>` / `<div role="math">` / `<figure class="mdz-tab">`
+  wrapper with `<figcaption>` carrying an auto-assigned label
+  ("Figure 1", "Equation 1", "Table 1"). Numbering is per-kind; ids
+  must satisfy the strict ABNF charset (`[A-Za-z][A-Za-z0-9_-]*`)
+  in both quoted and bare forms (the in-process review caught a
+  quoted-id charset bypass — fixed before merge).
+- **Cross-references** — `::ref[id]` resolves to a link with the
+  target's label as text. Missing ids render as a visible
+  `[?id]` marker with `class="mdz-ref-missing"` (spec-compliant
+  "visible miss" per `spec/directives/references-csl.md`).
+- **Inline citations** — `::cite[key]` renders the
+  chicago-author-date inline form: `(Smith 2020)` /
+  `(Smith & Jones 2021)` / `(Smith et al. 2022)`. Multi-key cites
+  `::cite[a,b]` group with semicolons inside a single bracket pair.
+  Anonymous works (no `author` field) fall back to title-leading.
+- **Bibliography** — `::bibliography` block emits an ordered list of
+  cited references in citation order. Uncited entries are omitted
+  (pandoc-citeproc default). Empty-marker fallback when no `::cite`
+  appears in the document.
+- **References format** — archives MAY ship `references.json` at
+  archive root. The viewer's parser accepts both the canonical
+  CSL-JSON array form AND the id-keyed object form (Zotero exporter
+  convention). Malformed JSON / unsupported root types degrade to
+  empty + a console warn; citations render as visible misses.
+- **Citation style** — declared at `manifest.content.citation_style`
+  (now typed in `manifest-types.ts`). Currently only
+  `chicago-author-date` is implemented in-process; unknown styles
+  fall back with a console warn. Authors who need a specific journal
+  style should pre-render with pandoc-citeproc and embed the
+  rendered HTML.
+- **CSL date handling** — `issuedYear` accepts numeric AND string
+  year forms (CSL-JSON typing says number, real-world feeds ship
+  strings) and pre-1500 / BCE years for classics-era citations.
+- **Sanitizer interaction** — directives.ts emits HTML using only
+  tags + attributes already in the sanitizer allowlist (`figure`,
+  `figcaption`, `cite`, `a`, `section`, `ol`, `li`, `div role=math`
+  + global `id` / `class` / `aria-*`). Every interpolation goes
+  through a shared `escapeHtml` (factored from two earlier copies).
+  No `data-*` attributes (would require sanitizer + threat-model
+  expansion). XSS-via-citation-key test asserts no live `<script>`
+  or attribute-position event handlers can survive.
+- **Tests** — 72 vitest cases pass: 38 sanitizer (existing), 24
+  directives (new), 10 references (new). Covers labeled-block
+  numbering, cross-ref resolution + miss, single / multi-author /
+  multi-key citations, anonymous works, bibliography ordering,
+  empty bibliography, end-to-end through marked + sanitizer,
+  XSS injection via cite path, parseReferences both formats and
+  malformed inputs, issuedYear edge cases.
+
 ### Added — Phase 2 enablers (2026-04-24)
 
 - **`mdz validate --profile <id-or-path>`** enforces conformance against
