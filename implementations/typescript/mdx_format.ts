@@ -1657,21 +1657,14 @@ export function cleanObject<T extends object>(obj: PlainObject<T>): Partial<T> {
       `cleanObject expects a plain object, got ${obj.constructor?.name ?? typeof obj}`,
     );
   }
-  // Use a null-prototype object to eliminate prototype-pollution risk
-  // entirely; then copy into a regular object for the return value shape
-  // callers expect. The intermediate null-proto map means `__proto__`
-  // assignment via bracket notation creates an own property rather than
-  // setting the prototype chain.
-  const tmp = Object.create(null) as Record<string, unknown>;
-  for (const [key, value] of Object.entries(obj)) {
-    if (value !== undefined && value !== null) {
-      tmp[key] = value;
-    }
-  }
   const result: Partial<T> = {};
-  for (const key of Object.keys(tmp)) {
+  for (const [key, value] of Object.entries(obj)) {
+    if (value === undefined || value === null) continue;
+    // For dangerous keys, `result[key] = value` would walk up Object.prototype
+    // (mutating the chain for __proto__, clobbering Object.prototype.constructor,
+    // etc.). defineProperty always creates an own data property instead.
     Object.defineProperty(result, key, {
-      value: tmp[key],
+      value,
       enumerable: true,
       writable: true,
       configurable: true,
@@ -3352,253 +3345,18 @@ ${processedContent}
   }
 
   /**
-   * Very basic Markdown to HTML conversion.
-   * For production use, this should use a proper Markdown parser.
+   * Toy Markdown → HTML stub for the deprecated {@link toHTML} preview.
+   *
+   * Deliberately minimal: wraps the raw content in a single `<pre>` block
+   * with HTML-escaped text. Earlier revisions implemented a ~240-line
+   * regex-based converter that mimicked CommonMark badly; the regex soup
+   * gave a false impression of correctness. This stub is honest about the
+   * fact that `toHTML` is a dev-preview escape hatch, not a renderer.
+   *
+   * For real rendering, use the Phase 2 `<mdz-viewer>` web component.
    */
   private basicMarkdownToHTML(markdown: string): string {
-    let html = markdown;
-
-    // Escape HTML entities first (except in code blocks)
-    // This is simplified - real implementation needs better handling
-
-    // v1.1: Parse alignment shorthand notation {:.left}, {:.center}, {:.right}, {:.justify}
-    // These appear on a separate line before or after block elements
-    const alignmentShorthandRegex = /\{:\.(left|center|right|justify)\}/g;
-
-    // v1.1: Parse full attribute blocks {.class #id style="..."}
-    const attributeBlockRegex = /\{([^}]+)\}/g;
-
-    // Helper to extract alignment class from attribute string
-    const extractAlignmentClass = (
-      attrs: string
-    ): { alignment: string | null; classes: string[]; id: string | null } => {
-      let alignment: string | null = null;
-      const classes: string[] = [];
-      let id: string | null = null;
-
-      // Parse alignment shorthand :.left, :.center, etc.
-      const alignMatch = attrs.match(/:\.(left|center|right|justify)/);
-      if (alignMatch) {
-        alignment = `align-${alignMatch[1]}`;
-      }
-
-      // Parse classes .classname
-      const classMatches = attrs.matchAll(/\.([a-zA-Z][\w-]*)/g);
-      for (const match of classMatches) {
-        if (!match[0].startsWith(":.")) {
-          classes.push(match[1]);
-        }
-      }
-
-      // Parse ID #idname
-      const idMatch = attrs.match(/#([a-zA-Z][\w-]*)/);
-      if (idMatch) {
-        id = idMatch[1];
-      }
-
-      return { alignment, classes, id };
-    };
-
-    // v1.1: Process headings with alignment attributes
-    // Match heading followed by attribute block on same line or next line
-    html = html.replace(
-      /^(#{1,6})\s+(.+?)\s*(?:\{([^}]+)\})?$/gm,
-      (match, hashes, content, attrs) => {
-        const level = hashes.length;
-        let classAttr = "";
-        let idAttr = "";
-
-        if (attrs) {
-          const { alignment, classes, id } = extractAlignmentClass(attrs);
-          const allClasses = alignment ? [alignment, ...classes] : classes;
-          if (allClasses.length > 0) {
-            classAttr = ` class="${allClasses.join(" ")}"`;
-          }
-          if (id) {
-            idAttr = ` id="${id}"`;
-          }
-        }
-
-        return `<h${level}${idAttr}${classAttr}>${content.trim()}</h${level}>`;
-      }
-    );
-
-    // v1.1: Process paragraphs with alignment (handled later in paragraph section)
-
-    // v1.1: Process container blocks (:::: syntax)
-    // Container blocks apply alignment/attributes to all contained content
-    // Pattern: ::::{.align-center}\nContent\n::::
-    html = html.replace(
-      /^::::\s*(?:\{([^}]+)\})?\s*\n([\s\S]*?)^::::\s*$/gm,
-      (match, attrs, content) => {
-        let classAttr = "";
-        let idAttr = "";
-
-        if (attrs) {
-          const { alignment, classes, id } = extractAlignmentClass(attrs);
-          const allClasses = alignment ? [alignment, ...classes] : classes;
-          if (allClasses.length > 0) {
-            classAttr = ` class="${allClasses.join(" ")}"`;
-          }
-          if (id) {
-            idAttr = ` id="${id}"`;
-          }
-        }
-
-        // Wrap content in a div with the container attributes
-        return `<div${idAttr}${classAttr}>\n${content.trim()}\n</div>`;
-      }
-    );
-
-    // v1.1: Process directive container blocks (::::directive-name{attrs}\n...\n::::)
-    html = html.replace(
-      /^::::(\w+)(?:\s*\{([^}]+)\})?\s*\n([\s\S]*?)^::::\s*$/gm,
-      (match, directive, attrs, content) => {
-        let classAttr = "";
-
-        if (attrs) {
-          const { alignment, classes } = extractAlignmentClass(attrs);
-          const allClasses = alignment ? [alignment, ...classes] : classes;
-          if (allClasses.length > 0) {
-            classAttr = ` class="${allClasses.join(" ")}"`;
-          }
-        }
-
-        // Handle specific directive types
-        if (directive === "note") {
-          const typeMatch = attrs?.match(/type="(\w+)"/);
-          const noteType = typeMatch ? typeMatch[1] : "note";
-          const icons: Record<string, string> = {
-            note: "ℹ️",
-            warning: "⚠️",
-            tip: "💡",
-            danger: "🚫",
-            success: "✅",
-          };
-          const icon = icons[noteType] || "ℹ️";
-          return `<div${classAttr} role="note" aria-label="${noteType}">\n<strong>${icon} ${noteType.charAt(0).toUpperCase() + noteType.slice(1)}:</strong>\n${content.trim()}\n</div>`;
-        }
-
-        if (directive === "details") {
-          const summaryMatch = attrs?.match(/summary="([^"]+)"/);
-          const summary = summaryMatch ? summaryMatch[1] : "Details";
-          return `<details${classAttr}>\n<summary>${summary}</summary>\n${content.trim()}\n</details>`;
-        }
-
-        // Generic directive block
-        return `<div${classAttr} data-directive="${directive}">\n${content.trim()}\n</div>`;
-      }
-    );
-
-    // Headings (without attributes - already handled above, but keep for backward compat)
-    // Only process if not already converted
-    html = html.replace(/^######\s+([^<].+)$/gm, "<h6>$1</h6>");
-    html = html.replace(/^#####\s+([^<].+)$/gm, "<h5>$1</h5>");
-    html = html.replace(/^####\s+([^<].+)$/gm, "<h4>$1</h4>");
-    html = html.replace(/^###\s+([^<].+)$/gm, "<h3>$1</h3>");
-    html = html.replace(/^##\s+([^<].+)$/gm, "<h2>$1</h2>");
-    html = html.replace(/^#\s+([^<].+)$/gm, "<h1>$1</h1>");
-
-    // Bold and italic
-    html = html.replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>");
-    html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-    html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
-    html = html.replace(/___(.+?)___/g, "<strong><em>$1</em></strong>");
-    html = html.replace(/__(.+?)__/g, "<strong>$1</strong>");
-    html = html.replace(/_(.+?)_/g, "<em>$1</em>");
-
-    // Code blocks (simplified)
-    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, "<pre><code>$2</code></pre>");
-
-    // Inline code
-    html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
-
-    // Links
-    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
-
-    // Images
-    html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
-
-    // Horizontal rules
-    html = html.replace(/^---+$/gm, "<hr>");
-    html = html.replace(/^\*\*\*+$/gm, "<hr>");
-
-    // Blockquotes with v1.1 alignment support
-    html = html.replace(
-      /^>\s+(.+?)\s*(?:\{([^}]+)\})?$/gm,
-      (match, content, attrs) => {
-        let classAttr = "";
-        if (attrs) {
-          const alignMatch = attrs.match(/:\.(left|center|right|justify)/);
-          if (alignMatch) {
-            classAttr = ` class="align-${alignMatch[1]}"`;
-          }
-        }
-        return `<blockquote${classAttr}>${content}</blockquote>`;
-      }
-    );
-
-    // v1.1: Parse standalone alignment blocks that apply to next paragraph
-    // Pattern: {:.center}\n\nParagraph text
-    const alignmentBlockPattern = /^\{:\.(left|center|right|justify)\}\s*\n\n/gm;
-
-    // Paragraphs (simplified) with v1.1 alignment support
-    const paragraphs = html.split(/\n\n+/);
-    let pendingAlignment: string | null = null;
-
-    html = paragraphs
-      .map((p) => {
-        p = p.trim();
-
-        // Check for standalone alignment block
-        const alignBlockMatch = p.match(/^\{:\.(left|center|right|justify)\}$/);
-        if (alignBlockMatch) {
-          pendingAlignment = `align-${alignBlockMatch[1]}`;
-          return ""; // Remove the alignment block itself
-        }
-
-        // Check for inline alignment at end of paragraph
-        const inlineAlignMatch = p.match(/^(.+?)\s*\{:\.(left|center|right|justify)\}$/s);
-        if (inlineAlignMatch) {
-          const [, content, align] = inlineAlignMatch;
-          if (
-            !content.startsWith("<h") &&
-            !content.startsWith("<pre") &&
-            !content.startsWith("<hr") &&
-            !content.startsWith("<blockquote") &&
-            !content.startsWith("<ul") &&
-            !content.startsWith("<ol")
-          ) {
-            return `<p class="align-${align}">${content.trim().replace(/\n/g, "<br>")}</p>`;
-          }
-        }
-
-        if (
-          !p ||
-          p.startsWith("<h") ||
-          p.startsWith("<pre") ||
-          p.startsWith("<hr") ||
-          p.startsWith("<blockquote") ||
-          p.startsWith("<ul") ||
-          p.startsWith("<ol")
-        ) {
-          pendingAlignment = null;
-          return p;
-        }
-
-        // Apply pending alignment from previous block
-        if (pendingAlignment) {
-          const result = `<p class="${pendingAlignment}">${p.replace(/\n/g, "<br>")}</p>`;
-          pendingAlignment = null;
-          return result;
-        }
-
-        return `<p>${p.replace(/\n/g, "<br>")}</p>`;
-      })
-      .filter((p) => p !== "")
-      .join("\n\n");
-
-    return html;
+    return `<pre class="mdz-raw-markdown">${this.escapeHTML(markdown)}</pre>`;
   }
 
   /**

@@ -1,0 +1,5 @@
+{
+  "expected_violations": ["heading-order"],
+  "wcag_level": "AA",
+  "description": "h1 -> h4 skips levels 2 and 3."
+}

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>MDZ Viewer</title>
+  <style>
+    body { font-family: system-ui, sans-serif; width: 320px; margin: 0; padding: 16px; }
+    h1 { font-size: 16px; margin: 0 0 12px 0; }
+    label { display: block; font-size: 12px; color: #666; margin-bottom: 4px; }
+    input[type="url"] { width: 100%; box-sizing: border-box; padding: 6px 8px;
+                       font-size: 13px; border: 1px solid #ccc; border-radius: 3px; }
+    button { margin-top: 8px; width: 100%; padding: 8px; background: #1d4ed8;
+             color: white; border: none; border-radius: 3px; font-size: 13px;
+             cursor: pointer; }
+    button[disabled] { background: #9ca3af; cursor: not-allowed; }
+    .file-drop { margin-top: 12px; padding: 16px; border: 2px dashed #9ca3af;
+                 border-radius: 4px; text-align: center; color: #666; font-size: 12px; }
+    .file-drop.drag { border-color: #1d4ed8; background: #eff6ff; }
+    footer { margin-top: 16px; font-size: 11px; color: #666; text-align: center; }
+    footer a { color: #1d4ed8; }
+  </style>
+</head>
+<body>
+  <h1>Open an MDZ archive</h1>
+  <form id="url-form">
+    <label for="url-input">URL:</label>
+    <input id="url-input" type="url" placeholder="https://.../paper.mdz" required>
+    <button type="submit">Open in Viewer</button>
+  </form>
+  <div id="file-drop" class="file-drop">
+    Or drop a local .mdz / .mdx file here
+  </div>
+  <footer>
+    <a href="https://github.com/danielsimonjr/mdx" target="_blank" rel="noopener">About MDZ</a>
+  </footer>
+  <script src="popup.js"></script>
+</body>
+</html>

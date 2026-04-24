@@ -1,0 +1,36 @@
+/* Extension viewer — wraps the <mdz-viewer> web component with minimal chrome. */
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #fafafa;
+  color: #111;
+}
+
+@media (prefers-color-scheme: dark) {
+  body { background: #0f0f0f; color: #f5f5f5; }
+}
+
+#viewer-host {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+#fallback-msg {
+  padding: 1.5rem;
+  border: 1px dashed #ccc;
+  border-radius: 4px;
+  color: #666;
+  background: #fff;
+}
+#fallback-msg code {
+  background: #f0f0f0;
+  padding: 0.1em 0.3em;
+  border-radius: 2px;
+  font-family: ui-monospace, monospace;
+}
+
+mdz-viewer {
+  display: block;
+}

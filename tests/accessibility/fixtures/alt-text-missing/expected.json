@@ -1,0 +1,5 @@
+{
+  "expected_violations": ["image-alt"],
+  "wcag_level": "AA",
+  "description": "Two images with empty / whitespace-only alt text. Should fail WCAG 1.1.1."
+}

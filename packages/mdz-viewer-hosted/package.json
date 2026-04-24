@@ -1,0 +1,20 @@
+{
+  "name": "@mdz-format/viewer-hosted",
+  "version": "0.1.0-alpha.0",
+  "private": true,
+  "description": "Cloudflare Worker that renders any MDZ archive at a URL via the @mdz-format/viewer web component. Public instance at view.mdz-format.org.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mdz-format/viewer": "0.1.0-alpha.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241022.0",
+    "typescript": "^5.5.0",
+    "wrangler": "^3.80.0"
+  }
+}

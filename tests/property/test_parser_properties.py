@@ -138,24 +138,32 @@ labeled_block = st.builds(
     body=paragraph,
 )
 
-# Simple document: list of blocks separated by blank lines.
-# Now includes v2.0/v2.1 shapes alongside v1.1 content.
-document = st.builds(
-    lambda blocks: "\n".join(blocks),
-    blocks=st.lists(
-        st.one_of(
-            content_line,
-            st.builds(lambda s, c: s + c, s=shorthand, c=content_line),
-            st.builds(lambda a, c: a + c, a=block_attr_line, c=content_line),
-            cell_source,
-            include_directive,
-            container,
-            labeled_block,
-        ),
-        min_size=0,
-        max_size=10,
-    ),
+# Common v1.1/v2.0 block shapes shared by both the full and v1-only document
+# strategies. Factored out so the two strategies can't drift.
+_v1_block_shapes = (
+    content_line,
+    st.builds(lambda s, c: s + c, s=shorthand, c=content_line),
+    st.builds(lambda a, c: a + c, a=block_attr_line, c=content_line),
+    cell_source,
+    include_directive,
+    container,
 )
+
+
+def _document_strategy(*extra_shapes: st.SearchStrategy[str]) -> st.SearchStrategy[str]:
+    """Build a document strategy from the shared v1 shapes plus any extras."""
+    return st.builds(
+        lambda blocks: "\n".join(blocks),
+        blocks=st.lists(
+            st.one_of(*_v1_block_shapes, *extra_shapes),
+            min_size=0,
+            max_size=10,
+        ),
+    )
+
+
+# Full document: v1.1, v2.0, and v2.1 shapes.
+document = _document_strategy(labeled_block)
 
 
 # ---------------------------------------------------------------------------
@@ -196,23 +204,9 @@ def test_ast_is_json_serializable(text: str) -> None:
 # Narrower document strategy for the legacy-vs-Lark parity property.
 # Excludes v2.1 labeled blocks (::fig / ::eq / ::tab) because those are
 # Lark-only; legacy parser routes them through the generic-directive path
-# and produces a different AST by design. Removing this property when
-# legacy is retired is a TODO in the docstring below.
-document_v1_only = st.builds(
-    lambda blocks: "\n".join(blocks),
-    blocks=st.lists(
-        st.one_of(
-            content_line,
-            st.builds(lambda s, c: s + c, s=shorthand, c=content_line),
-            st.builds(lambda a, c: a + c, a=block_attr_line, c=content_line),
-            include_directive,
-            container,
-            cell_source,
-        ),
-        min_size=0,
-        max_size=10,
-    ),
-)
+# and produces a different AST by design. Remove this strategy (and the
+# test that uses it) when the legacy parser is retired at end of Phase 1.
+document_v1_only = _document_strategy()
 
 
 @given(text=document_v1_only)

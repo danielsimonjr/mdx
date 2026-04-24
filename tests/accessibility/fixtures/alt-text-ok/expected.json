@@ -1,0 +1,5 @@
+{
+  "expected_violations": [],
+  "wcag_level": "AA",
+  "description": "Two images, both with descriptive alt text. Should pass."
+}

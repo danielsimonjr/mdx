@@ -1,0 +1,5 @@
+{
+  "expected_violations": ["link-name"],
+  "wcag_level": "AA",
+  "description": "Three links with vague text: 'click here', 'here', 'link'. Each a WCAG 2.4.4 violation."
+}

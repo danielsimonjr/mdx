@@ -18,6 +18,10 @@ const infoCommand = require('./commands/info');
 const editCommand = require('./commands/edit');
 const createCommand = require('./commands/create');
 const validateCommand = require('./commands/validate');
+const importIpynbCommand = require('./commands/import-ipynb');
+const exportJatsCommand = require('./commands/export-jats');
+const exportEpubCommand = require('./commands/export-epub');
+const verifyCommand = require('./commands/verify');
 
 // CLI Banner
 const banner = `
@@ -74,6 +78,35 @@ program
   .option('-t, --template <template>', 'Template to use (blank, article, report, presentation)', 'blank')
   .option('-o, --output <path>', 'Output path for the MDZ file')
   .action(createCommand);
+
+// Import command (Phase 2.4) - convert Jupyter notebook to MDZ
+program
+  .command('import-ipynb <file>')
+  .description('Convert a Jupyter .ipynb file into an MDZ archive')
+  .option('-o, --output <path>', 'Output .mdz path (default: same name with .mdz extension)')
+  .action(importIpynbCommand);
+
+// Export to JATS (Phase 2.4) - for journal ingest pipelines
+program
+  .command('export-jats <file>')
+  .description('Export an MDZ archive to JATS 1.3 XML for journal production')
+  .option('-o, --output <path>', 'Output .jats.xml path')
+  .action(exportJatsCommand);
+
+// Export to EPUB (Phase 2.4) - for ereader ecosystem
+program
+  .command('export-epub <file>')
+  .description('Export an MDZ archive to EPUB 3.3 for Calibre / readium / iBooks')
+  .option('-o, --output <path>', 'Output .epub path')
+  .action(exportEpubCommand);
+
+// Verify command (Phase 3.1) - cryptographic verification of signatures
+program
+  .command('verify <file>')
+  .description('Verify signature chain + integrity of an MDZ archive')
+  .option('--trust <path>', 'Trust policy JSON — only listed DIDs accepted as signers')
+  .option('--offline', 'Skip DID resolution (use cached keys only)')
+  .action(verifyCommand);
 
 // Validate command - validate MDZ file structure
 program

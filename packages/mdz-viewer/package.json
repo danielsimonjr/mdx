@@ -1,0 +1,51 @@
+{
+  "name": "@mdz-format/viewer",
+  "version": "0.1.0-alpha.0",
+  "description": "Framework-agnostic <mdz-viewer> web component for rendering MDZ (Markdown Zipped Container) archives. Reads legacy .mdx through 2027-01-01.",
+  "type": "module",
+  "main": "dist/mdz-viewer.js",
+  "module": "dist/mdz-viewer.js",
+  "types": "dist/mdz-viewer.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/mdz-viewer.d.ts",
+      "import": "./dist/mdz-viewer.js"
+    }
+  },
+  "files": [
+    "dist/",
+    "src/",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "mdz",
+    "mdx",
+    "web-component",
+    "markdown",
+    "scientific-paper",
+    "viewer"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/danielsimonjr/mdx"
+  },
+  "dependencies": {
+    "fflate": "^0.8.2",
+    "marked": "^14.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "vite": "^5.4.0",
+    "vitest": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

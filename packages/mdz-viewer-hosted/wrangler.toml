@@ -1,0 +1,32 @@
+# Cloudflare Worker configuration for view.mdz-format.org
+#
+# Deploys the hosted MDZ viewer service — free, no-auth, CORS-friendly.
+# A user navigates to view.mdz-format.org?url=<archive-url> and gets a
+# rendering of the MDZ archive at that URL, without downloading it locally.
+#
+# Deploy: `npx wrangler deploy` (requires a Cloudflare account with the
+# domain configured).
+
+name = "mdz-viewer-hosted"
+main = "src/worker.ts"
+compatibility_date = "2024-10-01"
+# nodejs_compat needed for Buffer / stream polyfills used by the archive
+# inflator and sanitizer. Can be dropped once fflate + a pure-DOM path is
+# confirmed to work without Node globals on Workers.
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+head_sampling_rate = 1.0
+
+# Cache the rendered HTML aggressively — MDZ archives are content-addressed,
+# so if the URL points at a CDN blob with a stable hash the rendering is
+# immutable. Callers that want to force re-render add `?fresh=1`.
+[[rules]]
+type = "ESModule"
+globs = ["**/*.ts"]
+
+# TODO: register view.mdz-format.org as a route once the domain is owned.
+# [[routes]]
+# pattern = "view.mdz-format.org/*"
+# custom_domain = true

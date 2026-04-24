@@ -105,7 +105,12 @@ _IDENT_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_\-]*$")
 
 @v_args(inline=True)
 class _AttrTransformer(Transformer):
-    """Transform Lark parse tree of a directive line into ParsedAttrs + kind."""
+    """Transform a Lark parse tree of attr_body into a merged ParsedAttrs.
+
+    Each `*_item` rule returns a single-field ParsedAttrs; `attr_body`
+    folds them into one with the expected "first id wins, classes append,
+    kv merges" semantics.
+    """
 
     def attr_body(self, *items: ParsedAttrs) -> ParsedAttrs:
         merged = ParsedAttrs()
@@ -116,9 +121,8 @@ class _AttrTransformer(Transformer):
             merged.kv.update(it.kv)
         return merged
 
-    # `attr_item` is a pass-through — the grammar wraps class_item / id_item /
-    # kv_item in it, but semantically each sub-rule already produces the
-    # ParsedAttrs we want. Just unwrap.
+    # Pass-through: attr_item wraps class_item / id_item / kv_item / bool_item
+    # in the grammar, but each sub-rule already produces the ParsedAttrs we want.
     def attr_item(self, inner: ParsedAttrs) -> ParsedAttrs:
         return inner
 
@@ -132,20 +136,16 @@ class _AttrTransformer(Transformer):
         return ParsedAttrs(kv={str(key): value_str})
 
     def bool_item(self, name: Any) -> ParsedAttrs:
-        # HTML-style boolean attribute (e.g., `controls`, `autoplay`,
-        # `frozen`). Surface as kv={name: "true"} so downstream consumers
-        # can look for it via the same kv.get(name) path as any other
-        # attribute. This also means ``::cell{frozen}`` works identically
-        # to ``::cell{frozen="true"}``, matching HTML conventions.
+        # HTML-style boolean attribute (e.g., `controls`, `autoplay`, `frozen`)
+        # surfaces as kv={name: "true"} so `::cell{frozen}` matches
+        # `::cell{frozen="true"}` for downstream kv.get() lookups.
         return ParsedAttrs(kv={str(name): "true"})
 
     def value(self, v: Any) -> str:
+        # QUOTED_STR: strip surrounding quotes and unescape per the ABNF
+        # escape production. UNQUOTED_VALUE: pass through untouched.
         s = str(v)
-        # Strip surrounding quotes on QUOTED_STR and unescape per the ABNF
-        # escape production. UNQUOTED_VALUE passes through untouched.
-        if len(s) >= 2 and (
-            (s[0] == '"' and s[-1] == '"') or (s[0] == "'" and s[-1] == "'")
-        ):
+        if len(s) >= 2 and s[0] == s[-1] and s[0] in ('"', "'"):
             return _unescape_quoted(s[1:-1])
         return s
 
@@ -436,18 +436,14 @@ def parse(text: str) -> list[dict]:
             j = _skip_blank(lines, i + 1)
             body_source = lines[j] if j < len(lines) else ""
             # The labeled-block id is AUTHORITATIVE — a preceding
-            # `{#other-id}` block-attr must NOT overwrite it. Pass the id
-            # out-of-band (in `inline.id`) so emit()'s precedence rule
+            # `{#other-id}` block-attr must NOT overwrite it. Set the id on
+            # `attrs` and pass as `inline` so emit()'s precedence rule
             # (inline > block > container) keeps our id intact.
-            inline_with_id = ParsedAttrs(
-                classes=list(attrs.classes),
-                id=raw_id,
-                kv=dict(attrs.kv),
-            )
+            attrs.id = raw_id
             emit({
                 "type": {"fig": "figure", "eq": "equation", "tab": "table"}[kind],
                 "body_source": body_source.strip(),
-            }, inline=inline_with_id)
+            }, inline=attrs)
             # Advance past the body source line so it doesn't double-emit.
             i = j + 1 if j < len(lines) else j
             continue

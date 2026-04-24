@@ -348,36 +348,38 @@ describe("customSignerRole runtime validation", () => {
   // the "custom roles must be explicitly opted in" contract at runtime.
   // Without this runtime check, the branded type is decorative.
 
-  it("accepts reverse-DNS identifiers", () => {
-expect(() => customSignerRole("com.example.legal-counsel")).not.toThrow();
-    expect(() => customSignerRole("org.acme.reviewer.senior")).not.toThrow();
-  });
+  const ACCEPTED: ReadonlyArray<[label: string, value: string]> = [
+    ["reverse-DNS", "com.example.legal-counsel"],
+    ["reverse-DNS (multi-segment)", "org.acme.reviewer.senior"],
+    ["URI with authority", "https://example.com/roles/translator"],
+    ["URN", "urn:mdz:role:reviewer"],
+  ];
+  // "auther"/"reviwer"/"contributor" are rejected specifically because they
+  // look like (typo'd) built-in roles; accepting them would silently turn
+  // typos into "custom" roles.
+  const REJECTED: ReadonlyArray<[label: string, value: unknown, pattern: RegExp]> = [
+    ["built-in: author", "author", /built-in/],
+    ["built-in: reviewer", "reviewer", /built-in/],
+    ["built-in: notary", "notary", /built-in/],
+    ["typo: auther", "auther", /reverse-DNS/],
+    ["typo: reviwer", "reviwer", /reverse-DNS/],
+    ["bare word: contributor", "contributor", /reverse-DNS/],
+    ["empty string", "", /./],
+    ["undefined", undefined, /./],
+    ["number", 42, /./],
+  ];
 
-  it("accepts URI-form identifiers", () => {
-expect(() => customSignerRole("https://example.com/roles/translator")).not.toThrow();
-    expect(() => customSignerRole("urn:mdz:role:reviewer")).not.toThrow();
-  });
+  for (const [label, value] of ACCEPTED) {
+    it(`accepts ${label}: ${value}`, () => {
+      expect(() => customSignerRole(value)).not.toThrow();
+    });
+  }
 
-  it("rejects built-in role names (use them directly)", () => {
-expect(() => customSignerRole("author")).toThrow(/built-in/);
-    expect(() => customSignerRole("reviewer")).toThrow(/built-in/);
-    expect(() => customSignerRole("notary")).toThrow(/built-in/);
-  });
-
-  it("rejects bare words that look like possible typos", () => {
-// "auther" (typo of author), "reviwer" (typo), "contributor" (plausible
-    // built-in that isn't) — all must be rejected because accepting them
-    // would silently make typos into "custom" roles.
-    expect(() => customSignerRole("auther")).toThrow(/reverse-DNS/);
-    expect(() => customSignerRole("reviwer")).toThrow(/reverse-DNS/);
-    expect(() => customSignerRole("contributor")).toThrow(/reverse-DNS/);
-  });
-
-  it("rejects empty or non-string input", () => {
-expect(() => customSignerRole("")).toThrow();
-    expect(() => customSignerRole(undefined as unknown as string)).toThrow();
-    expect(() => customSignerRole(42 as unknown as string)).toThrow();
-  });
+  for (const [label, value, pattern] of REJECTED) {
+    it(`rejects ${label}`, () => {
+      expect(() => customSignerRole(value as string)).toThrow(pattern);
+    });
+  }
 
   it("isCustomSignerRole agrees with the constructor", () => {
     const good = customSignerRole("com.example.special");

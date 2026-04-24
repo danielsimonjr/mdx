@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MDZ Viewer</title>
+  <link rel="stylesheet" href="viewer.css">
+</head>
+<body>
+  <main id="viewer-host">
+    <p id="fallback-msg">
+      Loading MDZ viewer — if this message doesn't disappear, the extension's
+      bundled viewer JS isn't present. Run <code>npm run build</code> in
+      <code>packages/mdz-viewer</code> and copy the output here.
+    </p>
+  </main>
+  <script type="module" src="viewer.js"></script>
+</body>
+</html>
