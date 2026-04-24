@@ -1411,7 +1411,7 @@ export class MDXManifest {
 
     // Type assertion needed due to union type complexity
     (this._data.assets[categoryKey] as AssetMetadata[]).push(
-      cleanObject(metadata) as AssetMetadata
+      cleanObject(metadata as unknown as Record<string, unknown>) as unknown as AssetMetadata
     );
     this.updateModified();
   }
@@ -1963,7 +1963,7 @@ export class MDXDocument {
         ) &&
         value !== undefined
       ) {
-        (metadata as Record<string, unknown>)[key] = value;
+        (metadata as unknown as Record<string, unknown>)[key] = value;
       }
     }
 
@@ -2228,7 +2228,7 @@ export class MDXDocument {
     const entry: VersionEntry = {
       version,
       timestamp: isoTimestamp(),
-      author: cleanObject(author) as Author,
+      author: cleanObject(author as unknown as Record<string, unknown>) as unknown as Author,
       message,
       snapshot: {
         type: SnapshotType.FULL,
@@ -2328,7 +2328,7 @@ export class MDXDocument {
       type: "Annotation",
       motivation: type,
       created: isoTimestamp(),
-      creator: cleanObject(author) as Author,
+      creator: cleanObject(author as unknown as Record<string, unknown>) as unknown as Author,
       target: {
         source: this._manifest.entryPoint,
         selector: {
@@ -2415,7 +2415,7 @@ export class MDXDocument {
       annotation["mdx:replies"].push({
         id: replyId,
         created: isoTimestamp(),
-        creator: cleanObject(author) as Author,
+        creator: cleanObject(author as unknown as Record<string, unknown>) as unknown as Author,
         body: {
           type: "TextualBody",
           value: body,
