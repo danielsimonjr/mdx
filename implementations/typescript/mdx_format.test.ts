@@ -64,20 +64,30 @@ describe("constants", () => {
 
 describe("deprecated MDX* aliases (remove after 2027-01-01)", () => {
   // Verifying the backward-compat promise in CHANGELOG under "Renamed MDX → MDZ":
-  // existing consumers importing the old names must still compile and run.
-  it("MDX_VERSION is an alias of MDZ_VERSION", () => {
+  // existing consumers importing the old names must still compile and run AND
+  // must still match the legacy MIME/extension values on read-side comparisons.
+  it("MDX_VERSION is an alias of MDZ_VERSION (spec version unchanged)", () => {
     expect(MDX_VERSION).toBe(MDZ_VERSION);
   });
 
-  it("MDX_MIME_TYPE is an alias of MDZ_MIME_TYPE (the new type, not legacy)", () => {
-    // Source-compat for callers who imported MDX_MIME_TYPE before the rename —
-    // they now write the new MIME type, which is what they should have been
-    // doing anyway.
-    expect(MDX_MIME_TYPE).toBe(MDZ_MIME_TYPE);
+  it("MDX_MIME_TYPE preserves the pre-rename value (equals MDX_MIME_TYPE_LEGACY)", () => {
+    // If a pre-rename caller had `if (mime === MDX_MIME_TYPE)` checking an
+    // archive's MIME type, that check must still match legacy .mdx archives.
+    // A silent flip to the new MIME string would break detection.
+    expect(MDX_MIME_TYPE).toBe(MDX_MIME_TYPE_LEGACY);
+    expect(MDX_MIME_TYPE).toBe("application/vnd.mdx-container+zip");
   });
 
-  it("MDX_EXTENSION is an alias of MDZ_EXTENSION (the new ext, not legacy)", () => {
-    expect(MDX_EXTENSION).toBe(MDZ_EXTENSION);
+  it("MDX_EXTENSION preserves the pre-rename `.mdx` value", () => {
+    expect(MDX_EXTENSION).toBe(MDX_EXTENSION_LEGACY);
+    expect(MDX_EXTENSION).toBe(".mdx");
+  });
+
+  it("new code paths should use MDZ_* constants (values differ from MDX_*)", () => {
+    // Sanity-check that MDZ_* and MDX_* constants are now distinguishable.
+    // If these ever collapse to the same value again, the rename regressed.
+    expect(MDZ_MIME_TYPE).not.toBe(MDX_MIME_TYPE);
+    expect(MDZ_EXTENSION).not.toBe(MDX_EXTENSION);
   });
 });
 

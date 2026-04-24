@@ -61,23 +61,32 @@ export const MDX_EXTENSION_LEGACY = ".mdx";
 
 /**
  * @deprecated Use `MDZ_VERSION`. Kept for backward compatibility; will be
- * removed after 2027-01-01. Both point at the same value.
+ * removed after 2027-01-01. Both point at the same value — the spec
+ * version is unchanged across the rename.
  */
 export const MDX_VERSION = MDZ_VERSION;
 
 /**
- * @deprecated Use `MDZ_MIME_TYPE` (the new preferred type) or
- * `MDX_MIME_TYPE_LEGACY` (the old type, still accepted on read). Kept as
- * an alias of `MDZ_MIME_TYPE` for source-compat with code written before
- * the rename.
+ * @deprecated Use `MDZ_MIME_TYPE` for new code.
+ *
+ * Points at `MDX_MIME_TYPE_LEGACY` (the pre-rename
+ * `application/vnd.mdx-container+zip`) so pre-rename code that compares
+ * MIME strings against this constant (e.g., `if (mime === MDX_MIME_TYPE)`)
+ * continues to match legacy `.mdx` archives. Pre-rename code that *writes*
+ * using this constant will continue to write the legacy MIME type, which
+ * is readable by every MDZ reader per the 2027-01-01 backward-compat
+ * policy. New code should use `MDZ_MIME_TYPE` directly.
  */
-export const MDX_MIME_TYPE = MDZ_MIME_TYPE;
+export const MDX_MIME_TYPE = MDX_MIME_TYPE_LEGACY;
 
 /**
- * @deprecated Use `MDZ_EXTENSION` (new `.mdz`) or `MDX_EXTENSION_LEGACY`
- * (old `.mdx`). Kept as an alias of `MDZ_EXTENSION` for source-compat.
+ * @deprecated Use `MDZ_EXTENSION` for new code.
+ *
+ * Points at `MDX_EXTENSION_LEGACY` (`.mdx`) for the same reason
+ * `MDX_MIME_TYPE` aliases `MDX_MIME_TYPE_LEGACY`: pre-rename code
+ * comparing paths should continue to match legacy archives.
  */
-export const MDX_EXTENSION = MDZ_EXTENSION;
+export const MDX_EXTENSION = MDX_EXTENSION_LEGACY;
 
 // ============================================================================
 // Enumerations

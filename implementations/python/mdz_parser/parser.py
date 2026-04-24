@@ -25,6 +25,7 @@ Design notes:
 from __future__ import annotations
 
 import re
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -35,11 +36,71 @@ from .ast import ParsedAttrs
 from .errors import ParseError
 
 
+class MalformedAttributeWarning(UserWarning):
+    """Emitted when a line looks like an attribute marker but can't be parsed.
+
+    v1.1 spec mandates that malformed block-attribute lines degrade to plain
+    paragraphs — see `tests/alignment/09-malformed.md`. But "silently a
+    paragraph" is easy to miss; a user typing ``{#my-id}`` just below an
+    image with a bad indent gets their id dropped without any feedback.
+    This warning surfaces that for tooling (linters, IDEs) while keeping
+    the spec-required AST shape unchanged.
+
+    To escalate malformed attrs to errors in a strict mode, run with
+    ``warnings.filterwarnings('error', category=MalformedAttributeWarning)``.
+    """
+
+
 # ---------------------------------------------------------------------------
 # Lark grammar loader
 # ---------------------------------------------------------------------------
 
 _GRAMMAR_PATH = Path(__file__).resolve().parents[3] / "spec" / "grammar" / "mdz-directives.lark"
+
+
+# JSON-style escape sequences allowed inside QUOTED_STR attribute values.
+# Matches the ABNF `escape` production. Unlike Python's `unicode_escape`
+# codec, this does NOT mangle non-ASCII input (e.g., `src="résumé.md"` stays
+# intact) because we iterate code points, not bytes.
+_ESCAPE_MAP: dict[str, str] = {
+    '"': '"',
+    "'": "'",
+    "\\": "\\",
+    "/": "/",
+    "b": "\b",
+    "f": "\f",
+    "n": "\n",
+    "r": "\r",
+    "t": "\t",
+}
+
+
+def _unescape_quoted(inner: str) -> str:
+    """Unescape a QUOTED_STR body per the ABNF `escape` production.
+
+    Handles \\", \\', \\\\, \\/, \\b, \\f, \\n, \\r, \\t. Unknown escapes
+    pass through as the literal character after the backslash. Non-ASCII
+    input is preserved byte-for-byte (unlike `bytes.decode('unicode_escape')`
+    which would corrupt it).
+    """
+    out: list[str] = []
+    i = 0
+    while i < len(inner):
+        ch = inner[i]
+        if ch == "\\" and i + 1 < len(inner):
+            nxt = inner[i + 1]
+            out.append(_ESCAPE_MAP.get(nxt, nxt))
+            i += 2
+        else:
+            out.append(ch)
+            i += 1
+    return "".join(out)
+
+
+# Identifier pattern shared with the ABNF grammar (IDENT production).
+# Exposed as a compiled regex so ParsedAttrs validation and labeled-block
+# id format checks stay in sync.
+_IDENT_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_\-]*$")
 
 
 @v_args(inline=True)
@@ -71,25 +132,21 @@ class _AttrTransformer(Transformer):
         return ParsedAttrs(kv={str(key): value_str})
 
     def bool_item(self, name: Any) -> ParsedAttrs:
-        # HTML-style boolean attribute (e.g., `controls`, `autoplay`). The
-        # legacy parser silently dropped these; we match that for byte-for-byte
-        # parity on existing fixtures. A future AST revision may surface
-        # them as kv={name: "true"} if there's demand — but that's a v2.1
-        # change, not a bugfix.
-        return ParsedAttrs()
+        # HTML-style boolean attribute (e.g., `controls`, `autoplay`,
+        # `frozen`). Surface as kv={name: "true"} so downstream consumers
+        # can look for it via the same kv.get(name) path as any other
+        # attribute. This also means ``::cell{frozen}`` works identically
+        # to ``::cell{frozen="true"}``, matching HTML conventions.
+        return ParsedAttrs(kv={str(name): "true"})
 
     def value(self, v: Any) -> str:
         s = str(v)
-        # Strip surrounding quotes on QUOTED_STR and unescape.
+        # Strip surrounding quotes on QUOTED_STR and unescape per the ABNF
+        # escape production. UNQUOTED_VALUE passes through untouched.
         if len(s) >= 2 and (
             (s[0] == '"' and s[-1] == '"') or (s[0] == "'" and s[-1] == "'")
         ):
-            inner = s[1:-1]
-            try:
-                inner = inner.encode("utf-8").decode("unicode_escape")
-            except UnicodeDecodeError:
-                pass
-            return inner
+            return _unescape_quoted(s[1:-1])
         return s
 
 
@@ -114,29 +171,57 @@ def _get_attr_parser() -> Lark:
     global _attr_parser
     if _attr_parser is None:
         grammar = _GRAMMAR_PATH.read_text(encoding="utf-8")
-        _attr_parser = Lark(grammar, start="attr_body", parser="earley")
+        # ambiguity="explicit" makes Lark raise `_Ambig` trees rather than
+        # silently picking one derivation. If our grammar ever becomes
+        # ambiguous (e.g., edited such that `foo` could parse as both
+        # bool_item and class_item), the transformer will fail loudly
+        # instead of silently choosing.
+        _attr_parser = Lark(
+            grammar,
+            start="attr_body",
+            parser="earley",
+            ambiguity="explicit",
+        )
     return _attr_parser
 
 
-def _parse_attrs_lark(body: str) -> ParsedAttrs:
+def _parse_attrs_lark(body: str, *, strict: bool = False, line: int = 0) -> ParsedAttrs:
     """Parse an attribute body (inside `{...}` or `[...]`) via Lark.
 
-    Returns an empty ParsedAttrs for empty input. Malformed bodies that
-    Lark cannot parse degrade to ParsedAttrs() — this preserves v1.1
-    graceful-degradation behavior for block-attribute markers (the spec
-    explicitly allows `{foo}` with no dot/hash prefix to fall through as
-    a plain-text paragraph rather than raise).
+    Returns an empty ParsedAttrs for empty input.
+
+    Error policy depends on `strict`:
+    - `strict=False` (v1.1 block-attr / shorthand path) — malformed bodies
+      degrade to empty ParsedAttrs per the spec's "graceful degradation"
+      rule. `{word}` without a dot/hash prefix falls through as a
+      plain-text paragraph.
+    - `strict=True` (v2.0+ directive path — cell, output, include,
+      container, labeled-block, inline-directive) — malformed bodies
+      raise `ParseError` with line-number context. Silent fallback for
+      these directives was a review finding (they carry semantic payload;
+      swallowing a typo in ``::cell{language="python kernel="p"}`` would
+      produce a cell with no language silently).
     """
     body = body.strip()
     if not body:
         return ParsedAttrs()
     try:
         tree = _get_attr_parser().parse(body)
-        return _AttrTransformer().transform(tree)
-    except LarkError:
-        # Graceful degradation on malformed attr bodies. This is the v1.1
-        # policy; v2.1 strict mode (not yet implemented) would raise here.
+    except LarkError as e:
+        if strict:
+            raise ParseError(
+                f"malformed directive attributes {{{body}}}: {e}",
+                line or 1,
+            )
         return ParsedAttrs()
+    # If the grammar is ambiguous, Lark wraps the tree with _Ambig. With
+    # ambiguity="explicit" this surfaces as a Tree whose data == "_ambig".
+    if getattr(tree, "data", None) == "_ambig":
+        raise ParseError(
+            f"ambiguous attribute body {{{body}}} — grammar needs disambiguation",
+            line or 1,
+        )
+    return _AttrTransformer().transform(tree)
 
 
 # ---------------------------------------------------------------------------
@@ -292,10 +377,10 @@ def parse(text: str) -> list[dict]:
             i += 1
             continue
 
-        # Container open
+        # Container open (v2.0 — strict attr parsing)
         m = RE_CONTAINER_OPEN.match(line)
         if m and (m.group("attrs") is not None or m.group("name") is not None):
-            attrs = _parse_attrs_lark(m.group("attrs") or "")
+            attrs = _parse_attrs_lark(m.group("attrs") or "", strict=True, line=i + 1)
             if m.group("name"):
                 attrs.kv.setdefault("_directive", m.group("name"))
             container_stack.append(attrs)
@@ -309,10 +394,11 @@ def parse(text: str) -> list[dict]:
             i += 1
             continue
 
-        # Block-level attribute line
+        # Block-level attribute line (v1.1 — graceful degradation per spec:
+        # `{word}` without dot/hash prefix falls through as plain paragraph)
         m = RE_BLOCK_ATTR.match(line)
         if m:
-            pending_block = _parse_attrs_lark(m.group(1))
+            pending_block = _parse_attrs_lark(m.group(1), strict=False)
             i += 1
             continue
 
@@ -320,24 +406,48 @@ def parse(text: str) -> list[dict]:
         m_lab = RE_LABELED_BLOCK.match(line)
         if m_lab:
             kind = m_lab.group("kind")
-            attrs = _parse_attrs_lark(m_lab.group("attrs"))
-            if not attrs.kv.get("id") and not attrs.id:
+            label_line = i + 1
+            # Strict attr parsing — a typo in `::fig{id="f1` (unclosed)
+            # MUST fail loudly; labeled blocks carry semantic payload
+            # (cross-reference targets) where silent drop is data loss.
+            attrs = _parse_attrs_lark(
+                m_lab.group("attrs"), strict=True, line=label_line
+            )
+            # Presence check: an explicit empty `id=""` is as bad as missing.
+            raw_id = attrs.kv.get("id") or attrs.id or ""
+            if not raw_id.strip():
                 raise ParseError(
-                    f"::{kind} requires an `id=\"...\"` attribute "
+                    f"::{kind} requires a non-empty `id=\"...\"` attribute "
                     f"for cross-reference resolution",
-                    i + 1,
+                    label_line,
                 )
-            block_id = attrs.kv.get("id") or attrs.id or ""
-            # Body consumption: labeled blocks are single-line openers; the
-            # following block (image, math, table, or paragraph) becomes the
-            # labeled body in the rendered AST.
+            # Format check: the id must match the IDENT production in the
+            # grammar so `::ref[<id>]` can resolve deterministically.
+            # `::fig{id="foo bar"}` is parseable (QUOTED_STR accepts space)
+            # but semantically invalid — reject at parse time with a clear
+            # error rather than let it slip through to render-time "id not
+            # found" confusion.
+            if not _IDENT_RE.match(raw_id):
+                raise ParseError(
+                    f"::{kind} id={raw_id!r} is not a valid identifier "
+                    f"(must match [A-Za-z][A-Za-z0-9_-]*)",
+                    label_line,
+                )
             j = _skip_blank(lines, i + 1)
             body_source = lines[j] if j < len(lines) else ""
+            # The labeled-block id is AUTHORITATIVE — a preceding
+            # `{#other-id}` block-attr must NOT overwrite it. Pass the id
+            # out-of-band (in `inline.id`) so emit()'s precedence rule
+            # (inline > block > container) keeps our id intact.
+            inline_with_id = ParsedAttrs(
+                classes=list(attrs.classes),
+                id=raw_id,
+                kv=dict(attrs.kv),
+            )
             emit({
                 "type": {"fig": "figure", "eq": "equation", "tab": "table"}[kind],
-                "id": block_id,
                 "body_source": body_source.strip(),
-            }, inline=attrs)
+            }, inline=inline_with_id)
             # Advance past the body source line so it doesn't double-emit.
             i = j + 1 if j < len(lines) else j
             continue
@@ -346,7 +456,9 @@ def parse(text: str) -> list[dict]:
         m = RE_CELL_OPEN.match(line)
         if m:
             cell_line = i + 1
-            cell_attrs = _parse_attrs_lark(m.group("attrs") or "")
+            cell_attrs = _parse_attrs_lark(
+                m.group("attrs") or "", strict=True, line=cell_line
+            )
             j = _skip_blank(lines, i + 1)
             if j >= len(lines) or not RE_FENCE.match(lines[j]):
                 raise ParseError(
@@ -373,7 +485,9 @@ def parse(text: str) -> list[dict]:
                     j = j2
                     break
                 out_line = j2 + 1
-                out_attrs = _parse_attrs_lark(om.group("attrs") or "")
+                out_attrs = _parse_attrs_lark(
+                    om.group("attrs") or "", strict=True, line=out_line
+                )
                 if "type" not in out_attrs.kv:
                     raise ParseError(
                         "::output requires an explicit `type=\"...\"` "
@@ -410,13 +524,24 @@ def parse(text: str) -> list[dict]:
             if "execution_count" in cell_attrs.kv:
                 raw_ec = cell_attrs.kv["execution_count"]
                 try:
-                    cell_block["execution_count"] = int(raw_ec)
+                    ec = int(raw_ec)
                 except ValueError:
                     raise ParseError(
                         f"::cell execution_count must be an integer, "
                         f"got {raw_ec!r}",
                         cell_line,
                     )
+                # ABNF normative constraint #5: non-negative integer.
+                # Jupyter execution counts are 1-based but 0 is accepted
+                # (some runtimes use it for "not yet executed"). Negative
+                # values make no physical sense.
+                if ec < 0:
+                    raise ParseError(
+                        f"::cell execution_count must be a non-negative "
+                        f"integer, got {raw_ec!r}",
+                        cell_line,
+                    )
+                cell_block["execution_count"] = ec
             if cell_attrs.kv.get("frozen") == "true":
                 cell_block["frozen"] = True
             emit(cell_block, inline=cell_attrs)
@@ -427,8 +552,12 @@ def parse(text: str) -> list[dict]:
         m_inc = RE_INLINE_DIRECTIVE.match(line)
         if m_inc and m_inc.group("name") == "include":
             inc_line = i + 1
-            bracket = _parse_attrs_lark(m_inc.group("label") or "")
-            brace = _parse_attrs_lark(m_inc.group("attrs") or "")
+            bracket = _parse_attrs_lark(
+                m_inc.group("label") or "", strict=True, line=inc_line
+            )
+            brace = _parse_attrs_lark(
+                m_inc.group("attrs") or "", strict=True, line=inc_line
+            )
             combined = {**bracket.kv, **brace.kv}
             target = combined.get("target") or combined.get("path") or ""
             if not target.strip():
@@ -449,7 +578,9 @@ def parse(text: str) -> list[dict]:
         # Generic inline directive
         m = RE_INLINE_DIRECTIVE.match(line)
         if m:
-            attrs = _parse_attrs_lark(m.group("attrs") or "")
+            attrs = _parse_attrs_lark(
+                m.group("attrs") or "", strict=True, line=i + 1
+            )
             block: dict = {
                 "type": "directive",
                 "name": m.group("name"),
@@ -490,11 +621,26 @@ def parse(text: str) -> list[dict]:
             continue
 
         # Malformed: unclosed brace or bare {word} — passthrough as paragraph
+        # per v1.1 graceful-degradation policy. A MalformedAttributeWarning
+        # is issued so tooling (linters, IDEs) can surface the likely typo
+        # without changing the spec-required AST shape.
         if stripped.startswith("{") and "}" not in stripped:
+            warnings.warn(
+                f"line {i + 1}: unclosed attribute marker {stripped!r} — "
+                f"treating as plain paragraph per v1.1 degradation rule",
+                MalformedAttributeWarning,
+                stacklevel=2,
+            )
             emit({"type": "paragraph", "text": stripped})
             i += 1
             continue
         if re.match(r"^\{[a-z][a-z0-9\-]*\}$", stripped):
+            warnings.warn(
+                f"line {i + 1}: bare {{{stripped[1:-1]}}} attribute (no "
+                f"`.` or `#` prefix) — treating as plain paragraph",
+                MalformedAttributeWarning,
+                stacklevel=2,
+            )
             emit({"type": "paragraph", "text": stripped})
             i += 1
             continue

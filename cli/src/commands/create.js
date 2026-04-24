@@ -1,5 +1,5 @@
 /**
- * Create command - Create new MDX files
+ * Create command - Create new MDZ files
  */
 
 const fs = require('fs');
@@ -130,7 +130,7 @@ Contact: {{author}}
 
 async function createCommand(name, options) {
     console.log(chalk.cyan('\n╔═══════════════════════════════════════════════════════════╗'));
-    console.log(chalk.cyan('║') + '  ' + chalk.bold.white('Create New MDX Document') + '                                 ' + chalk.cyan('║'));
+    console.log(chalk.cyan('║') + '  ' + chalk.bold.white('Create New MDZ Document') + '                                 ' + chalk.cyan('║'));
     console.log(chalk.cyan('╚═══════════════════════════════════════════════════════════╝\n'));
 
     // Gather document info
@@ -202,16 +202,19 @@ async function createCommand(name, options) {
         }
     ]);
 
-    const spinner = ora('Creating MDX document...').start();
+    const spinner = ora('Creating MDZ document...').start();
 
     try {
         const zip = new AdmZip();
         const timestamp = new Date().toISOString();
         const docId = crypto.randomUUID();
 
-        // Build manifest
+        // Build manifest. The field name is `mdx_version` for backward-compat
+        // with every archive ever written (renaming the field would break
+        // every v1.1/v2.0 reader); the VALUE is the current spec version.
+        // See CHANGELOG "Renamed MDX → MDZ" for the rationale.
         const manifest = {
-            mdx_version: '1.0.0',
+            mdx_version: '2.0.0',
             document: {
                 id: docId,
                 title: answers.title,
@@ -349,10 +352,10 @@ pre { background: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 8px; ov
 
         console.log(chalk.cyan('\n🚀 Next Steps'));
         console.log(chalk.gray('───────────────────────────────────────'));
-        console.log(`  View:    ${chalk.white('mdx view ' + answers.output)}`);
-        console.log(`  Edit:    ${chalk.white('mdx edit ' + answers.output)}`);
-        console.log(`  Info:    ${chalk.white('mdx info ' + answers.output)}`);
-        console.log(`  Extract: ${chalk.white('mdx extract ' + answers.output)}`);
+        console.log(`  View:    ${chalk.white('mdz view ' + answers.output)}`);
+        console.log(`  Edit:    ${chalk.white('mdz edit ' + answers.output)}`);
+        console.log(`  Info:    ${chalk.white('mdz info ' + answers.output)}`);
+        console.log(`  Extract: ${chalk.white('mdz extract ' + answers.output)}`);
         console.log('');
 
     } catch (error) {

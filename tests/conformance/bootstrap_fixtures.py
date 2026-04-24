@@ -189,13 +189,13 @@ NEGATIVE_FIXTURES: list[tuple[str, str, str, int]] = [
     (
         "fig-missing-id.md",
         '::fig{caption="no id"}\n\n![img](fig.png)\n',
-        "requires an `id=",
+        "requires a non-empty `id",
         1,
     ),
     (
         "eq-missing-id.md",
         "::eq{}\n\nE = mc^2\n",
-        "requires an `id=",
+        "requires a non-empty `id",
         1,
     ),
 ]

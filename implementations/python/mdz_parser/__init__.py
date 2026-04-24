@@ -17,9 +17,9 @@ backward compatibility with callers that haven't migrated. Internally it
 is a thin wrapper over this parser.
 """
 
-from .parser import parse, MDZParser
+from .parser import parse, MDZParser, MalformedAttributeWarning
 from .errors import ParseError
 
-__all__ = ["parse", "MDZParser", "ParseError"]
+__all__ = ["parse", "MDZParser", "ParseError", "MalformedAttributeWarning"]
 
 __version__ = "0.1.0"

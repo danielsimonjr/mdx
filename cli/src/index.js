@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 
 /**
- * MDX CLI - Command-line tool for MDX (Markdown eXtended Container) files
+ * MDZ CLI - Command-line tool for MDZ (Markdown Zipped Container) files.
+ *
+ * Accepts both `.mdz` (current) and `.mdx` (legacy, through 2027-01-01)
+ * archives throughout.
  */
 
 const { program } = require('commander');
@@ -19,38 +22,38 @@ const validateCommand = require('./commands/validate');
 // CLI Banner
 const banner = `
 ${chalk.cyan('╔═══════════════════════════════════════════════════════════╗')}
-${chalk.cyan('║')}  ${chalk.bold.white('MDX CLI')} - Markdown eXtended Container Tool            ${chalk.cyan('║')}
-${chalk.cyan('║')}  ${chalk.gray('Create, view, edit, and manage MDX documents')}            ${chalk.cyan('║')}
+${chalk.cyan('║')}  ${chalk.bold.white('MDZ CLI')} - Markdown Zipped Container Tool              ${chalk.cyan('║')}
+${chalk.cyan('║')}  ${chalk.gray('Create, view, edit, and manage MDZ documents')}             ${chalk.cyan('║')}
 ${chalk.cyan('╚═══════════════════════════════════════════════════════════╝')}
 `;
 
 program
-  .name('mdx')
-  .description('CLI tool for working with MDX (Markdown eXtended Container) files')
-  .version('1.0.0')
+  .name('mdz')
+  .description('CLI tool for working with MDZ (Markdown Zipped Container) files; reads legacy .mdx too')
+  .version('2.0.0')
   .addHelpText('before', banner);
 
-// View command - opens MDX in browser viewer
+// View command - opens MDZ in browser viewer
 program
   .command('view <file>')
   .alias('v')
-  .description('Open an MDX file in the browser viewer')
+  .description('Open an MDZ file in the browser viewer')
   .option('-p, --port <port>', 'Port for local server', '3000')
   .action(viewCommand);
 
-// Extract command - extracts MDX contents
+// Extract command - extracts MDZ contents
 program
   .command('extract <file> [output]')
   .alias('x')
-  .description('Extract MDX contents to a folder')
+  .description('Extract MDZ contents to a folder')
   .option('-f, --force', 'Overwrite existing files')
   .action(extractCommand);
 
-// Info command - displays MDX info in terminal
+// Info command - displays MDZ info in terminal
 program
   .command('info <file>')
   .alias('i')
-  .description('Display MDX file information in terminal')
+  .description('Display MDZ file information in terminal')
   .option('-c, --content', 'Show full markdown content')
   .option('-m, --manifest', 'Show full manifest JSON')
   .option('-a, --assets', 'List all assets with details')
@@ -60,23 +63,23 @@ program
 program
   .command('edit <file>')
   .alias('e')
-  .description('Interactive MDX editor')
+  .description('Interactive MDZ editor')
   .action(editCommand);
 
-// Create command - create new MDX file
+// Create command - create new MDZ file
 program
   .command('create [name]')
   .alias('c')
-  .description('Create a new MDX file')
+  .description('Create a new MDZ file')
   .option('-t, --template <template>', 'Template to use (blank, article, report, presentation)', 'blank')
-  .option('-o, --output <path>', 'Output path for the MDX file')
+  .option('-o, --output <path>', 'Output path for the MDZ file')
   .action(createCommand);
 
-// Validate command - validate MDX file structure
+// Validate command - validate MDZ file structure
 program
   .command('validate <file>')
   .alias('val')
-  .description('Validate MDX file structure and manifest')
+  .description('Validate MDZ file structure and manifest')
   .option('-v, --verbose', 'Show detailed information including info-level messages')
   .option('--no-exit', 'Do not exit with error code on validation failure')
   .action(validateCommand);
