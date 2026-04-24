@@ -1360,15 +1360,19 @@ export const BUILT_IN_SIGNER_ROLES: ReadonlySet<BuiltInSignerRole> = new Set([
 ]);
 
 /**
- * Pattern a custom signer role must match. Supports two forms:
+ * Pattern a custom signer role must match. Supports three forms:
  *   - reverse-DNS identifier:  `com.example.legal-counsel`
- *   - URI:                     `https://example.com/roles/translator`
+ *   - URI with authority:      `https://example.com/roles/translator`
+ *   - URN:                     `urn:mdz:role:reviewer`
+ *
  * The pattern is intentionally narrow — bare strings like "assistant" or
  * "contributor" are rejected because they look like (typo'd) built-in
- * roles and would defeat the point of opting in to a custom role.
+ * roles and would defeat the point of opting in to a custom role. The
+ * distinguishing signal is either a dot (reverse-DNS), `://` (URI with
+ * authority), or `scheme:ns:...` with 2+ colons (URN).
  */
 const CUSTOM_SIGNER_ROLE_PATTERN =
-  /^(?:[a-z0-9]+(?:[-.][a-z0-9]+)+|[a-z][a-z0-9+.\-]*:\/\/.+)$/i;
+  /^(?:[a-z0-9]+(?:[-.][a-z0-9]+)+|[a-z][a-z0-9+.\-]*:\/\/.+|[a-z][a-z0-9+.\-]*:[^:]+:.+)$/i;
 
 /**
  * Opt-in constructor for a custom signer role.
