@@ -1,0 +1,54 @@
+{
+  "$schema": "https://mdx-format.org/schemas/profile.schema.json",
+  "id": "https://mdx-format.org/profiles/api-reference/v1",
+  "name": "API Reference",
+  "version": "1.0.0",
+  "description": "A technical API reference document covering endpoints, authentication, errors, and examples.",
+  "required_sections": [
+    { "heading_pattern": "^Overview$", "level": 1 },
+    { "heading_pattern": "^Authentication$", "level": 1 },
+    { "heading_pattern": "^Endpoints$", "level": 1 },
+    { "heading_pattern": "^Errors$", "level": 1 }
+  ],
+  "recommended_sections": [
+    { "heading_pattern": "^Examples?$", "level": 1 },
+    { "heading_pattern": "^Rate Limit(s|ing)?$", "level": 1 },
+    { "heading_pattern": "^(Versioning|Deprecation Policy)$", "level": 1 },
+    { "heading_pattern": "^Changelog$", "level": 1 }
+  ],
+  "required_manifest_fields": [
+    "document.title",
+    "document.version",
+    "document.license",
+    "document.modified"
+  ],
+  "recommended_manifest_fields": [
+    "document.authors",
+    "document.accessibility.features"
+  ],
+  "required_extensions": ["tables", "attributes"],
+  "recommended_extensions": ["cell", "task-lists"],
+  "validation_rules": [
+    {
+      "rule": "version_is_semver",
+      "value": true,
+      "description": "document.version must be SemVer-formatted."
+    },
+    {
+      "rule": "endpoints_section_has_tables",
+      "value": true,
+      "description": "The Endpoints section should contain at least one table listing routes."
+    },
+    {
+      "rule": "code_examples_have_language",
+      "value": true,
+      "description": "Fenced code blocks in examples should declare a language tag."
+    }
+  ],
+  "preferred_capabilities": ["tables", "syntax-highlighting"],
+  "notes": [
+    "Use ::cell blocks with cached output for runnable request/response examples.",
+    "Include a Rate Limits section even if 'none' — explicit beats implicit.",
+    "Deprecation notices should use ::note{type='warning'} callouts."
+  ]
+}

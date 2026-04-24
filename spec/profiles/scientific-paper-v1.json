@@ -1,0 +1,60 @@
+{
+  "$schema": "https://mdx-format.org/schemas/profile.schema.json",
+  "id": "https://mdx-format.org/profiles/scientific-paper/v1",
+  "name": "Scientific Paper",
+  "version": "1.0.0",
+  "description": "A peer-reviewable scientific paper with standard IMRaD structure plus abstract, keywords, and references.",
+  "required_sections": [
+    { "heading_pattern": "^(Abstract|Summary)$", "level": 1 },
+    { "heading_pattern": "^Introduction$", "level": 1 },
+    { "heading_pattern": "^(Methods?|Materials and Methods)$", "level": 1 },
+    { "heading_pattern": "^Results$", "level": 1 },
+    { "heading_pattern": "^Discussion$", "level": 1 },
+    { "heading_pattern": "^References$", "level": 1 }
+  ],
+  "recommended_sections": [
+    { "heading_pattern": "^Acknowledg(e?)ments$", "level": 1 },
+    { "heading_pattern": "^(Supplementary Materials|Appendix( [A-Z])?)$", "level": 1 }
+  ],
+  "required_manifest_fields": [
+    "document.title",
+    "document.authors",
+    "document.keywords",
+    "document.license",
+    "document.created"
+  ],
+  "recommended_manifest_fields": [
+    "document.accessibility.features",
+    "document.derived_from"
+  ],
+  "required_extensions": ["math", "footnotes"],
+  "recommended_extensions": ["cell", "attributes"],
+  "validation_rules": [
+    {
+      "rule": "min_authors",
+      "value": 1,
+      "description": "At least one author required for attribution."
+    },
+    {
+      "rule": "keyword_min_count",
+      "value": 3,
+      "description": "At least 3 keywords recommended for discoverability."
+    },
+    {
+      "rule": "figures_have_alt_text",
+      "value": true,
+      "description": "Every figure asset must have non-empty alt_text."
+    },
+    {
+      "rule": "math_requires_mathml_fallback",
+      "value": true,
+      "description": "Math directives should include MathML accessibility alternative."
+    }
+  ],
+  "preferred_capabilities": ["math", "structural-navigation"],
+  "notes": [
+    "Use ::figure directive with caption + credit attributes for every figure.",
+    "Cite sources in a References section using Markdown footnotes or a citation extension.",
+    "Include a DOI in document.keywords or document.custom if the paper has one assigned."
+  ]
+}

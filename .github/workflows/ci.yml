@@ -140,6 +140,50 @@ jobs:
       - name: Run reference alignment parser conformance tests
         run: python tests/alignment/test_parser.py
 
+  validate-v20-examples:
+    name: Validate v2.0 Examples and Parser
+    runs-on: ubuntu-latest
+    needs: validate-json-schema
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install ajv-cli
+        run: npm install -g ajv-cli ajv-formats
+
+      - name: Generate comprehensive v2.0 example
+        run: python implementations/python/create_v20_example.py
+
+      - name: Validate comprehensive v2.0 manifest against v2.0 schema
+        run: |
+          unzip -p examples/v2/comprehensive.mdx manifest.json > /tmp/v2_manifest.json
+          ajv validate -s spec/manifest-v2.schema.json -d /tmp/v2_manifest.json --spec=draft2020 -c ajv-formats
+
+      - name: Validate v2.0 reference profile JSONs parse
+        run: |
+          python -c "import json; [print(p, '→', json.load(open(p))['name']) for p in ['spec/profiles/scientific-paper-v1.json', 'spec/profiles/api-reference-v1.json']]"
+
+      - name: Run v2.0 parser conformance tests
+        run: python tests/v2.0/test_parser_v20.py
+
+      - name: Verify archive ordering (§10.2)
+        run: |
+          first=$(unzip -l examples/v2/comprehensive.mdx | awk 'NR==4 {print $4}')
+          if [ "$first" != "manifest.json" ]; then
+            echo "ERROR: First entry is '$first', expected 'manifest.json' per §10.2"
+            exit 1
+          fi
+          echo "Archive ordering OK (manifest.json is first entry)"
+
   validate-cli:
     name: Validate CLI Tool
     runs-on: ubuntu-latest

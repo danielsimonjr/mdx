@@ -153,6 +153,37 @@ async function infoCommand(file, options) {
             features.push(attrInfo);
         }
 
+        // v2.0 features
+        if (manifest.content?.locales?.available?.length) {
+            const tags = manifest.content.locales.available.map(l => l.tag).join(', ');
+            features.push(`🌍 Locales: ${tags} (default: ${manifest.content.locales.default})`);
+        }
+        if (manifest.content?.variants?.length) {
+            const ids = manifest.content.variants.map(v => v.id).join(', ');
+            features.push(`🔀 Variants: ${ids}`);
+        }
+        if (manifest.content?.includes?.length) {
+            features.push(`📎 Includes: ${manifest.content.includes.length} target(s)`);
+        }
+        if (manifest.document?.profile) {
+            features.push(`📐 Profile: ${manifest.document.profile}`);
+        }
+        if (manifest.document?.accessibility?.features?.length) {
+            const a11y = manifest.document.accessibility.features.join(', ');
+            features.push(`♿ Accessibility: ${a11y}`);
+        }
+        if (manifest.document?.derived_from?.length) {
+            features.push(`🔗 Derived from: ${manifest.document.derived_from.length} source(s)`);
+        }
+        if (manifest.security?.signatures?.length) {
+            const roles = manifest.security.signatures.map(s => s.role).join(', ');
+            features.push(`✍️  Signatures: ${roles}`);
+        }
+        if (manifest.interactivity?.kernels?.length) {
+            const ids = manifest.interactivity.kernels.map(k => k.id).join(', ');
+            features.push(`🧮 Kernels: ${ids}`);
+        }
+
         if (features.length > 0) {
             features.forEach(f => console.log(`  ${f}`));
         } else {

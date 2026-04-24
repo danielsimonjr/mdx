@@ -87,10 +87,30 @@ RE_INLINE_DIRECTIVE = re.compile(
     re.VERBOSE,
 )
 
+# v2.0 ::cell opening: `::cell{language="..." kernel="..."}`
+RE_CELL_OPEN = re.compile(
+    r"""^\s*::cell(?:\{(?P<attrs>[^}]*)\})?\s*$""",
+    re.VERBOSE,
+)
+
+# v2.0 ::output block header: `::output{type="text" mime="..." src="..."}`
+RE_OUTPUT_OPEN = re.compile(
+    r"""^\s*::output(?:\{(?P<attrs>[^}]*)\})?\s*$""",
+    re.VERBOSE,
+)
+
+# Fenced code block opener/closer: ``` or ```lang
+RE_FENCE = re.compile(r"^\s*```(?P<lang>[a-zA-Z0-9_\-]*)\s*$")
+
 # Within an attribute list body, pull out classes / ids / key=value pairs.
 RE_ATTR_CLASS = re.compile(r"\.([a-z][a-z0-9\-]*)")
 RE_ATTR_ID = re.compile(r"#([a-z][a-z0-9\-]*)")
-RE_ATTR_KV = re.compile(r"""([a-z][a-z0-9_\-]*)\s*=\s*"([^"]*)"|([a-z][a-z0-9_\-]*)\s*=\s*'([^']*)'""")
+RE_ATTR_KV = re.compile(
+    r"""(?P<k1>[a-z][a-z0-9_\-]*)\s*=\s*"(?P<v1>[^"]*)"
+      | (?P<k2>[a-z][a-z0-9_\-]*)\s*=\s*'(?P<v2>[^']*)'
+      | (?P<k3>[a-z][a-z0-9_\-]*)\s*=\s*(?P<v3>[A-Za-z0-9_][A-Za-z0-9_\-.]*)""",
+    re.VERBOSE,
+)
 
 # Heading: `# text` through `###### text`.
 RE_HEADING = re.compile(r"^\s*(#{1,6})\s+(.*?)\s*$")
@@ -142,8 +162,10 @@ def parse_attrs(body: str) -> ParsedAttrs:
     kv: dict[str, str] = {}
     masked = body
     for m in list(RE_ATTR_KV.finditer(body)):
-        k = m.group(1) or m.group(3)
-        v = m.group(2) if m.group(2) is not None else m.group(4)
+        k = m.group("k1") or m.group("k2") or m.group("k3")
+        v = m.group("v1") if m.group("v1") is not None else (
+            m.group("v2") if m.group("v2") is not None else m.group("v3")
+        )
         if k is not None and v is not None:
             kv[k] = v
         # Blank out the whole match in `masked` so class/id regexes can't
@@ -192,8 +214,39 @@ def _resolve_alignment(
     return winner_align + sorted(non_align)
 
 
+def _consume_fenced_block(lines: list[str], start: int) -> tuple[str, str, int]:
+    """Read a fenced code block starting at `lines[start]`.
+
+    Returns (language, body_joined_with_newlines, next_index_after_close).
+    If the opening fence is missing, returns ("", "", start).
+    If no closing fence is found, body contains everything to EOF.
+    """
+    if start >= len(lines):
+        return "", "", start
+    m = RE_FENCE.match(lines[start])
+    if not m:
+        return "", "", start
+    lang = m.group("lang") or ""
+    body_lines: list[str] = []
+    i = start + 1
+    while i < len(lines):
+        if RE_FENCE.match(lines[i]):
+            return lang, "\n".join(body_lines), i + 1
+        body_lines.append(lines[i])
+        i += 1
+    # Unclosed fence — degrade to "everything to EOF"
+    return lang, "\n".join(body_lines), i
+
+
+def _skip_blank(lines: list[str], i: int) -> int:
+    while i < len(lines) and not lines[i].strip():
+        i += 1
+    return i
+
+
 def parse(text: str) -> list[dict]:
-    """Parse v1.1 Markdown with alignment / block-attribute extensions.
+    """Parse v1.1 + v2.0 Markdown with alignment, block attributes,
+    transclusion, and computational cells.
 
     Returns a list of block dicts. See module docstring for shape."""
     lines = text.splitlines()
@@ -220,7 +273,11 @@ def parse(text: str) -> list[dict]:
         blocks.append(block)
         pending_block = None
 
-    for raw_line in lines:
+    # Indexed loop so ::cell can consume the fenced code block + ::output
+    # blocks that follow it.
+    i = 0
+    while i < len(lines):
+        raw_line = lines[i]
         line = raw_line.rstrip("\r")
         stripped = line.strip()
 
@@ -228,11 +285,13 @@ def parse(text: str) -> list[dict]:
         # (A pending block attr actually expects the NEXT non-empty block, so
         # blank lines do not clear it.)
         if not stripped:
+            i += 1
             continue
 
         # Container close
         if RE_CONTAINER_CLOSE.match(line) and container_stack:
             container_stack.pop()
+            i += 1
             continue
 
         # Container open: `:::{attrs}` or `:::name{attrs}` or `:::name`
@@ -247,6 +306,7 @@ def parse(text: str) -> list[dict]:
                 # itself is not a class, but we tag it in kv for downstream use.
                 container_attrs.kv.setdefault("_directive", m.group("name"))
             container_stack.append(container_attrs)
+            i += 1
             continue
 
         # Shorthand alignment: `{:.center}` → queue `align-center` as pending.
@@ -256,12 +316,98 @@ def parse(text: str) -> list[dict]:
             # Shorthand aligns are NOT already prefixed `align-`; normalize.
             class_name = f"align-{shorthand}" if not shorthand.startswith("align-") else shorthand
             pending_block = ParsedAttrs(classes=[class_name])
+            i += 1
             continue
 
         # Block-level attribute: `{.class #id key="value"}`
         m = RE_BLOCK_ATTR.match(line)
         if m:
             pending_block = parse_attrs(m.group(1))
+            i += 1
+            continue
+
+        # v2.0 — ::cell directive: source code + zero or more ::output blocks
+        m = RE_CELL_OPEN.match(line)
+        if m:
+            cell_attrs = parse_attrs(m.group("attrs") or "")
+            source_lang = ""
+            source_body = ""
+            cell_outputs: list[dict] = []
+
+            # Skip blanks, then try to consume the source fenced code block
+            j = _skip_blank(lines, i + 1)
+            if j < len(lines) and RE_FENCE.match(lines[j]):
+                source_lang, source_body, j = _consume_fenced_block(lines, j)
+
+            # Consume zero or more ::output{} blocks, each optionally followed
+            # by a fenced code block.
+            while True:
+                j2 = _skip_blank(lines, j)
+                if j2 >= len(lines):
+                    j = j2
+                    break
+                om = RE_OUTPUT_OPEN.match(lines[j2])
+                if not om:
+                    j = j2
+                    break
+                output_attrs = parse_attrs(om.group("attrs") or "")
+                j3 = _skip_blank(lines, j2 + 1)
+                out_body = ""
+                if j3 < len(lines) and RE_FENCE.match(lines[j3]):
+                    _, out_body, j3 = _consume_fenced_block(lines, j3)
+                output_block: dict = {
+                    "type": output_attrs.kv.get("type", "text"),
+                }
+                if output_attrs.kv.get("mime"):
+                    output_block["mime"] = output_attrs.kv["mime"]
+                if output_attrs.kv.get("src"):
+                    output_block["src"] = output_attrs.kv["src"]
+                if out_body:
+                    output_block["body"] = out_body
+                cell_outputs.append(output_block)
+                j = j3
+
+            cell_block = {
+                "type": "cell",
+                "language": cell_attrs.kv.get("language", source_lang or ""),
+                "kernel": cell_attrs.kv.get("kernel", ""),
+                "source": source_body,
+                "outputs": cell_outputs,
+            }
+            if "execution_count" in cell_attrs.kv:
+                try:
+                    cell_block["execution_count"] = int(cell_attrs.kv["execution_count"])
+                except ValueError:
+                    cell_block["execution_count"] = cell_attrs.kv["execution_count"]
+            if cell_attrs.kv.get("frozen") == "true":
+                cell_block["frozen"] = True
+            emit(cell_block, inline=cell_attrs)
+            i = j
+            continue
+
+        # v2.0 — ::include directive (transclusion)
+        # Per spec §12.2, ::include uses `[key="value" key="value"]`
+        # for its configuration (a departure from standard directive
+        # label syntax), optionally combined with `{...}` for additional
+        # attrs like content_hash.
+        m_inc = RE_INLINE_DIRECTIVE.match(line)
+        if m_inc and m_inc.group("name") == "include":
+            # Parse both the bracket body (as key=value) AND the brace body.
+            bracket_attrs = parse_attrs(m_inc.group("label") or "")
+            brace_attrs = parse_attrs(m_inc.group("attrs") or "")
+            combined_kv = {**bracket_attrs.kv, **brace_attrs.kv}
+            target = combined_kv.get("target") or combined_kv.get("path") or ""
+            include_block: dict = {
+                "type": "include",
+                "target": target,
+            }
+            if combined_kv.get("fragment"):
+                include_block["fragment"] = combined_kv["fragment"]
+            if combined_kv.get("content_hash"):
+                include_block["content_hash"] = combined_kv["content_hash"]
+            # Classes come only from the {...} brace form
+            emit(include_block, inline=brace_attrs)
+            i += 1
             continue
 
         # Inline directive: `::video[label]{attrs}` on own line
@@ -277,6 +423,7 @@ def parse(text: str) -> list[dict]:
             if "src" in inline_attrs.kv:
                 block["src"] = inline_attrs.kv["src"]
             emit(block, inline=inline_attrs)
+            i += 1
             continue
 
         # Heading
@@ -284,6 +431,7 @@ def parse(text: str) -> list[dict]:
         if m:
             level = len(m.group(1))
             emit({"type": "heading", "level": level, "text": m.group(2)})
+            i += 1
             continue
 
         # Blockquote
@@ -292,18 +440,21 @@ def parse(text: str) -> list[dict]:
             # Collapse multi-line quotes into one block with joined text
             # (simple reference behavior; a full parser would group lines).
             emit({"type": "blockquote", "text": m.group(1)})
+            i += 1
             continue
 
         # Ordered list item
         m = RE_ORDERED_ITEM.match(line)
         if m:
             emit({"type": "ordered_item", "text": m.group(1)})
+            i += 1
             continue
 
         # Unordered list item
         m = RE_UNORDERED_ITEM.match(line)
         if m:
             emit({"type": "unordered_item", "text": m.group(1)})
+            i += 1
             continue
 
         # Malformed marker (unclosed `{`, bare `{word}` without `.` or `#`):
@@ -312,15 +463,17 @@ def parse(text: str) -> list[dict]:
         if stripped.startswith("{") and "}" not in stripped:
             emit({"type": "paragraph", "text": stripped})
             # Don't consume pending; malformed is not a valid attr block.
-            pending_block = pending_block  # noqa: preserve across malformed
+            i += 1
             continue
         # {bareword} without . or # prefix — also malformed
         if re.match(r"^\{[a-z][a-z0-9\-]*\}$", stripped):
             emit({"type": "paragraph", "text": stripped})
+            i += 1
             continue
 
         # Default: paragraph
         emit({"type": "paragraph", "text": stripped})
+        i += 1
 
     return blocks
 
