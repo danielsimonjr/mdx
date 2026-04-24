@@ -1165,14 +1165,20 @@ export function sanitizePath(path: string): string {
 
 /**
  * Removes undefined and null values from an object.
+ *
+ * The generic `T extends object` constraint lets callers pass typed
+ * interfaces (e.g. `Author`, `AssetMetadata`) directly without first
+ * widening to `Record<string, unknown>`. That earlier widening was
+ * what forced the noisy `as unknown as X` casts at call sites.
+ *
  * @param obj - The object to clean
- * @returns A new object with only defined values
+ * @returns A new object with only defined values (same key-value types as input)
  */
-export function cleanObject<T extends Record<string, unknown>>(obj: T): Partial<T> {
+export function cleanObject<T extends object>(obj: T): Partial<T> {
   const result: Partial<T> = {};
-  for (const [key, value] of Object.entries(obj)) {
+  for (const [key, value] of Object.entries(obj) as Array<[keyof T, T[keyof T]]>) {
     if (value !== undefined && value !== null) {
-      result[key as keyof T] = value as T[keyof T];
+      result[key] = value;
     }
   }
   return result;
@@ -1375,9 +1381,7 @@ export class MDXManifest {
     if (!this._data.document.authors) {
       this._data.document.authors = [];
     }
-    this._data.document.authors.push(
-      cleanObject(author as unknown as Record<string, unknown>) as unknown as Author,
-    );
+    this._data.document.authors.push(cleanObject(author) as Author);
     this.updateModified();
   }
 
@@ -1389,9 +1393,7 @@ export class MDXManifest {
     if (!this._data.document.contributors) {
       this._data.document.contributors = [];
     }
-    this._data.document.contributors.push(
-      cleanObject(contributor as unknown as Record<string, unknown>) as unknown as Author,
-    );
+    this._data.document.contributors.push(cleanObject(contributor) as Author);
     this.updateModified();
   }
 
@@ -1416,7 +1418,7 @@ export class MDXManifest {
 
     // Type assertion needed due to union type complexity
     (this._data.assets[categoryKey] as AssetMetadata[]).push(
-      cleanObject(metadata as unknown as Record<string, unknown>) as unknown as AssetMetadata
+      cleanObject(metadata) as AssetMetadata,
     );
     this.updateModified();
   }
@@ -2233,7 +2235,7 @@ export class MDXDocument {
     const entry: VersionEntry = {
       version,
       timestamp: isoTimestamp(),
-      author: cleanObject(author as unknown as Record<string, unknown>) as unknown as Author,
+      author: cleanObject(author) as Author,
       message,
       snapshot: {
         type: SnapshotType.FULL,
@@ -2333,7 +2335,7 @@ export class MDXDocument {
       type: "Annotation",
       motivation: type,
       created: isoTimestamp(),
-      creator: cleanObject(author as unknown as Record<string, unknown>) as unknown as Author,
+      creator: cleanObject(author) as Author,
       target: {
         source: this._manifest.entryPoint,
         selector: {
@@ -2420,7 +2422,7 @@ export class MDXDocument {
       annotation["mdx:replies"].push({
         id: replyId,
         created: isoTimestamp(),
-        creator: cleanObject(author as unknown as Record<string, unknown>) as unknown as Author,
+        creator: cleanObject(author) as Author,
         body: {
           type: "TextualBody",
           value: body,
