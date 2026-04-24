@@ -371,7 +371,7 @@ blockquote {
     timestamp = iso_timestamp()
     
     manifest = {
-        "mdx_version": "1.1.0",
+        "mdx_version": "2.0.0",
         "document": {
             "id": doc_id,
             "title": "MDX Format Demonstration Document",

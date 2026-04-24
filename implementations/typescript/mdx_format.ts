@@ -35,7 +35,7 @@ import JSZip from "jszip";
 // ============================================================================
 
 /** Current MDX specification version */
-export const MDX_VERSION = "1.1.0";
+export const MDX_VERSION = "2.0.0";
 
 /** MIME type for MDX container files */
 export const MDX_MIME_TYPE = "application/vnd.mdx-container+zip";

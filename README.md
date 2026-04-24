@@ -3,7 +3,7 @@
 **Markdown eXtended Container** - An open document format that packages Markdown content with embedded media into self-contained ZIP archives.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Specification](https://img.shields.io/badge/Spec-v1.1.0--Draft-orange.svg)](spec/MDX_FORMAT_SPECIFICATION_v1.1.md)
+[![Specification](https://img.shields.io/badge/Spec-v2.0.0--Draft-orange.svg)](spec/MDX_FORMAT_SPECIFICATION_v2.0.md)
 
 ## Overview
 
@@ -16,12 +16,22 @@ MDX is a portable document format designed to bundle Markdown content with image
 - **Version Control Friendly** - Text-based manifest and Markdown enable meaningful diffs
 - **Collaboration Ready** - Built-in support for annotations, comments, and version history
 
-### What's New in v1.1
+### What's New in v2.0
 
-- **Text Alignment** - Align paragraphs, headings, and blocks with shorthand syntax `{:.center}`, `{:.right}`, `{:.left}`, `{:.justify}`
-- **Block Attributes** - Apply CSS classes, IDs, and styles to any block element
-- **Container Blocks** - Group multiple elements with shared formatting using `::::` syntax
-- **Directive Containers** - Enhanced `::::note`, `::::details`, and other directive blocks
+Ten capability additions, each backward-compatible with v1.1:
+
+1. **Internationalization** — multi-locale content bundling (§8)
+2. **Content-addressed storage** — optional `assets/by-hash/` + `content_hash` (§9)
+3. **Streaming-friendly archive ordering** — read text before media arrives (§10)
+4. **Computational cells** — `::cell` directive with cached outputs (§11)
+5. **Transclusion** — `::include` directive for cross-file and cross-document composition (§12)
+6. **Document profiles** — machine-checkable structural requirements per document type (§13)
+7. **Rich accessibility model** — long descriptions, AD tracks, sign-language, MathML fallbacks (§14)
+8. **Provenance + fork graph** — multi-parent versions, derived-from chain, history DAG (§15)
+9. **Multi-signature + DID identity** — `signatures[]` with roles and W3C DIDs (§16)
+10. **Responsive variants** — per-asset `variants[]` and document-level `content.variants[]` (§17)
+
+All v1.1 features (alignment, block attributes, container blocks, directive containers) continue to work unchanged. See [`spec/MDX_FORMAT_SPECIFICATION_v2.0.md`](spec/MDX_FORMAT_SPECIFICATION_v2.0.md) for full details and [`spec/MDX_FORMAT_SPECIFICATION_v1.1.md`](spec/MDX_FORMAT_SPECIFICATION_v1.1.md) for the v1.1 baseline.
 
 ## File Structure
 
@@ -59,7 +69,7 @@ with zipfile.ZipFile('my-document.mdx', 'w', zipfile.ZIP_DEFLATED) as mdx:
     # Add manifest
     timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
     manifest = {
-        "mdx_version": "1.1.0",
+        "mdx_version": "2.0.0",
         "document": {
             "title": "My Document",
             "id": str(uuid.uuid4()),  # UUID v4 required
@@ -137,14 +147,17 @@ mdx/
 ## Specification
 
 The complete specification is available at:
-- **v1.1** (Current): [spec/MDX_FORMAT_SPECIFICATION_v1.1.md](spec/MDX_FORMAT_SPECIFICATION_v1.1.md)
+- **v2.0** (Current): [spec/MDX_FORMAT_SPECIFICATION_v2.0.md](spec/MDX_FORMAT_SPECIFICATION_v2.0.md)
+- **v1.1** (Predecessor): [spec/MDX_FORMAT_SPECIFICATION_v1.1.md](spec/MDX_FORMAT_SPECIFICATION_v1.1.md)
 - **v1.0**: [spec/MDX_FORMAT_SPECIFICATION.md](spec/MDX_FORMAT_SPECIFICATION.md)
 
-**Current Version:** 1.1.0 (Draft)
+**Current Version:** 2.0.0 (Draft)
 
 **MIME Type:** `application/vnd.mdx-container+zip`
 
 **File Extensions:** `.mdx` (primary), `.mdxc` (alternative, to avoid conflict with MDX/JSX)
+
+**JSON Schema:** [`spec/manifest-v2.schema.json`](spec/manifest-v2.schema.json) (v2.0), [`spec/manifest.schema.json`](spec/manifest.schema.json) (v1.1 baseline, still accepted)
 
 ## Comparison with Other Formats
 

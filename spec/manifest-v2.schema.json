@@ -1,0 +1,747 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mdx-format.org/schemas/manifest-v2.schema.json",
+  "title": "MDX Manifest Schema (v2.0)",
+  "description": "JSON Schema for MDX v2.0 manifest.json files. Backward-compatible with v1.1 — v1.1 manifests with mdx_version bumped to 2.0.x validate as minimal v2.0.",
+  "type": "object",
+  "required": ["mdx_version", "document", "content"],
+  "properties": {
+    "$schema": { "type": "string", "format": "uri" },
+    "mdx_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9.]+)?$",
+      "description": "MDX specification version (SemVer)"
+    },
+    "document": { "$ref": "#/$defs/documentInfo" },
+    "content": { "$ref": "#/$defs/contentConfig" },
+    "assets": { "$ref": "#/$defs/assetsInventory" },
+    "styles": { "$ref": "#/$defs/stylesConfig" },
+    "rendering": { "$ref": "#/$defs/renderingConfig" },
+    "interactivity": { "$ref": "#/$defs/interactivityConfig" },
+    "collaboration": { "$ref": "#/$defs/collaborationConfig" },
+    "history": { "$ref": "#/$defs/historyConfig" },
+    "security": { "$ref": "#/$defs/securityConfig" },
+    "extensions": { "type": "object", "additionalProperties": true },
+    "custom": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": false,
+
+  "$defs": {
+    "bcp47Tag": {
+      "type": "string",
+      "pattern": "^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{1,8})*$",
+      "description": "BCP 47 language tag (e.g., en-US, ja-JP, zh-Hant)"
+    },
+    "isoDate": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^(sha256|sha512|blake3):[a-f0-9]+$",
+      "description": "Format: algorithm:hex-digest. v2.0 adds blake3 to the accepted algorithms."
+    },
+    "did": {
+      "type": "string",
+      "pattern": "^did:[a-z0-9]+:.+$",
+      "description": "W3C DID per DID-Core specification"
+    },
+
+    "accessibilityFeatures": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "captions",
+          "audio-description",
+          "sign-language",
+          "long-description",
+          "mathml",
+          "structural-navigation",
+          "display-transformability",
+          "transcript",
+          "sonification",
+          "tactile-alternative",
+          "reading-order",
+          "synchronized-audio-text"
+        ]
+      },
+      "uniqueItems": true
+    },
+
+    "documentAccessibility": {
+      "type": "object",
+      "description": "Document-level accessibility metadata (v2.0 §14)",
+      "properties": {
+        "summary": { "type": "string" },
+        "reading_level": {
+          "type": "string",
+          "description": "e.g., 'grade-6', 'grade-11', 'expert'"
+        },
+        "content_warnings": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "features": { "$ref": "#/$defs/accessibilityFeatures" },
+        "hazards": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "flashing",
+              "motion-simulation",
+              "sound",
+              "none",
+              "unknown"
+            ]
+          }
+        },
+        "api_compliance": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Compliance claims, e.g., ['WCAG-2.2-AA']"
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "assetAccessibility": {
+      "type": "object",
+      "description": "Per-asset accessibility metadata (v2.0 §14.3)",
+      "properties": {
+        "long_description": { "type": "string" },
+        "long_description_path": { "type": "string" },
+        "audio_description_track": { "type": "string" },
+        "sign_language_track": { "type": "string" },
+        "extended_descriptions": { "type": "string" },
+        "transcript": { "type": "string" },
+        "mathml": { "type": "string" },
+        "sonification": { "type": "string" },
+        "tactile_alternative": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "assetLocaleAlternative": {
+      "type": "object",
+      "required": ["tag", "path"],
+      "properties": {
+        "tag": { "$ref": "#/$defs/bcp47Tag" },
+        "path": { "type": "string" },
+        "alt_text": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "assetVariant": {
+      "type": "object",
+      "description": "Per-asset variant for responsive delivery (v2.0 §17)",
+      "required": ["path"],
+      "properties": {
+        "path": { "type": "string" },
+        "mime_type": { "type": "string" },
+        "content_hash": { "$ref": "#/$defs/contentHash" },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "width": { "type": "integer", "minimum": 0 },
+        "height": { "type": "integer", "minimum": 0 },
+        "density": {
+          "type": "string",
+          "pattern": "^\\d+(\\.\\d+)?x$",
+          "description": "Display density, e.g. '1x', '2x', '3x'"
+        },
+        "formats": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "media_conditions": {
+          "type": "string",
+          "description": "CSS media-query-like conditions"
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "derivedFromEntry": {
+      "type": "object",
+      "required": ["id", "relation"],
+      "properties": {
+        "id": { "type": "string", "description": "Source document URN or URL" },
+        "version": { "type": "string" },
+        "relation": {
+          "type": "string",
+          "enum": ["fork", "merge-source", "translation-of", "derivative-work"]
+        },
+        "notes": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "author": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "url": { "type": "string", "format": "uri" },
+        "did": { "$ref": "#/$defs/did" },
+        "role": { "type": "string" },
+        "organization": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "license": {
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "required": ["type"],
+          "properties": {
+            "type": { "type": "string" },
+            "url": { "type": "string", "format": "uri" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+
+    "documentInfo": {
+      "type": "object",
+      "required": ["id", "title", "created", "modified"],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "content_id": {
+          "$ref": "#/$defs/contentHash",
+          "description": "Content-addressed identifier (v2.0 §9.4)"
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "subtitle": { "type": "string" },
+        "description": { "type": "string" },
+        "authors": { "type": "array", "items": { "$ref": "#/$defs/author" } },
+        "contributors": { "type": "array", "items": { "$ref": "#/$defs/author" } },
+        "created": { "$ref": "#/$defs/isoDate" },
+        "modified": { "$ref": "#/$defs/isoDate" },
+        "published": { "$ref": "#/$defs/isoDate" },
+        "version": { "type": "string" },
+        "language": { "$ref": "#/$defs/bcp47Tag" },
+        "license": { "$ref": "#/$defs/license" },
+        "copyright": { "type": "string" },
+        "keywords": { "type": "array", "items": { "type": "string" } },
+        "category": { "type": "string" },
+        "subject": { "type": "string" },
+        "cover_image": { "type": "string" },
+
+        "profile": {
+          "type": "string",
+          "format": "uri",
+          "description": "Profile URI (v2.0 §13) — e.g., https://mdx-format.org/profiles/scientific-paper/v1"
+        },
+        "derived_from": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/derivedFromEntry" },
+          "description": "Source documents (v2.0 §15.2)"
+        },
+        "accessibility": {
+          "$ref": "#/$defs/documentAccessibility"
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "localeAvailable": {
+      "type": "object",
+      "required": ["tag", "entry_point"],
+      "properties": {
+        "tag": { "$ref": "#/$defs/bcp47Tag" },
+        "entry_point": { "type": "string" },
+        "title": { "type": "string" },
+        "cover_image": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "contentLocales": {
+      "type": "object",
+      "required": ["default", "available"],
+      "properties": {
+        "default": { "$ref": "#/$defs/bcp47Tag" },
+        "available": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/localeAvailable" }
+        },
+        "fallback": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/bcp47Tag" }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "contentVariant": {
+      "type": "object",
+      "required": ["id", "entry_point"],
+      "properties": {
+        "id": { "type": "string" },
+        "entry_point": { "type": "string" },
+        "audience": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "contentInclude": {
+      "type": "object",
+      "required": ["id", "target"],
+      "properties": {
+        "id": { "type": "string" },
+        "target": {
+          "type": "string",
+          "description": "Archive-relative path or mdx://<doc-id>[/path][#fragment] or https://... URL"
+        },
+        "content_hash": { "$ref": "#/$defs/contentHash" },
+        "trusted": { "type": "boolean", "default": false }
+      },
+      "additionalProperties": false
+    },
+
+    "contentConfig": {
+      "type": "object",
+      "required": ["entry_point"],
+      "properties": {
+        "entry_point": { "type": "string" },
+        "encoding": { "type": "string" },
+        "markdown_variant": { "type": "string" },
+        "markdown_version": { "type": "string" },
+        "extensions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "additional_files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": { "type": "string" },
+              "title": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "includes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contentInclude" },
+          "description": "Transclusion declarations (v2.0 §12.3)"
+        },
+        "locales": {
+          "$ref": "#/$defs/contentLocales",
+          "description": "Multi-locale bundle (v2.0 §8)"
+        },
+        "variants": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contentVariant" },
+          "description": "Document-level variants (v2.0 §17.3)"
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "baseAsset": {
+      "type": "object",
+      "required": ["path"],
+      "properties": {
+        "path": { "type": "string" },
+        "mime_type": { "type": "string" },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "checksum": {
+          "$ref": "#/$defs/contentHash",
+          "description": "DEPRECATED in v2.0 — use content_hash. Retained for backward compat."
+        },
+        "content_hash": { "$ref": "#/$defs/contentHash" },
+        "description": { "type": "string" },
+        "accessibility": { "$ref": "#/$defs/assetAccessibility" },
+        "variants": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/assetVariant" }
+        },
+        "locales": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/assetLocaleAlternative" }
+        }
+      }
+    },
+
+    "imageAsset": {
+      "allOf": [
+        { "$ref": "#/$defs/baseAsset" },
+        {
+          "type": "object",
+          "properties": {
+            "width": { "type": "integer", "minimum": 0 },
+            "height": { "type": "integer", "minimum": 0 },
+            "alt_text": { "type": "string" },
+            "title": { "type": "string" },
+            "credit": { "type": "string" }
+          }
+        }
+      ]
+    },
+
+    "videoCaption": {
+      "type": "object",
+      "required": ["path"],
+      "properties": {
+        "path": { "type": "string" },
+        "language": { "$ref": "#/$defs/bcp47Tag" },
+        "label": { "type": "string" },
+        "kind": {
+          "type": "string",
+          "enum": ["subtitles", "captions", "descriptions", "chapters", "metadata"]
+        },
+        "default": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+
+    "videoAsset": {
+      "allOf": [
+        { "$ref": "#/$defs/baseAsset" },
+        {
+          "type": "object",
+          "properties": {
+            "width": { "type": "integer", "minimum": 0 },
+            "height": { "type": "integer", "minimum": 0 },
+            "duration_seconds": { "type": "number", "minimum": 0 },
+            "frame_rate": { "type": "number", "minimum": 0 },
+            "codec": { "type": "string" },
+            "poster": { "type": "string" },
+            "captions": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/videoCaption" }
+            }
+          }
+        }
+      ]
+    },
+
+    "audioAsset": {
+      "allOf": [
+        { "$ref": "#/$defs/baseAsset" },
+        {
+          "type": "object",
+          "properties": {
+            "duration_seconds": { "type": "number", "minimum": 0 },
+            "sample_rate": { "type": "integer", "minimum": 0 },
+            "channels": { "type": "integer", "minimum": 1 },
+            "bit_rate": { "type": "integer", "minimum": 0 },
+            "transcript": { "type": "string" }
+          }
+        }
+      ]
+    },
+
+    "modelAsset": {
+      "allOf": [
+        { "$ref": "#/$defs/baseAsset" },
+        {
+          "type": "object",
+          "properties": {
+            "format_version": { "type": "string" },
+            "preview": { "type": "string" },
+            "binary_buffers": { "type": "array", "items": { "type": "string" } },
+            "textures": { "type": "array", "items": { "type": "string" } },
+            "animations": { "type": "boolean" },
+            "vertex_count": { "type": "integer", "minimum": 0 },
+            "triangle_count": { "type": "integer", "minimum": 0 }
+          }
+        }
+      ]
+    },
+
+    "documentAsset": {
+      "allOf": [
+        { "$ref": "#/$defs/baseAsset" },
+        {
+          "type": "object",
+          "properties": {
+            "pages": { "type": "integer", "minimum": 0 },
+            "title": { "type": "string" },
+            "pdf_version": { "type": "string" }
+          }
+        }
+      ]
+    },
+
+    "dataAsset": {
+      "allOf": [
+        { "$ref": "#/$defs/baseAsset" },
+        {
+          "type": "object",
+          "properties": {
+            "rows": { "type": "integer", "minimum": 0 },
+            "columns": { "type": "integer", "minimum": 0 },
+            "delimiter": { "type": "string" },
+            "has_header": { "type": "boolean" },
+            "encoding": { "type": "string" },
+            "schema_ref": { "type": "string" }
+          }
+        }
+      ]
+    },
+
+    "fontAsset": {
+      "allOf": [
+        { "$ref": "#/$defs/baseAsset" },
+        {
+          "type": "object",
+          "properties": {
+            "family": { "type": "string" },
+            "weight": { "type": "integer" },
+            "style": { "type": "string" }
+          }
+        }
+      ]
+    },
+
+    "assetsInventory": {
+      "type": "object",
+      "properties": {
+        "images":    { "type": "array", "items": { "$ref": "#/$defs/imageAsset" } },
+        "video":     { "type": "array", "items": { "$ref": "#/$defs/videoAsset" } },
+        "audio":     { "type": "array", "items": { "$ref": "#/$defs/audioAsset" } },
+        "models":    { "type": "array", "items": { "$ref": "#/$defs/modelAsset" } },
+        "documents": { "type": "array", "items": { "$ref": "#/$defs/documentAsset" } },
+        "data":      { "type": "array", "items": { "$ref": "#/$defs/dataAsset" } },
+        "fonts":     { "type": "array", "items": { "$ref": "#/$defs/fontAsset" } },
+        "other":     { "type": "array", "items": { "$ref": "#/$defs/baseAsset" } }
+      },
+      "additionalProperties": false
+    },
+
+    "stylesConfig": {
+      "type": "object",
+      "properties": {
+        "theme": { "type": "string" },
+        "print": { "type": "string" },
+        "syntax_highlighting": { "type": "string" },
+        "custom_properties": { "type": "object", "additionalProperties": { "type": "string" } },
+        "alignment_classes": { "type": "object", "additionalProperties": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+
+    "renderingConfig": {
+      "type": "object",
+      "properties": {
+        "math_renderer": { "type": "string" },
+        "math_delimiters": {
+          "type": "object",
+          "properties": {
+            "inline": { "type": "array", "items": { "type": "string" }, "minItems": 2, "maxItems": 2 },
+            "block":  { "type": "array", "items": { "type": "string" }, "minItems": 2, "maxItems": 2 }
+          },
+          "additionalProperties": false
+        },
+        "table_of_contents": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "depth": { "type": "integer", "minimum": 1, "maximum": 6 },
+            "ordered": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        "line_numbers": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "start": { "type": "integer" }
+          },
+          "additionalProperties": false
+        },
+        "footnotes": {
+          "type": "object",
+          "properties": {
+            "style": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "attributes": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "allow_inline_styles": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        "fragment_scheme": {
+          "type": "string",
+          "description": "Fragment anchor scheme for ::include (v2.0 §12.5); defaults to commonmark-slug"
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "kernelSpec": {
+      "type": "object",
+      "required": ["id", "language"],
+      "properties": {
+        "id": { "type": "string" },
+        "spec_path": { "type": "string" },
+        "language": { "type": "string" },
+        "version": { "type": "string" },
+        "requirements": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+
+    "interactivityConfig": {
+      "type": "object",
+      "properties": {
+        "scripts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": { "type": "string" },
+              "type": { "type": "string" },
+              "integrity": { "type": "string" },
+              "sandbox": { "type": "boolean" },
+              "permissions": { "type": "array", "items": { "type": "string" } },
+              "load": { "type": "string", "enum": ["eager", "lazy"] }
+            },
+            "additionalProperties": false
+          }
+        },
+        "kernels": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/kernelSpec" },
+          "description": "Computational-cell kernels (v2.0 §11.5)"
+        },
+        "required_capabilities": { "type": "array", "items": { "type": "string" } },
+        "optional_capabilities": { "type": "array", "items": { "type": "string" } },
+        "fallback_behavior": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "collaborationConfig": {
+      "type": "object",
+      "properties": {
+        "allow_annotations": { "type": "boolean" },
+        "annotation_types": { "type": "array", "items": { "type": "string" } },
+        "track_changes": { "type": "boolean" },
+        "allow_replies": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+
+    "historyConfig": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "versions_file": { "type": "string" },
+        "graph_file": {
+          "type": "string",
+          "description": "Path to fork/merge DAG (v2.0 §15.4)"
+        },
+        "snapshots_directory": { "type": "string" },
+        "retention_policy": { "type": "string" },
+        "diff_format": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "signatureEntry": {
+      "type": "object",
+      "required": ["role", "signer", "algorithm", "signature"],
+      "properties": {
+        "role": {
+          "type": "string",
+          "description": "One of: author, reviewer, editor, publisher, notary, or a custom URI"
+        },
+        "signer": {
+          "type": "object",
+          "required": ["name"],
+          "properties": {
+            "name": { "type": "string" },
+            "email": { "type": "string", "format": "email" },
+            "url": { "type": "string", "format": "uri" },
+            "did": { "$ref": "#/$defs/did" },
+            "key_id": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "algorithm": {
+          "type": "string",
+          "enum": ["Ed25519", "RS256", "ES256"]
+        },
+        "scope": {
+          "type": "string",
+          "enum": ["manifest-only", "manifest-and-content", "full-archive"]
+        },
+        "canonicalization": {
+          "type": "string",
+          "enum": ["jcs"]
+        },
+        "timestamp": { "$ref": "#/$defs/isoDate" },
+        "signature": { "type": "string" },
+        "certificate": { "type": "string" },
+        "prev_signature": { "type": "string" },
+        "revocation_url": { "type": "string", "format": "uri" }
+      },
+      "additionalProperties": false
+    },
+
+    "legacySignature": {
+      "type": "object",
+      "description": "DEPRECATED v1.1 singular signature. v2.0 viewers accept but should not write.",
+      "properties": {
+        "signed_by": { "type": "string" },
+        "algorithm": { "type": "string" },
+        "certificate": { "type": "string" },
+        "signature": { "type": "string" }
+      }
+    },
+
+    "securityConfig": {
+      "type": "object",
+      "properties": {
+        "integrity": {
+          "type": "object",
+          "properties": {
+            "algorithm": { "type": "string" },
+            "manifest_checksum": { "$ref": "#/$defs/contentHash" }
+          },
+          "additionalProperties": false
+        },
+        "signature": { "$ref": "#/$defs/legacySignature" },
+        "signatures": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/signatureEntry" },
+          "description": "Multi-signature chain (v2.0 §16)"
+        },
+        "permissions": {
+          "type": "object",
+          "properties": {
+            "allow_external_links": { "type": "boolean" },
+            "allow_external_images": { "type": "boolean" },
+            "allow_external_includes": { "type": "boolean" },
+            "allow_scripts": { "type": "boolean" },
+            "allow_kernels": { "type": "boolean" },
+            "script_sandbox": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

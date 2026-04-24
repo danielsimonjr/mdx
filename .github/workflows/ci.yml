@@ -183,14 +183,24 @@ jobs:
       - name: Install ajv-cli
         run: npm install -g ajv-cli ajv-formats
 
-      - name: Validate schema syntax
+      - name: Validate v1.1 schema syntax
         run: ajv compile -s spec/manifest.schema.json --spec=draft2020 -c ajv-formats
 
-      - name: Validate example manifest against schema
+      - name: Validate v2.0 schema syntax
+        run: ajv compile -s spec/manifest-v2.schema.json --spec=draft2020 -c ajv-formats
+
+      - name: Validate example manifest against v1.1 schema
         run: |
           cd examples
           unzip -p example-document.mdx manifest.json > manifest.json
-          ajv validate -s ../spec/manifest.schema.json -d manifest.json --spec=draft2020 -c ajv-formats || echo "Schema validation completed with warnings"
+          ajv validate -s ../spec/manifest.schema.json -d manifest.json --spec=draft2020 -c ajv-formats || echo "v1.1 schema validation completed with warnings"
+
+      - name: Validate example manifest against v2.0 schema (backward compat)
+        run: |
+          cd examples
+          # Regenerate manifest from the example MDX
+          unzip -p example-document.mdx manifest.json > manifest.json
+          ajv validate -s ../spec/manifest-v2.schema.json -d manifest.json --spec=draft2020 -c ajv-formats || echo "v2.0 schema validation completed with warnings"
 
   markdown-lint:
     name: Lint Markdown

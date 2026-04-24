@@ -36,8 +36,8 @@ import {
 // =============================================================================
 
 describe("constants", () => {
-  it("MDX_VERSION is v1.1.0", () => {
-    expect(MDX_VERSION).toBe("1.1.0");
+  it("MDX_VERSION is v2.0.0", () => {
+    expect(MDX_VERSION).toBe("2.0.0");
   });
 
   it("MDX_MIME_TYPE is the registered application/vnd.mdx-container+zip", () => {
