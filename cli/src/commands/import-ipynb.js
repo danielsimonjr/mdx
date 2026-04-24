@@ -34,7 +34,6 @@
  *   2 — ipynb format error (invalid JSON, missing required fields)
  */
 
-'use strict';
 
 const fs = require('fs');
 const path = require('path');
@@ -252,9 +251,18 @@ function renderOutput(out, ctx) {
     if (out.output_type === 'error') {
         // Render tracebacks as text output. Strip ANSI escape codes for
         // readability; downstream viewers can re-apply via highlight.
-        ctx.onText();
         const tb = (out.traceback || []).map(stripAnsi).join('\n');
-        const body = `${out.ename || 'Error'}: ${out.evalue || ''}\n${tb}`.trim();
+        const ename = out.ename || '';
+        const evalue = out.evalue || '';
+        // If all three fields are effectively empty, the original
+        // notebook had a malformed error output. Warn rather than emit
+        // a cell ending in a cryptic "Error:" line.
+        if (!ename && !evalue && !tb.trim()) {
+            ctx.onWarning('cell has an error output with no ename/evalue/traceback — dropped');
+            return null;
+        }
+        ctx.onText();
+        const body = `${ename || 'Error'}: ${evalue}\n${tb}`.trim();
         return '::output{type="text"}\n```\n' + body + '\n```';
     }
 

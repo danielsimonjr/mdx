@@ -43,7 +43,6 @@
  *     misleading users.
  */
 
-'use strict';
 
 const fs = require('fs');
 const path = require('path');
@@ -139,16 +138,25 @@ function runChecks(manifest, manifestBytes, entries, trustPolicy, options) {
         } else {
             const algo = match[1].toLowerCase();
             const expected = match[2].toLowerCase();
-            const hash = crypto
-                .createHash(algo === 'sha256' ? 'sha256' : algo === 'sha512' ? 'sha512' : 'sha256')
-                .update(manifestBytes)
-                .digest('hex');
-            if (hash === expected) {
-                report.passes.push(`integrity.manifest_checksum verifies (${algo})`);
-            } else {
+            // Only verify algorithms we can actually compute. Previously
+            // unknown algorithms silently fell back to SHA-256, which
+            // would accidentally pass for a lookalike hash of the right
+            // length. Reject explicitly instead.
+            const supportedAlgos = new Set(['sha256', 'sha512']);
+            if (!supportedAlgos.has(algo)) {
                 report.failures.push(
-                    `integrity.manifest_checksum mismatch: declared ${expected.slice(0, 12)}…, computed ${hash.slice(0, 12)}…`,
+                    `integrity.manifest_checksum uses unsupported algorithm: ${algo} ` +
+                        `(supported: sha256, sha512; blake3 is spec'd but not yet verified by this CLI)`,
                 );
+            } else {
+                const hash = crypto.createHash(algo).update(manifestBytes).digest('hex');
+                if (hash === expected) {
+                    report.passes.push(`integrity.manifest_checksum verifies (${algo})`);
+                } else {
+                    report.failures.push(
+                        `integrity.manifest_checksum mismatch: declared ${expected.slice(0, 12)}…, computed ${hash.slice(0, 12)}…`,
+                    );
+                }
             }
         }
     } else {

@@ -1,0 +1,23 @@
+{
+  "name": "mdz-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "MDZ (Markdown Zipped Container) — monorepo root. See README.md and ROADMAP.md. The installable packages live in packages/; the CLI lives in cli/; reference implementations in implementations/.",
+  "workspaces": [
+    "packages/*",
+    "cli",
+    "implementations/typescript"
+  ],
+  "scripts": {
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/danielsimonjr/mdx"
+  },
+  "license": "MIT"
+}

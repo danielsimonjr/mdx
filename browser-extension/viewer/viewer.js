@@ -44,7 +44,15 @@ async function main() {
   if (fallback) fallback.remove();
 
   const params = new URL(location.href).searchParams;
-  const archiveUrl = params.get("url");
+  let archiveUrl = params.get("url");
+  // MIME-intercept fallback (DNR rule 10/11 — see service-worker.js).
+  // When the extension catches an archive via Content-Type, the original
+  // URL isn't carried through (queryTransform doesn't support regex
+  // substitution). Recover from `document.referrer` as a best-effort;
+  // this works for direct navigations but not for redirect chains.
+  if (!archiveUrl && params.get("source") === "mime-intercept") {
+    archiveUrl = document.referrer || null;
+  }
   if (!archiveUrl) {
     const msg = document.createElement("p");
     msg.textContent = "No archive URL provided. Pass ?url=<archive-url>.";

@@ -18,7 +18,12 @@ export type {
   ContentConfig,
   AssetEntry,
   Author,
+  AcceptedMimeType,
 } from "./manifest-types.js";
 export { ACCEPTED_MIME_TYPES } from "./manifest-types.js";
+export type {
+  MDZLoadedEventDetail,
+  MDZErrorEventDetail,
+} from "./mdz-viewer.js";
 export { renderMarkdown } from "./render.js";
 export type { RenderOptions } from "./render.js";

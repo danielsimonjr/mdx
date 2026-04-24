@@ -64,19 +64,37 @@ attributes hoping the viewer renders them.
 
 ### T3 — Path traversal via archive entry names
 **Information disclosure / Tampering.** Archive contains `assets/../../etc/passwd`.
-- **Mitigation:** `sanitizePath` (TypeScript) and the archive inflator
-  strip `..` path segments. The viewer never writes to disk; desktop
-  editors that do extract MUST apply `sanitizePath` before `fs.writeFile`.
-- **Negative tests:** `tests/property/test_parser_properties.py` has a
-  `sanitizePath never allows path traversal` property.
+- **Mitigation (viewer):** `packages/mdz-viewer/src/archive.ts`
+  `inflateZip()` runs every entry name through `sanitizeArchivePath()`
+  before exposing it in the returned Map. Paths with `..` segments,
+  absolute paths, drive letters, or NUL bytes are rejected (whole
+  archive refused) rather than silently stripped — authors rarely
+  intend `../etc/passwd`; silent drop would hide the problem.
+- **Mitigation (writer SDK, desktop editors):** the TypeScript
+  `sanitizePath` helper in `implementations/typescript/mdx_format.ts`
+  strips `..` segments; desktop editors MUST apply it before
+  `fs.writeFile` when extracting.
+- **Negative tests:** property-test in
+  `implementations/typescript/mdx_format.property.test.ts`
+  asserts `sanitizePath never produces a .. segment` for arbitrary
+  input.
 
 ### T4 — ZIP bomb / archive DOS
 **Denial of Service.** Archive inflates to many GB of junk, exhausting memory.
-- **Mitigation:** fflate's `unzipSync` has no per-entry or total-size limit
-  by default. The viewer enforces a **per-session 500 MB inflation limit**
-  at the call site (`loadArchive` in 0.2.x) and logs a warning over 50 MB.
+- **Mitigation (viewer, enforced):** `packages/mdz-viewer/src/archive.ts`
+  `inflateZip()` enforces three limits:
+  - `MAX_ENTRY_COUNT = 10_000` — rejects archives with more entries
+  - `MAX_TOTAL_INFLATED_BYTES = 500 MB` — rejects archives that inflate larger
+  - `WARN_INFLATED_BYTES = 50 MB` — logs a console warning above this
+    threshold so power users have visibility.
+- **Bumping these limits** requires a threat-model review: in a shared
+  hosted viewer (`view.mdz-format.org`), a 2 GB inflation renders a
+  reviewer's browser unresponsive.
 - **Residual risk:** inflate-to-disk in desktop editors or CI batch
-  processors still vulnerable. Phase 4 streaming-read work addresses this.
+  processors — not covered by these limits. Desktop editors MUST apply
+  their own size bound before `fs.writeFile`. Phase 4 streaming-read
+  work (§4.4 of ROADMAP) is the long-term fix for very large archives
+  with legitimately-large media.
 
 ### T5 — Unterminated fence absorbing document
 **Tampering.** `::cell` with a `\`\`\`python` but no closing fence hides

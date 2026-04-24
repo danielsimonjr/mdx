@@ -237,6 +237,48 @@ jobs:
       - name: Test CLI accepts both .mdz and .mdx (backward-compat)
         run: python tests/cli/test_cli_dual_extension.py
 
+      - name: Test verify command (signature chain + integrity)
+        run: |
+          cd cli
+          node --test test/verify.test.js
+
+  test-phase-2-3:
+    name: Phase 2/3 Tests (viewer sanitizer + accessibility)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install workspace deps
+        run: npm install --ignore-scripts
+
+      - name: Run viewer sanitizer XSS tests
+        run: |
+          cd packages/mdz-viewer
+          npx vitest run src/render.test.ts
+
+      - name: Type-check viewer package
+        run: |
+          cd packages/mdz-viewer
+          npx tsc --noEmit
+
+      - name: Type-check hosted worker
+        run: |
+          cd packages/mdz-viewer-hosted
+          npx tsc --noEmit
+
+      - name: Run accessibility structural checks
+        run: python tests/accessibility/run_accessibility.py
+
   validate-json-schema:
     name: Validate JSON Schema
     runs-on: ubuntu-latest

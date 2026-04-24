@@ -65,10 +65,26 @@ mdx/                                    # (directory name deferred-rename)
 │   ├── src/
 │   │   ├── index.js                                # program: mdz
 │   │   └── commands/
+│   │       ├── info.js / view.js / extract.js      # v1 basics
+│   │       ├── edit.js / create.js / validate.js
+│   │       ├── import-ipynb.js                     # Phase 2: Jupyter -> MDZ
+│   │       ├── export-jats.js                      # Phase 2: MDZ -> JATS 1.3
+│   │       ├── export-epub.js                      # Phase 2: MDZ -> EPUB 3.3
+│   │       └── verify.js                           # Phase 3: signature chain
 │   └── dist/
-├── editor/index.html                               # WYSIWYG demo
-├── viewer/index.html                               # read-only demo
-├── chrome-extension/
+├── packages/                                       # Phase 2 npm packages
+│   ├── mdz-viewer/                                 # <mdz-viewer> web component
+│   │   └── src/ (archive.ts, render.ts,
+│   │             mdz-viewer.ts, index.ts,
+│   │             manifest-types.ts)
+│   └── mdz-viewer-hosted/                          # Cloudflare Worker
+│       └── src/worker.ts
+├── browser-extension/                              # Phase 2.5 WebExtensions
+│   ├── manifest.json
+│   ├── background/ content/ popup/ viewer/ icons/
+├── editor/index.html                               # WYSIWYG demo (pre-Phase 2.3)
+├── viewer/index.html                               # read-only demo (pre-Phase 2.1)
+├── chrome-extension/                               # legacy Chrome-only ext
 ├── tree-sitter-mdz/                                # alpha grammar
 ├── examples/
 │   ├── example-document.mdx                        # v1.x basic
@@ -83,7 +99,11 @@ mdx/                                    # (directory name deferred-rename)
 │   │   ├── positive/ negative/ roundtrip/ edge/
 │   │   └── run_conformance.py
 │   ├── property/test_parser_properties.py          # hypothesis
-│   └── v2.0/                                       # parser + schema + Lark
+│   ├── v2.0/                                       # parser + schema + Lark
+│   ├── cli/test_cli_dual_extension.py              # Phase 0: .mdz/.mdx parity
+│   └── accessibility/                              # Phase 3.3 scaffold
+│       ├── fixtures/ (5 starter categories)
+│       └── run_accessibility.py
 ├── docs/                                           # strategic documents
 │   ├── POSITIONING.md   COMPETITIVE.md
 │   ├── FUNDING.md       PARTNERSHIPS.md

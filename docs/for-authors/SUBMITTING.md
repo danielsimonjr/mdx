@@ -232,11 +232,11 @@ cross-file reference resolution planned for v2.1.
 | `mdz edit <file>` | ✓ works | Interactive terminal editor |
 | `mdz create [name]` | ✓ works | Interactive wizard; no `--profile` yet |
 | `mdz validate <file>` | ✓ works | Structural only; no profile rules |
-| `mdz import-ipynb` | ⏳ planned (Phase 2) | Target #1 adoption on-ramp |
-| `mdz sign` | ⏳ planned (Phase 3) | Spec'd in v2.0 §16 |
-| `mdz verify` | ⏳ planned (Phase 3) | Signature + chain verification |
-| `mdz export jats` | ⏳ planned (Phase 2) | For journal ingest pipelines |
-| `mdz export epub` | ⏳ planned (Phase 2) | EPUB 3.3 bridge |
+| `mdz import-ipynb` | ✓ works (starter) | Jupyter .ipynb → MDZ; cells + outputs + images converted |
+| `mdz sign` | ⏳ planned (Phase 3.2) | Ed25519/RS256/ES256 signing; spec'd in v2.0 §16 |
+| `mdz verify` | ✓ works (structural) | Chain + integrity check; crypto-verify is Phase 3.2 |
+| `mdz export-jats` | ✓ works (starter) | JATS 1.3 XML for journal ingest pipelines |
+| `mdz export-epub` | ✓ works (starter) | EPUB 3.3 package for Calibre / readium / iBooks |
 | `--profile` validation | ⏳ planned (Phase 2) | Enforces scientific-paper rules |
 | `view.mdz-format.org` hosted viewer | ⏳ planned (Phase 2.2) | Domain not yet registered |
 | `@mdz-format/viewer` web component | ⏳ planned (Phase 2.1) | npm scope not yet registered |

@@ -10,8 +10,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mdz-format/viewer": "0.1.0-alpha.0"
+    "@mdz-format/viewer": "*"
   },
+  "comment": "`@mdz-format/viewer: *` works because the npm workspaces config in the repo root symlinks packages/* into each workspace's node_modules. Swap to a version pin once the viewer is published.",
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241022.0",
     "typescript": "^5.5.0",

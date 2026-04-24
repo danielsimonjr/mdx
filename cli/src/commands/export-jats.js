@@ -35,7 +35,6 @@
  *     form, which is the most widely supported.
  */
 
-'use strict';
 
 const fs = require('fs');
 const path = require('path');
@@ -101,6 +100,16 @@ async function exportJats(inputPath, options) {
         if (!references) {
             console.log(chalk.yellow('  - No references.json found — <ref-list> is empty'));
         }
+        // Warn when the markdown has no `# Abstract` / `# Summary` section.
+        // JATS accepts articles without <abstract>, but most journal
+        // submission pipelines reject abstract-less papers at intake.
+        if (!/^#+\s+(abstract|summary)\s*$/im.test(markdown)) {
+            console.log(
+                chalk.yellow(
+                    '  - No "# Abstract" / "# Summary" section detected — most journals reject submissions without one',
+                ),
+            );
+        }
         console.log();
         console.log(
             'The MDZ remains the source of truth; this JATS is derived. ' +
@@ -126,7 +135,6 @@ function buildJats({ manifest, markdown, references, sourceFilename }) {
     const supplementary = buildSupplementary(sourceFilename);
 
     const generatedAt = new Date().toISOString();
-    const license = formatLicense(doc.license);
 
     return [
         '<?xml version="1.0" encoding="UTF-8"?>',
@@ -156,11 +164,6 @@ function buildJats({ manifest, markdown, references, sourceFilename }) {
         '</article>',
         '',
     ].join('\n');
-
-    // license variable is read via the template helper inside buildFrontMatter;
-    // kept here in scope for future use (e.g., copyright-statement rendering).
-    /* eslint-disable-next-line no-unused-vars */
-    void license;
 }
 
 function buildFrontMatter(doc, tokens) {
@@ -356,46 +359,82 @@ function renderToken(t, ctx) {
 }
 
 function renderInline(text, ctx) {
-    // Markdown inline -> JATS inline. Handles:
-    //   ![alt](path)                 -> <fig>/<inline-graphic>
-    //   [link](url)                  -> <ext-link>
-    //   **bold** / __bold__          -> <bold>
-    //   *em* / _em_                  -> <italic>
-    //   `code`                       -> <monospace>
-    //   $math$                       -> <inline-formula><tex-math>
-    const s = String(text || '');
-    // Images (block-level in practice; inline if mid-paragraph)
-    let out = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, src) => {
-        const img = ctx.imageLookup.get(src);
-        const hasAlt = alt || (img && img.alt_text) || '';
-        return (
-            `<fig><caption><p>${escapeXml(hasAlt)}</p></caption>` +
-            `<graphic xlink:href="${escapeXml(src)}"/></fig>`
-        );
-    });
-    // Inline code BEFORE other inline conversions so `**` inside backticks isn't touched.
-    out = out.replace(/`([^`]+)`/g, (_, c) => `<monospace>${escapeXml(c)}</monospace>`);
-    // Links
-    out = out.replace(
-        /\[([^\]]+)\]\(([^)]+)\)/g,
-        (_, label, href) =>
-            `<ext-link ext-link-type="uri" xlink:href="${escapeXml(href)}">${escapeXml(label)}</ext-link>`,
-    );
-    // Bold / italic
-    out = out.replace(/\*\*([^*]+)\*\*/g, (_, b) => `<bold>${escapeXml(b)}</bold>`);
-    out = out.replace(/\*([^*]+)\*/g, (_, e) => `<italic>${escapeXml(e)}</italic>`);
-    // Inline math ($...$)
-    out = out.replace(
-        /\$([^$\n]+)\$/g,
-        (_, m) => `<inline-formula><tex-math>${escapeXml(m)}</tex-math></inline-formula>`,
-    );
-    // Everything that's still raw text needs XML escaping — but the
-    // replacements above have already injected valid XML. To avoid
-    // double-escaping, handle the non-matched segments via a split/escape/rejoin
-    // pass in a future revision. For starter-quality output, accept that
-    // `renderInline` may produce some double-escaped text on exotic inputs
-    // and note it as a fidelity gap.
-    return out;
+    // Markdown inline -> JATS inline. Handles (precedence: images, code,
+    // links, bold, italic, inline math):
+    //   ![alt](path)        -> <fig><caption><p>alt</p></caption><graphic xlink:href=path/></fig>
+    //   `code`              -> <monospace>code</monospace>
+    //   [link](url)         -> <ext-link xlink:href=url>label</ext-link>
+    //   **bold**            -> <bold>bold</bold>
+    //   *em*                -> <italic>em</italic>
+    //   $math$              -> <inline-formula><tex-math>math</tex-math></inline-formula>
+    //
+    // Escaping strategy (fixes prior double-escape bug): we tokenize the
+    // input into a mixed sequence of "plain text" and "pre-built XML"
+    // segments, apply escapeXml to plain-text segments only, and
+    // concatenate. This guarantees that bare `<`, `>`, `&` in the
+    // surrounding prose become `&lt;`, `&gt;`, `&amp;` — producing
+    // well-formed XML that journal ingest pipelines accept.
+    //
+    // Precedence of replacements matters: image MUST be detected before
+    // link (both share `[...](...)` brackets), and code MUST be detected
+    // before bold/italic/math so that `**inside backticks**` stays literal.
+
+    const segments = [];
+    let rest = String(text || '');
+
+    // Greedy left-to-right tokenizer. Each iteration finds the LEFTMOST
+    // match across all patterns, emits the preceding plain-text segment,
+    // emits the replacement as a pre-built XML segment, and continues
+    // with what's after the match.
+    const patterns = [
+        // [regex, builder(match, ...groups)]
+        [
+            /!\[([^\]]*)\]\(([^)]+)\)/,
+            (_m, alt, src) => {
+                const img = ctx.imageLookup.get(src);
+                const hasAlt = alt || (img && img.alt_text) || '';
+                return (
+                    `<fig><caption><p>${escapeXml(hasAlt)}</p></caption>` +
+                    `<graphic xlink:href="${escapeXml(src)}"/></fig>`
+                );
+            },
+        ],
+        [/`([^`]+)`/, (_m, c) => `<monospace>${escapeXml(c)}</monospace>`],
+        [
+            /\[([^\]]+)\]\(([^)]+)\)/,
+            (_m, label, href) =>
+                `<ext-link ext-link-type="uri" xlink:href="${escapeXml(href)}">${escapeXml(label)}</ext-link>`,
+        ],
+        [/\*\*([^*]+)\*\*/, (_m, b) => `<bold>${escapeXml(b)}</bold>`],
+        [/\*([^*]+)\*/, (_m, e) => `<italic>${escapeXml(e)}</italic>`],
+        [
+            /\$([^$\n]+)\$/,
+            (_m, expr) => `<inline-formula><tex-math>${escapeXml(expr)}</tex-math></inline-formula>`,
+        ],
+    ];
+
+    while (rest.length > 0) {
+        let earliest = null;
+        for (const [re, build] of patterns) {
+            const m = re.exec(rest);
+            if (m && (earliest === null || m.index < earliest.match.index)) {
+                earliest = { match: m, build };
+            }
+        }
+        if (!earliest) {
+            segments.push(escapeXml(rest));
+            break;
+        }
+        // Plain text before the match -> escape it.
+        if (earliest.match.index > 0) {
+            segments.push(escapeXml(rest.slice(0, earliest.match.index)));
+        }
+        // The replacement already contains valid XML with inner text
+        // escaped by the builder — append verbatim, do NOT re-escape.
+        segments.push(earliest.build(...earliest.match));
+        rest = rest.slice(earliest.match.index + earliest.match[0].length);
+    }
+    return segments.join('');
 }
 
 function renderTable(t) {

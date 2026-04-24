@@ -268,13 +268,22 @@ ${body}
 
 function isSafeUrl(raw: string | null): raw is string {
   if (!raw) return false;
+  // Reject strings with raw control characters — `new URL()` accepts
+  // some (e.g., leading whitespace, which it trims silently), and
+  // embedding them in an HTML attribute can lead to parser-state
+  // surprises.
+  if (/[\x00-\x1f\x7f]/.test(raw)) return false;
   let parsed: URL;
   try {
     parsed = new URL(raw);
   } catch {
     return false;
   }
-  return parsed.protocol === "https:" || parsed.protocol === "http:";
+  // HTTPS only. The CSP profile's `connect-src 'self' https:` disallows
+  // fetching http:// archives anyway; accepting http: here would silently
+  // fail at fetch time with an opaque error. Reject upfront with a clean
+  // message instead.
+  return parsed.protocol === "https:";
 }
 
 function escapeHtml(s: string): string {

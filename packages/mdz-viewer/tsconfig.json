@@ -9,6 +9,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "lib": ["es2020", "dom", "dom.iterable"],
+    "types": ["trusted-types"],
     "noEmit": true,
     "isolatedModules": true,
     "useDefineForClassFields": true

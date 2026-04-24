@@ -104,7 +104,13 @@ archive. Every v2.0 feature maps to a concrete scientific-paper need:
 **Scientific-paper deliverables this niche requires (added per review —
 these are not optional for journal acceptance):**
 
-- [ ] **JATS-XML bridge** — `mdz-to-jats` and `jats-to-mdz` converters. PubMed
+- [x] **JATS-XML bridge** — `mdz export-jats` ships in Phase 2 as
+      `cli/src/commands/export-jats.js`. Handles front matter (title,
+      authors with did:web→ORCID, abstract, keywords, license), body
+      (headings, paragraphs, lists, tables, code, images, inline math),
+      back (CSL-JSON references), and supplementary-material linking
+      back to the MDZ. The reverse direction `jats-to-mdz` remains
+      planned. PubMed
       Central, Crossref deposit, and every mainstream journal ingest pipeline
       runs on JATS 1.3. Without this path, MDZ can be authored but cannot be
       published in any mainstream journal. Position this at Phase 2 priority
@@ -128,7 +134,10 @@ these are not optional for journal acceptance):**
 - [ ] **SPDX licensing metadata** — manifest requires `document.license.spdx`
       field with SPDX identifier (`CC-BY-4.0`, `CC0-1.0`, `MIT`, etc.) for
       automated OA compliance checking. Update the v2.0 schema.
-- [ ] **`.ipynb` → MDZ migration path** — `ipynb-to-mdz` CLI with documented
+- [x] **`.ipynb` → MDZ migration path** — `mdz import-ipynb` ships as
+      `cli/src/commands/import-ipynb.js`. Cells → `::cell`; outputs
+      (stream/display_data/execute_result) → `::output` with
+      documented
       MIME-bundle → `::output` mapping (text/plain, image/png, application/json,
       application/vnd.jupyter.widget-state+json → warning), metadata round-trip
       for `kernelspec` / `language_info`, cell-level execution_count
@@ -361,7 +370,7 @@ Only build these after the MVP has real users and we know what they want:
 Inherit EPUB's ecosystem (Calibre, readium.js, iBooks, Kindle, every ereader)
 for documents that don't need cells.
 
-- [ ] `mdz-to-epub` CLI: translates MDZ archive to EPUB 3.3 package
+- [x] `mdz export-epub` CLI: translates MDZ archive to EPUB 3.3 package
   - Manifest → OPF
   - Markdown → XHTML (via marked/markdown-it)
   - Assets copied across

@@ -10,9 +10,65 @@
  * The sanitizer is intentionally strict: untrusted MDZ archives MUST not
  * be able to execute script, exfiltrate data, or hijack the host page.
  * This is the Phase 3 CSP enforcement point at the viewer layer.
+ *
+ * The tag / attribute allowlists (`ALLOWED_TAGS`, `GLOBAL_ALLOWED_ATTRS`,
+ * `TAG_ALLOWED_ATTRS`, `NEVER_ALLOWED_ATTRS`) are module-scope `const`s
+ * and INTENTIONALLY NOT EXTENSIBLE from outside. Expanding the allowlist
+ * is a security decision that requires a threat-model review + PR
+ * discussion — file an issue with the requested tag / attribute and the
+ * threat analysis if you need to change them.
  */
 
-import { marked, type Renderer } from "marked";
+import { marked } from "marked";
+
+// ---------------------------------------------------------------------------
+// Trusted Types policy registration
+// ---------------------------------------------------------------------------
+//
+// The viewer's CSP profile (docs/security/CSP.md) declares
+// `require-trusted-types-for 'script'`. Without a matching policy
+// registered, any assignment to `.innerHTML` fails and the viewer breaks.
+// Register a single policy named "mdz-sanitizer" — inputs passing through
+// it are guaranteed sanitized by this module.
+//
+// Registration is idempotent and guarded for environments without
+// Trusted Types (most browsers outside Chromium and the test harness).
+
+interface TrustedHTMLPolicy {
+  createHTML(input: string): string;
+}
+
+let _trustedHtmlPolicy: TrustedHTMLPolicy | null = null;
+
+function getTrustedHtmlPolicy(): TrustedHTMLPolicy | null {
+  if (_trustedHtmlPolicy) return _trustedHtmlPolicy;
+  const tt = (globalThis as unknown as { trustedTypes?: { createPolicy: (name: string, rules: { createHTML: (s: string) => string }) => TrustedHTMLPolicy } }).trustedTypes;
+  if (!tt) return null;
+  try {
+    _trustedHtmlPolicy = tt.createPolicy("mdz-sanitizer", {
+      // The identity function is safe here because this policy is only
+      // reachable from the `renderMarkdown` sanitize path below — the
+      // string reaching `createHTML` has already been through the
+      // allowlist walk + URL rewriter.
+      createHTML: (s: string) => s,
+    });
+    return _trustedHtmlPolicy;
+  } catch {
+    // A duplicate-name policy throws in some browsers if the host page
+    // already registered "mdz-sanitizer" — degrade to the untyped path.
+    return null;
+  }
+}
+
+/**
+ * Wrap a sanitized HTML string into a TrustedHTML when Trusted Types is
+ * enforced. Returns the plain string otherwise (callers can assign to
+ * innerHTML either way; TypeScript's type union covers both).
+ */
+export function toSanitizedHtml(html: string): string | TrustedHTML {
+  const policy = getTrustedHtmlPolicy();
+  return policy ? (policy.createHTML(html) as unknown as TrustedHTML) : html;
+}
 
 export interface RenderOptions {
   /**
@@ -46,6 +102,26 @@ const GLOBAL_ALLOWED_ATTRS: ReadonlySet<string> = new Set([
   "aria-label", "aria-labelledby", "aria-describedby", "aria-hidden",
   "aria-live", "aria-atomic", "aria-busy", "aria-current", "aria-details",
   "aria-expanded", "aria-level", "aria-pressed", "aria-selected",
+]);
+
+/**
+ * Attributes that are NEVER allowed regardless of tag, even if a future
+ * edit accidentally adds them to TAG_ALLOWED_ATTRS. Defense-in-depth
+ * against the class of bugs where someone adds `iframe` back to
+ * ALLOWED_TAGS and forgets that `srcdoc` lets iframes execute arbitrary
+ * script-bearing HTML without ever resolving as a URL.
+ */
+const NEVER_ALLOWED_ATTRS: ReadonlySet<string> = new Set([
+  "srcdoc",
+  "innerhtml",
+  "outerhtml",
+  "data", // <object data="..."> can load script-bearing content
+  "action", // <form action="...">
+  "formaction", // <input formaction="...">
+  "ping", // <a ping="..."> — tracking channel
+  "background", // obsolete but still parsed
+  "dynsrc",
+  "lowsrc",
 ]);
 
 /** Per-tag allowed attributes beyond the global set. */
@@ -94,15 +170,57 @@ export function renderMarkdown(
  */
 function sanitizeHtml(html: string, opts: RenderOptions): string {
   if (typeof DOMParser === "undefined") {
-    // Environment without DOMParser (e.g., bare Node test). Fall back to
-    // a tag-stripping regex — not ideal but prevents script injection.
-    // Real browser environments always take the DOMParser path above.
-    return fallbackStripScripts(html);
+    // No DOMParser available — we refuse to emit HTML. Regex-based
+    // "sanitization" is a well-known source of bypass bugs (slashes,
+    // unusual whitespace, HTML entity escapes inside schemes) and would
+    // give callers a dangerous false sense of safety.
+    //
+    // If a Node-side consumer actually needs to render MDZ to HTML, use
+    // `jsdom` or `linkedom` in the call site to provide a DOMParser
+    // polyfill before invoking this function.
+    throw new Error(
+      "mdz-viewer render: DOMParser is unavailable in this environment. " +
+        "Install `linkedom` or `jsdom` and assign its DOMParser to globalThis " +
+        "before calling renderMarkdown. Regex-based sanitization is not safe " +
+        "for untrusted input.",
+    );
   }
-  const doc = new DOMParser().parseFromString(html, "text/html");
-  walk(doc.body, opts);
-  return doc.body.innerHTML;
+  // Wrap the fragment in a full HTML document so browsers and linkedom
+  // agree on where `body` is. Browsers auto-wrap fragments in body;
+  // linkedom does not, producing empty `doc.body` for bare fragments.
+  const wrapped = `<!DOCTYPE html><html><head></head><body>${html}</body></html>`;
+  const doc = new DOMParser().parseFromString(wrapped, "text/html");
+  // Extract the body element robustly: browsers expose doc.body; linkedom
+  // exposes it too but only when the input was wrapped (the case above).
+  const body = doc.body ?? doc.querySelector?.("body");
+  if (!body) {
+    throw new Error(
+      "mdz-viewer render: parsed document has no body element — DOMParser implementation is unsupported",
+    );
+  }
+  walk(body, opts);
+  return body.innerHTML;
 }
+
+/**
+ * Tags whose CONTENTS are dropped (not hoisted) when the tag itself is
+ * not on the allowlist. These are tags that typically contain foreign
+ * content or script code where "preserve the children" would re-expose
+ * the original attack surface (e.g., hoisting `<script>alert(1)</script>`
+ * from inside `<svg>` into the parent keeps the script alive).
+ */
+const DROP_CONTENTS_TAGS: ReadonlySet<string> = new Set([
+  "script",
+  "style",
+  "noscript",
+  "svg",
+  "math",
+  "template",
+  "iframe",
+  "object",
+  "embed",
+  "applet",
+]);
 
 function walk(node: Element, opts: RenderOptions): void {
   // Iterate over a snapshot — we may remove children during walk.
@@ -110,11 +228,27 @@ function walk(node: Element, opts: RenderOptions): void {
   for (const child of children) {
     const tag = child.tagName.toLowerCase();
     if (!ALLOWED_TAGS.has(tag)) {
-      // Drop the element but preserve its children by hoisting them up.
       const parent = child.parentNode;
-      if (parent) {
-        while (child.firstChild) parent.insertBefore(child.firstChild, child);
+      if (!parent) continue;
+      if (DROP_CONTENTS_TAGS.has(tag)) {
+        // Drop element AND all descendants — "hoist children" on a
+        // <script>/<svg>/etc. would re-expose the attack surface.
         parent.removeChild(child);
+      } else {
+        // Safe hoist: remove the element, keep its children. Recurse
+        // into the hoisted children so disallowed descendants (e.g.,
+        // <mi xlink:href="javascript:...">) are still handled.
+        const hoisted: Node[] = [];
+        while (child.firstChild) {
+          hoisted.push(child.firstChild);
+          parent.insertBefore(child.firstChild, child);
+        }
+        parent.removeChild(child);
+        // Recurse on any element children we just promoted so they go
+        // through the allowlist themselves.
+        for (const n of hoisted) {
+          if ((n as Element).tagName) walk(parent as Element, opts);
+        }
       }
       continue;
     }
@@ -136,8 +270,16 @@ function sanitizeAttributes(
   const attrs = Array.from(el.attributes);
   for (const attr of attrs) {
     const name = attr.name.toLowerCase();
-    if (name.startsWith("on")) {
-      // Event handler — unconditional drop.
+    if (name.startsWith("on") || name.startsWith("xmlns")) {
+      // Event handler or namespace declaration — unconditional drop.
+      // xmlns is blocked because it enables SVG/MathML foreign content
+      // which has its own script-capable attributes.
+      el.removeAttribute(attr.name);
+      continue;
+    }
+    if (NEVER_ALLOWED_ATTRS.has(name)) {
+      // Defense-in-depth — even if a future edit to TAG_ALLOWED_ATTRS
+      // added one of these, they never pass the sanitizer.
       el.removeAttribute(attr.name);
       continue;
     }
@@ -231,11 +373,8 @@ function rewriteUrl(
   return blob;
 }
 
-function fallbackStripScripts(html: string): string {
-  // Used only in environments lacking DOMParser. Production viewer runs
-  // in a browser; this is a defensive fallback for tests.
-  return html
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
-    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, "")
-    .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
-}
+// Note: `fallbackStripScripts` was removed as of the Phase 3 security
+// review. Regex-based HTML sanitization is not safe for untrusted input
+// — any consumer that needs a Node-side renderer must provide a real
+// DOM via `linkedom` or `jsdom`. The `sanitizeHtml` function above now
+// throws a descriptive error when DOMParser is missing.

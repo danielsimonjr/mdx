@@ -80,10 +80,22 @@ the viewer a defense-in-depth posture against malicious archives.
 
 ## Accessibility
 
-- WCAG 2.1 AA baseline. Keyboard-navigable, screen-reader tested.
-- `role="article"`, `aria-live="polite"` on the content region.
-- Honors `prefers-color-scheme` when `theme="auto"`.
-- Respects archive-declared `document.accessibility.features`.
+Target: **WCAG 2.1 AA** once the automated conformance suite (Phase 3.3)
+ships. Current 0.1.0-alpha state:
+
+- ✓ `role="article"`, `aria-live="polite"` on the content region.
+- ✓ Honors `prefers-color-scheme` when `theme="auto"`.
+- ✓ Sanitizer respects archive-declared `document.accessibility.features`
+  (passes them through as DOM attributes).
+- ⏳ Automated conformance suite (axe-core + Playwright) under
+  development in `tests/accessibility/` (Phase 3.3).
+- ⏳ Manual screen-reader (NVDA / JAWS / VoiceOver) testing is Phase 3.3
+  scope; no claims about passing real screen-reader review yet.
+
+If you ship MDZ archives that claim WCAG 2.1 AA in their
+`document.accessibility.api_compliance`, the viewer's current renderer
+is NOT yet certified to preserve that claim in its output. Expect a
+formal conformance report at the Phase 3.3 milestone.
 
 ## Size budget
 

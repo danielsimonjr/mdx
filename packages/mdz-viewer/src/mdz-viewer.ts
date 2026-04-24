@@ -34,6 +34,40 @@
 import { loadArchive, getAssetURL, ArchiveLoadError } from "./archive.js";
 import type { LoadedArchive } from "./archive.js";
 import { renderMarkdown } from "./render.js";
+import type { Manifest } from "./manifest-types.js";
+
+// ---------------------------------------------------------------------------
+// Event + element type augmentation
+// ---------------------------------------------------------------------------
+//
+// Declaration merging so callers get full TypeScript autocompletion:
+//
+//   const viewer = document.querySelector<MDZViewerElement>("mdz-viewer")!;
+//   viewer.addEventListener("mdz-loaded", (e) => {
+//     console.log(e.detail.manifest.document.title);  // ← typed
+//   });
+//
+// Without this augmentation, `e.detail` is `unknown` and the event type
+// isn't inferred from the string "mdz-loaded". CustomEvent detail shapes
+// live here; the component below dispatches matching shapes.
+
+export interface MDZLoadedEventDetail {
+  manifest: Manifest;
+}
+export interface MDZErrorEventDetail {
+  error: Error;
+  userMessage: string;
+}
+
+declare global {
+  interface HTMLElementEventMap {
+    "mdz-loaded": CustomEvent<MDZLoadedEventDetail>;
+    "mdz-error": CustomEvent<MDZErrorEventDetail>;
+  }
+  interface HTMLElementTagNameMap {
+    "mdz-viewer": MDZViewerElement;
+  }
+}
 
 /** Size budget reporting — logged to console.info on load for dev visibility. */
 const BUDGET_HINT_KB = 250;

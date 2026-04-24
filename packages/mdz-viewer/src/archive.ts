@@ -10,9 +10,37 @@
 import { unzipSync } from "fflate";
 import type { Manifest } from "./manifest-types.js";
 
+// ---------------------------------------------------------------------------
+// ZIP-bomb + path-traversal defenses (threat-model T3 + T4)
+// ---------------------------------------------------------------------------
+//
+// These limits are INTENTIONALLY conservative for the browser viewer.
+// Bumping them requires a threat-model review — the size of an archive
+// is attacker-controlled, and a 2 GB inflation on a shared viewer tab
+// would make the browser unresponsive.
+
+/** Maximum total inflated size across all archive entries. */
+const MAX_TOTAL_INFLATED_BYTES = 500 * 1024 * 1024; // 500 MB
+
+/** Threshold for logging a "large archive" warning. */
+const WARN_INFLATED_BYTES = 50 * 1024 * 1024; // 50 MB
+
+/** Maximum number of entries in the archive (ZIP-bomb shape #2). */
+const MAX_ENTRY_COUNT = 10_000;
+
 export interface LoadedArchive {
   manifest: Manifest;
-  entries: Map<string, Uint8Array>;
+  /**
+   * Read-only map of archive-relative path -> inflated bytes.
+   *
+   * Typed `ReadonlyMap` to prevent callers from mutating the archive
+   * after load (e.g., deleting manifest.json to corrupt a subsequent
+   * re-render). The underlying Map is not deep-frozen — the Uint8Array
+   * views can still be mutated by a determined caller, but doing so
+   * requires an explicit `entries.get(path)` + byte write, which is
+   * clearly intentional.
+   */
+  entries: ReadonlyMap<string, Uint8Array>;
   /** The primary markdown content for the active locale/variant. */
   content: string;
   /** All available locale tags declared in the manifest. */
@@ -95,19 +123,83 @@ async function toBytes(
 }
 
 function inflateZip(bytes: Uint8Array): Map<string, Uint8Array> {
+  let flat: Record<string, Uint8Array>;
   try {
-    const flat = unzipSync(bytes);
-    const map = new Map<string, Uint8Array>();
-    for (const [name, data] of Object.entries(flat)) {
-      map.set(name, data);
-    }
-    return map;
+    flat = unzipSync(bytes);
   } catch (e) {
     throw new ArchiveLoadError(
       `zip inflate failed: ${(e as Error).message}`,
       "This file isn't a valid ZIP archive.",
     );
   }
+
+  // --- ZIP-bomb defense (T4) ---
+  const names = Object.keys(flat);
+  if (names.length > MAX_ENTRY_COUNT) {
+    throw new ArchiveLoadError(
+      `archive has ${names.length} entries, exceeds max ${MAX_ENTRY_COUNT}`,
+      `This archive has too many entries (${names.length.toLocaleString()}) ` +
+        `to be safely rendered.`,
+    );
+  }
+  let totalBytes = 0;
+  for (const data of Object.values(flat)) totalBytes += data.byteLength;
+  if (totalBytes > MAX_TOTAL_INFLATED_BYTES) {
+    throw new ArchiveLoadError(
+      `archive inflates to ${totalBytes} bytes, exceeds max ${MAX_TOTAL_INFLATED_BYTES}`,
+      `This archive is too large (${Math.round(totalBytes / 1024 / 1024)} MB ` +
+        `after decompression) to load in the browser viewer.`,
+    );
+  }
+  if (totalBytes > WARN_INFLATED_BYTES && typeof console !== "undefined") {
+    console.warn(
+      `[mdz-viewer] archive inflates to ${Math.round(totalBytes / 1024 / 1024)} MB — ` +
+        `rendering may be slow on low-end devices.`,
+    );
+  }
+
+  // --- Path-traversal defense (T3) ---
+  const map = new Map<string, Uint8Array>();
+  for (const [name, data] of Object.entries(flat)) {
+    const clean = sanitizeArchivePath(name);
+    if (clean === null) {
+      // Reject the whole archive rather than silently dropping a
+      // malicious entry — if the author didn't intend this path, they
+      // should fix the archive.
+      throw new ArchiveLoadError(
+        `archive entry has unsafe path: ${JSON.stringify(name)}`,
+        `This archive contains a path that tries to escape its folder ` +
+          `(${JSON.stringify(name)}).`,
+      );
+    }
+    map.set(clean, data);
+  }
+  return map;
+}
+
+/**
+ * Sanitize an archive-relative path. Returns `null` if the path is
+ * unsafe (`..` segment, absolute path, drive letter on Windows, NUL byte,
+ * etc.); otherwise returns the canonicalized forward-slash path.
+ *
+ * Policy: reject rather than silently strip. Authors rarely intend
+ * `../etc/passwd`; accepting it and stripping silently would mask a
+ * real problem.
+ */
+function sanitizeArchivePath(name: string): string | null {
+  if (!name) return null;
+  if (name.includes("\0")) return null;
+  // Normalize backslashes (Windows ZIPs sometimes have them).
+  const norm = name.replace(/\\/g, "/");
+  // Absolute path or drive letter — reject.
+  if (norm.startsWith("/")) return null;
+  if (/^[a-z]:/i.test(norm)) return null;
+  const segments = norm.split("/");
+  for (const seg of segments) {
+    if (seg === "..") return null;
+    // "." is harmless but cluttered — drop it in the canonical form.
+  }
+  return segments.filter((s) => s !== "" && s !== ".").join("/");
 }
 
 function parseManifest(bytes: Uint8Array): Manifest {
@@ -176,10 +268,20 @@ function resolveContent(
 
   const contentBytes = entries.get(entryPoint);
   if (!contentBytes) {
-    throw new ArchiveLoadError(
-      `archive is missing content entry_point: ${entryPoint}`,
-      `The archive references "${entryPoint}" but that file isn't in the ZIP.`,
-    );
+    // Distinguish "locale resolution exhausted (declared entry_point was
+    // selected, it's not in the ZIP)" from "manifest points at a bogus
+    // top-level entry_point". The former is an author / tooling bug
+    // worth surfacing clearly.
+    const isLocalePath =
+      localeTags.length > 0 &&
+      locales?.available.some((a) => a.entry_point === entryPoint);
+    const technical = isLocalePath
+      ? `locale ${activeLocale ?? "default"} points at entry_point "${entryPoint}" which is missing from the archive`
+      : `archive is missing content entry_point: ${entryPoint}`;
+    const userMessage = isLocalePath
+      ? `The archive declares locale "${activeLocale ?? "default"}" (from ${localeTags.join(", ")}) but the file "${entryPoint}" isn't inside the ZIP.`
+      : `The archive references "${entryPoint}" but that file isn't in the ZIP.`;
+    throw new ArchiveLoadError(technical, userMessage);
   }
   const content = new TextDecoder("utf-8").decode(contentBytes);
   return { content, activeLocale, localeTags };

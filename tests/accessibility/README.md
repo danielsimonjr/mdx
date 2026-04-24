@@ -4,25 +4,26 @@
 web component, run against a corpus of hand-crafted fixtures via axe-core
 and pa11y.
 
-## What this suite verifies
+## What this suite verifies — current state
 
-Every fixture here is a small MDZ archive (or bare markdown) that
-exercises a specific accessibility requirement. The runner renders each
-fixture in a headless browser via the `<mdz-viewer>` web component,
-then runs axe-core against the rendered DOM.
+**Phase 3.3 scaffold.** Currently ships a structural Python runner (no
+browser) that catches 4 WCAG 2.1 AA criteria via markdown analysis. The
+full Playwright + axe-core integration (which would cover color contrast,
+keyboard nav, ARIA correctness) is Phase 3.3 work — this README
+describes both the current state and the target fixture set.
 
-| Fixture category | What's tested |
-|------------------|---------------|
-| `fixtures/alt-text/` | Every image has non-empty `alt` attribute |
-| `fixtures/heading-order/` | Heading levels are sequential (no h1→h3 skip) |
-| `fixtures/color-contrast/` | Text meets WCAG 2.1 AA contrast (4.5:1 normal, 3:1 large) |
-| `fixtures/keyboard-nav/` | Interactive elements are keyboard-accessible |
-| `fixtures/aria-labels/` | Landmarks and regions have appropriate ARIA labels |
-| `fixtures/table-semantics/` | Tables use `<th scope>`, not `<td>` for headers |
-| `fixtures/video-captions/` | Video assets declare `captions[]` or provide tracks |
-| `fixtures/language/` | `document.language` set; per-block `lang` on foreign text |
-| `fixtures/link-purpose/` | Link text makes sense out of context (no "click here") |
-| `fixtures/landmarks/` | Page has proper `<main>` / `<nav>` landmark structure |
+| Fixture category | Phase | Status | What's tested |
+|------------------|-------|--------|---------------|
+| `fixtures/alt-text-*/` | 3.3a | ✓ ships | Every image has non-empty `alt` attribute (WCAG 1.1.1) |
+| `fixtures/heading-order-*/` | 3.3a | ✓ ships | Heading levels are sequential; no h1→h3 skip (WCAG 2.4.10) |
+| `fixtures/link-purpose-*/` | 3.3a | ✓ ships | Link text makes sense out of context (WCAG 2.4.4) |
+| (language) | 3.3a | ✓ ships | `document.language` set in manifest (WCAG 3.1.1) — tested via runner, no dedicated fixture |
+| `fixtures/color-contrast/` | 3.3b | ⏳ planned | WCAG 2.1 AA contrast (4.5:1 / 3:1) — needs browser |
+| `fixtures/keyboard-nav/` | 3.3b | ⏳ planned | Interactive elements tabbable — needs browser |
+| `fixtures/aria-labels/` | 3.3b | ⏳ planned | Landmarks/regions labelled — needs browser |
+| `fixtures/table-semantics/` | 3.3b | ⏳ planned | `<th scope>` not `<td>` — browser-based check |
+| `fixtures/video-captions/` | 3.3b | ⏳ planned | Video `captions[]` or `<track>` — manifest + DOM |
+| `fixtures/landmarks/` | 3.3b | ⏳ planned | `<main>` / `<nav>` structure — browser |
 
 ## Running
 

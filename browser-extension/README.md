@@ -65,8 +65,6 @@ cp packages/mdz-viewer/dist/mdz-viewer.js browser-extension/vendor/mdz-viewer.js
 
 | Permission | Why |
 |------------|-----|
-| `activeTab` | Open viewer in new tab from popup |
-| `storage` | (reserved for future user-preferences) |
-| `declarativeNetRequest` | MIME-type redirect rule |
-| `declarativeNetRequestWithHostAccess` | Required to redirect on all origins |
-| `<all_urls>` host permission | Content script runs on pages that might link to .mdz files |
+| `declarativeNetRequest` | Path-based (`.mdz`/`.mdx`) and MIME-based rules that redirect archive URLs to the built-in viewer page |
+| `declarativeNetRequestWithHostAccess` | Required because the DNR rule applies to arbitrary origins (any page that serves `.mdz` or `.mdx`) |
+| `<all_urls>` host permission | Content script enhances `<a href="*.mdz">` links on any page with an "Open" button; `chrome.tabs.create` from the popup also uses it. (We deliberately do NOT request `activeTab` or `storage` — neither is used by the 0.1 build.) |

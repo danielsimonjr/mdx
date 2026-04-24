@@ -95,8 +95,18 @@ export interface Manifest {
 /**
  * Accepted MIME types on read. Written archives should use the first one;
  * the second is retained for legacy .mdx archives through 2027-01-01.
+ *
+ * Typed as a tuple literal (not `readonly string[]`) so switch statements
+ * over these values get exhaustiveness checking:
+ *
+ *   type AcceptedMime = typeof ACCEPTED_MIME_TYPES[number];
+ *   function describe(m: AcceptedMime): string {
+ *     switch (m) { case ACCEPTED_MIME_TYPES[0]: ...; case ACCEPTED_MIME_TYPES[1]: ...; }
+ *   }
  */
-export const ACCEPTED_MIME_TYPES: readonly string[] = [
+export const ACCEPTED_MIME_TYPES = [
   "application/vnd.mdz-container+zip",
   "application/vnd.mdx-container+zip",
 ] as const;
+
+export type AcceptedMimeType = (typeof ACCEPTED_MIME_TYPES)[number];

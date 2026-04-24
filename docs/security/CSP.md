@@ -102,18 +102,26 @@ object-src 'none';
 
 The viewer's sanitizer (`packages/mdz-viewer/src/render.ts`) is the only
 source of HTML that reaches `innerHTML`. When Trusted Types is active,
-the sanitizer registers itself:
+the sanitizer registers a policy via `getTrustedHtmlPolicy()`:
 
 ```javascript
-if (window.trustedTypes) {
-  window.trustedTypes.createPolicy("mdz-sanitizer", {
-    createHTML: (input) => sanitizedOutput,
-  });
-}
+trustedTypes.createPolicy("mdz-sanitizer", {
+  createHTML: (input) => input, // identity — already sanitized upstream
+});
 ```
 
-Any attempt by archive content to bypass the sanitizer (e.g., via a DOM
-manipulation that went through the wrong path) is blocked by the browser.
+The identity function is safe because this policy is only reachable via
+the `toSanitizedHtml()` helper in `render.ts`, which wraps strings that
+have already been walked by the allowlist + URL rewriter. Host pages
+that run the viewer under
+`Content-Security-Policy: require-trusted-types-for 'script'` MUST
+ensure the "mdz-sanitizer" policy name isn't already claimed by another
+library — see `toSanitizedHtml()` for the graceful-degrade behavior
+when policy creation throws.
+
+Any attempt by archive content to reach `innerHTML` via a path that
+BYPASSES the sanitizer is blocked by the browser (there's no other
+policy registered to wrap the raw string).
 
 ## Reporting
 
