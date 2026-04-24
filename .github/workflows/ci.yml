@@ -27,7 +27,7 @@ jobs:
       - name: Type check
         run: |
           cd implementations/typescript
-          npx tsc --noEmit --ignoreDeprecations 6.0
+          npx tsc --noEmit
 
   test-typescript:
     name: TypeScript Unit Tests
