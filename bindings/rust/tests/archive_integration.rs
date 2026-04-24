@@ -121,7 +121,7 @@ fn signature_chain_root_must_not_have_prev_signature() {
       "security": {
         "signatures": [
           {
-            "signer": "did:web:example.com",
+            "signer": {"name": "Alice", "did": "did:web:example.com"},
             "algorithm": "ed25519",
             "signature": "abc",
             "prev_signature": "sha256:deadbeef",
@@ -158,7 +158,7 @@ fn signature_chain_accepts_single_root_without_prev() {
       "security": {
         "signatures": [
           {
-            "signer": "did:web:example.com",
+            "signer": {"name": "Alice", "did": "did:web:example.com"},
             "algorithm": "ed25519",
             "signature": "abc",
             "signed_at": "2026-01-01T00:00:00Z"
