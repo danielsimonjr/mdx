@@ -1,0 +1,112 @@
+{
+  "name": "mdz-vscode",
+  "displayName": "MDZ Format",
+  "description": "Syntax highlighting, live preview, and CLI integration for MDZ (Markdown Zipped Container) scientific papers. Reads legacy .mdx too.",
+  "version": "0.1.0-alpha.0",
+  "publisher": "mdz-format",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Programming Languages", "Other", "Visualization"],
+  "keywords": ["mdz", "mdx", "markdown", "scientific", "preview"],
+  "icon": "icon.png",
+  "activationEvents": [
+    "onLanguage:mdz"
+  ],
+  "main": "./src/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "mdz",
+        "aliases": ["MDZ", "Markdown Zipped", "mdz"],
+        "extensions": [".mdz-md"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "mdz",
+        "scopeName": "source.mdz",
+        "path": "./syntaxes/mdz.tmLanguage.json",
+        "embeddedLanguages": {
+          "meta.embedded.block.python": "python",
+          "meta.embedded.block.r": "r",
+          "meta.embedded.block.julia": "julia",
+          "meta.embedded.block.javascript": "javascript"
+        }
+      }
+    ],
+    "commands": [
+      {
+        "command": "mdz.view",
+        "title": "MDZ: Open archive in viewer",
+        "category": "MDZ"
+      },
+      {
+        "command": "mdz.preview",
+        "title": "MDZ: Preview current document",
+        "category": "MDZ"
+      },
+      {
+        "command": "mdz.validate",
+        "title": "MDZ: Validate archive",
+        "category": "MDZ"
+      },
+      {
+        "command": "mdz.importIpynb",
+        "title": "MDZ: Import Jupyter notebook as MDZ",
+        "category": "MDZ"
+      },
+      {
+        "command": "mdz.exportJats",
+        "title": "MDZ: Export as JATS XML",
+        "category": "MDZ"
+      },
+      {
+        "command": "mdz.verify",
+        "title": "MDZ: Verify archive signatures",
+        "category": "MDZ"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "mdz.view",
+          "when": "resourceExtname == .mdz || resourceExtname == .mdx",
+          "group": "navigation"
+        },
+        {
+          "command": "mdz.validate",
+          "when": "resourceExtname == .mdz || resourceExtname == .mdx",
+          "group": "navigation"
+        },
+        {
+          "command": "mdz.verify",
+          "when": "resourceExtname == .mdz || resourceExtname == .mdx",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "MDZ Format",
+      "properties": {
+        "mdz.cliPath": {
+          "type": "string",
+          "default": "mdz",
+          "description": "Path to the mdz CLI executable. Leave as default if mdz is on PATH."
+        },
+        "mdz.viewer.theme": {
+          "type": "string",
+          "enum": ["light", "dark", "auto"],
+          "default": "auto",
+          "description": "Theme for the MDZ preview panel."
+        }
+      }
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/danielsimonjr/mdx"
+  },
+  "license": "MIT"
+}

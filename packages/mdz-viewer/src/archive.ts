@@ -337,8 +337,6 @@ const EXT_TO_MIME: Record<string, string> = {
 
 function guessMimeFromPath(path: string): string {
   const lower = path.toLowerCase();
-  for (const ext of Object.keys(EXT_TO_MIME)) {
-    if (lower.endsWith(ext)) return EXT_TO_MIME[ext];
-  }
-  return "application/octet-stream";
+  const hit = Object.entries(EXT_TO_MIME).find(([ext]) => lower.endsWith(ext));
+  return hit ? hit[1] : "application/octet-stream";
 }

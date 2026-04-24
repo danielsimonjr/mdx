@@ -225,36 +225,32 @@ const DROP_CONTENTS_TAGS: ReadonlySet<string> = new Set([
 function walk(node: Element, opts: RenderOptions): void {
   // Iterate over a snapshot — we may remove children during walk.
   const children = Array.from(node.children);
+  let hoistedAny = false;
   for (const child of children) {
     const tag = child.tagName.toLowerCase();
-    if (!ALLOWED_TAGS.has(tag)) {
-      const parent = child.parentNode;
-      if (!parent) continue;
-      if (DROP_CONTENTS_TAGS.has(tag)) {
-        // Drop element AND all descendants — "hoist children" on a
-        // <script>/<svg>/etc. would re-expose the attack surface.
-        parent.removeChild(child);
-      } else {
-        // Safe hoist: remove the element, keep its children. Recurse
-        // into the hoisted children so disallowed descendants (e.g.,
-        // <mi xlink:href="javascript:...">) are still handled.
-        const hoisted: Node[] = [];
-        while (child.firstChild) {
-          hoisted.push(child.firstChild);
-          parent.insertBefore(child.firstChild, child);
-        }
-        parent.removeChild(child);
-        // Recurse on any element children we just promoted so they go
-        // through the allowlist themselves.
-        for (const n of hoisted) {
-          if ((n as Element).tagName) walk(parent as Element, opts);
-        }
-      }
+    if (ALLOWED_TAGS.has(tag)) {
+      sanitizeAttributes(child, tag, opts);
+      walk(child, opts);
       continue;
     }
-    sanitizeAttributes(child, tag, opts);
-    walk(child, opts);
+    const parent = child.parentNode;
+    if (!parent) continue;
+    if (DROP_CONTENTS_TAGS.has(tag)) {
+      // Drop element AND all descendants — "hoist children" on a
+      // <script>/<svg>/etc. would re-expose the attack surface.
+      parent.removeChild(child);
+    } else {
+      // Safe hoist: remove the element, keep its children.
+      while (child.firstChild) {
+        parent.insertBefore(child.firstChild, child);
+      }
+      parent.removeChild(child);
+      hoistedAny = true;
+    }
   }
+  // Re-walk once if we promoted any children so disallowed descendants
+  // (e.g., <mi xlink:href="javascript:...">) still get processed.
+  if (hoistedAny) walk(node, opts);
 }
 
 function sanitizeAttributes(
@@ -357,20 +353,24 @@ function rewriteUrl(
 
   // srcset is a comma-separated list; rewrite each url piece.
   if (trimmed.includes(",") && /\s\d+[wx]/.test(trimmed)) {
-    return trimmed
-      .split(",")
-      .map((piece) => {
-        const [u, descriptor = ""] = piece.trim().split(/\s+/, 2);
-        const rewritten = rewriteUrl(u, opts);
-        return rewritten ? `${rewritten} ${descriptor}`.trim() : "";
-      })
-      .filter(Boolean)
-      .join(", ");
+    return rewriteSrcset(trimmed, opts);
   }
 
   // Archive-relative path — ask the caller to resolve.
   const blob = opts.resolveAsset(trimmed);
   return blob;
+}
+
+function rewriteSrcset(srcset: string, opts: RenderOptions): string {
+  return srcset
+    .split(",")
+    .map((piece) => {
+      const [u, descriptor = ""] = piece.trim().split(/\s+/, 2);
+      const rewritten = rewriteUrl(u, opts);
+      return rewritten ? `${rewritten} ${descriptor}`.trim() : "";
+    })
+    .filter(Boolean)
+    .join(", ");
 }
 
 // Note: `fallbackStripScripts` was removed as of the Phase 3 security

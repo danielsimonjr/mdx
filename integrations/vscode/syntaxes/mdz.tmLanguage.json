@@ -1,0 +1,132 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "MDZ",
+  "scopeName": "source.mdz",
+  "comment": "TextMate grammar for MDZ directives, layered on top of Markdown. Anything not matched by these patterns is delegated to `text.html.markdown` via the include directive so standard CommonMark highlighting still works.",
+  "patterns": [
+    { "include": "#cell" },
+    { "include": "#output" },
+    { "include": "#include-directive" },
+    { "include": "#labeled-block" },
+    { "include": "#container-open" },
+    { "include": "#container-close" },
+    { "include": "#inline-ref" },
+    { "include": "#inline-cite" },
+    { "include": "#inline-directive" },
+    { "include": "#shorthand-align" },
+    { "include": "#block-attr" },
+    { "include": "text.html.markdown" }
+  ],
+  "repository": {
+    "cell": {
+      "comment": "::cell{language=\"python\" kernel=\"python3\" execution_count=1} followed by a fenced code block",
+      "begin": "^(::cell)(\\{[^}]*\\})?\\s*$",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.directive.cell.mdz" },
+        "2": { "name": "meta.directive.attrs.mdz", "patterns": [{ "include": "#attr-body" }] }
+      },
+      "end": "^```\\s*$",
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.markdown" }
+      },
+      "patterns": [
+        {
+          "begin": "^```(python|r|julia|javascript|js|sh|bash)?\\s*$",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.markdown" },
+            "1": { "name": "fenced_code.block.language" }
+          },
+          "end": "(?=^```\\s*$)",
+          "contentName": "meta.embedded.block.$1",
+          "patterns": [{ "include": "source.$1" }]
+        }
+      ]
+    },
+    "output": {
+      "comment": "::output{type=\"text\" mime=\"...\" src=\"...\"} optionally followed by a fenced block",
+      "match": "^(::output)(\\{[^}]*\\})\\s*$",
+      "captures": {
+        "1": { "name": "keyword.control.directive.output.mdz" },
+        "2": { "name": "meta.directive.attrs.mdz" }
+      }
+    },
+    "include-directive": {
+      "comment": "::include[target=\"...\" fragment=\"...\"]{content_hash=\"...\"}",
+      "match": "^(::include)(\\[[^\\]]*\\])(\\{[^}]*\\})?\\s*$",
+      "captures": {
+        "1": { "name": "keyword.control.directive.include.mdz" },
+        "2": { "name": "meta.directive.bracket.mdz" },
+        "3": { "name": "meta.directive.attrs.mdz" }
+      }
+    },
+    "labeled-block": {
+      "comment": "::fig{id=\"f1\"} / ::eq{id=\"e1\"} / ::tab{id=\"t1\"}",
+      "match": "^(::(fig|eq|tab))(\\{[^}]*\\})\\s*$",
+      "captures": {
+        "1": { "name": "keyword.control.directive.labeled.mdz" },
+        "3": { "name": "meta.directive.attrs.mdz" }
+      }
+    },
+    "container-open": {
+      "comment": ":::name{attrs} or :::{attrs}",
+      "match": "^(:::+)([a-z][a-z0-9-]*)?\\s*(\\{[^}]*\\})?\\s*$",
+      "captures": {
+        "1": { "name": "punctuation.definition.container.mdz" },
+        "2": { "name": "entity.name.tag.container.mdz" },
+        "3": { "name": "meta.directive.attrs.mdz" }
+      }
+    },
+    "container-close": {
+      "match": "^(:::+)\\s*$",
+      "captures": {
+        "1": { "name": "punctuation.definition.container.mdz" }
+      }
+    },
+    "inline-ref": {
+      "match": "(::ref)\\[([^\\]]+)\\]",
+      "captures": {
+        "1": { "name": "keyword.control.directive.ref.mdz" },
+        "2": { "name": "variable.other.reference.mdz" }
+      }
+    },
+    "inline-cite": {
+      "match": "(::cite)\\[([^\\]]+)\\]",
+      "captures": {
+        "1": { "name": "keyword.control.directive.cite.mdz" },
+        "2": { "name": "variable.other.citation-key.mdz" }
+      }
+    },
+    "inline-directive": {
+      "comment": "::name[label]{attrs} — video, audio, model, embed, data, note, details, toc",
+      "match": "^(::[a-z][a-z0-9-]*)(\\[[^\\]]*\\])?(\\{[^}]*\\})?\\s*$",
+      "captures": {
+        "1": { "name": "keyword.control.directive.mdz" },
+        "2": { "name": "meta.directive.label.mdz" },
+        "3": { "name": "meta.directive.attrs.mdz" }
+      }
+    },
+    "shorthand-align": {
+      "comment": "{:.center} → applies align-center class to next block",
+      "match": "^\\s*(\\{:\\.[a-z][a-z0-9-]*\\})\\s*$",
+      "captures": {
+        "1": { "name": "meta.attribute.alignment.mdz" }
+      }
+    },
+    "block-attr": {
+      "comment": "{.class #id key=\"value\"} on its own line",
+      "match": "^\\s*(\\{[^}]*[.#][^}]*\\})\\s*$",
+      "captures": {
+        "1": { "name": "meta.attribute.block.mdz" }
+      }
+    },
+    "attr-body": {
+      "patterns": [
+        { "match": "\\.([a-z][a-z0-9-]*)", "name": "entity.other.attribute-name.class.mdz" },
+        { "match": "#([a-z][a-z0-9-]*)", "name": "entity.other.attribute-name.id.mdz" },
+        { "match": "([a-z][a-z0-9_-]*)\\s*=", "captures": { "1": { "name": "entity.other.attribute-name.mdz" } } },
+        { "begin": "\"", "end": "\"", "name": "string.quoted.double.mdz", "patterns": [{ "match": "\\\\.", "name": "constant.character.escape.mdz" }] },
+        { "begin": "'", "end": "'", "name": "string.quoted.single.mdz", "patterns": [{ "match": "\\\\.", "name": "constant.character.escape.mdz" }] }
+      ]
+    }
+  }
+}

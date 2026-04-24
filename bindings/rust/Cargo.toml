@@ -1,0 +1,38 @@
+[package]
+name = "mdz"
+version = "0.1.0-alpha.0"
+edition = "2021"
+description = "Rust bindings for the MDZ (Markdown Zipped Container) format — a single-file container for executable scientific papers."
+license = "MIT"
+repository = "https://github.com/danielsimonjr/mdx"
+keywords = ["mdz", "mdx", "markdown", "scientific", "archive"]
+categories = ["parser-implementations", "science"]
+readme = "README.md"
+rust-version = "1.70"
+
+[lib]
+name = "mdz"
+path = "src/lib.rs"
+
+[dependencies]
+# ZIP handling — zip crate is the de facto standard, async-safe variant.
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
+# JSON manifest parsing via serde.
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+# SHA-256 / SHA-512 for content_hash and integrity checks.
+sha2 = "0.10"
+# Hex encoding for hash comparison strings.
+hex = "0.4"
+# Structured error handling.
+thiserror = "1.0"
+
+[dev-dependencies]
+# Test-only: example generation + roundtrip fixtures.
+tempfile = "3"
+
+[features]
+default = ["verify"]
+# Opt-in features — gate optional functionality behind compile flags so
+# downstream consumers can shrink their binary.
+verify = []        # integrity + content_hash + signature-chain checks

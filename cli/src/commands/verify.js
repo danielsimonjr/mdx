@@ -114,7 +114,15 @@ function runChecks(manifest, manifestBytes, entries, trustPolicy, options) {
         failures: [],
     };
 
-    // --- Structural checks ---
+    checkStructure(manifest, report);
+    checkIntegrity(manifest, manifestBytes, report);
+    checkContentId(manifest, entries, report);
+    checkSignatures(manifest, trustPolicy, options, report);
+
+    return report;
+}
+
+function checkStructure(manifest, report) {
     if (!manifest.mdx_version) {
         report.failures.push('manifest missing required field: mdx_version');
     } else {
@@ -127,89 +135,84 @@ function runChecks(manifest, manifestBytes, entries, trustPolicy, options) {
     } else {
         report.passes.push(`document.id: ${manifest.document.id}`);
     }
+}
 
-    // --- Integrity: manifest checksum ---
+function checkIntegrity(manifest, manifestBytes, report) {
     const declared =
         manifest.security && manifest.security.integrity && manifest.security.integrity.manifest_checksum;
-    if (declared) {
-        const match = /^([a-z0-9]+):([a-f0-9]+)$/i.exec(declared);
-        if (!match) {
-            report.failures.push(`integrity.manifest_checksum has invalid format: ${declared}`);
-        } else {
-            const algo = match[1].toLowerCase();
-            const expected = match[2].toLowerCase();
-            // Only verify algorithms we can actually compute. Previously
-            // unknown algorithms silently fell back to SHA-256, which
-            // would accidentally pass for a lookalike hash of the right
-            // length. Reject explicitly instead.
-            const supportedAlgos = new Set(['sha256', 'sha512']);
-            if (!supportedAlgos.has(algo)) {
-                report.failures.push(
-                    `integrity.manifest_checksum uses unsupported algorithm: ${algo} ` +
-                        `(supported: sha256, sha512; blake3 is spec'd but not yet verified by this CLI)`,
-                );
-            } else {
-                const hash = crypto.createHash(algo).update(manifestBytes).digest('hex');
-                if (hash === expected) {
-                    report.passes.push(`integrity.manifest_checksum verifies (${algo})`);
-                } else {
-                    report.failures.push(
-                        `integrity.manifest_checksum mismatch: declared ${expected.slice(0, 12)}…, computed ${hash.slice(0, 12)}…`,
-                    );
-                }
-            }
-        }
-    } else {
+    if (!declared) {
         report.warnings.push('integrity.manifest_checksum not declared (archive is unsigned at the manifest level)');
+        return;
     }
-
-    // --- Content ID verification ---
-    if (manifest.document && manifest.document.content_id) {
-        const entryPoint = (manifest.content && manifest.content.entry_point) || 'document.md';
-        const contentEntry = entries.find((e) => e.entryName === entryPoint);
-        if (!contentEntry) {
-            report.failures.push(`content_id cannot be verified — entry_point ${entryPoint} missing`);
-        } else {
-            const result = verifyContentHash(manifest.document.content_id, contentEntry.getData());
-            if (result.ok) {
-                report.passes.push(`document.content_id verifies (${result.algo})`);
-            } else {
-                report.failures.push(result.message);
-            }
-        }
+    const match = /^([a-z0-9]+):([a-f0-9]+)$/i.exec(declared);
+    if (!match) {
+        report.failures.push(`integrity.manifest_checksum has invalid format: ${declared}`);
+        return;
     }
+    const algo = match[1].toLowerCase();
+    const expected = match[2].toLowerCase();
+    // Only verify algorithms we can actually compute. Previously unknown
+    // algorithms silently fell back to SHA-256, which would accidentally
+    // pass for a lookalike hash of the right length. Reject explicitly.
+    const supportedAlgos = new Set(['sha256', 'sha512']);
+    if (!supportedAlgos.has(algo)) {
+        report.failures.push(
+            `integrity.manifest_checksum uses unsupported algorithm: ${algo} ` +
+                `(supported: sha256, sha512; blake3 is spec'd but not yet verified by this CLI)`,
+        );
+        return;
+    }
+    const hash = crypto.createHash(algo).update(manifestBytes).digest('hex');
+    if (hash === expected) {
+        report.passes.push(`integrity.manifest_checksum verifies (${algo})`);
+    } else {
+        report.failures.push(
+            `integrity.manifest_checksum mismatch: declared ${expected.slice(0, 12)}…, computed ${hash.slice(0, 12)}…`,
+        );
+    }
+}
 
-    // --- Signature chain (v2.0 §16) ---
+function checkContentId(manifest, entries, report) {
+    if (!manifest.document || !manifest.document.content_id) return;
+    const entryPoint = (manifest.content && manifest.content.entry_point) || 'document.md';
+    const contentEntry = entries.find((e) => e.entryName === entryPoint);
+    if (!contentEntry) {
+        report.failures.push(`content_id cannot be verified — entry_point ${entryPoint} missing`);
+        return;
+    }
+    const result = verifyContentHash(manifest.document.content_id, contentEntry.getData());
+    if (result.ok) {
+        report.passes.push(`document.content_id verifies (${result.algo})`);
+    } else {
+        report.failures.push(result.message);
+    }
+}
+
+function checkSignatures(manifest, trustPolicy, options, report) {
     const signatures = manifest.security && manifest.security.signatures;
     if (Array.isArray(signatures) && signatures.length > 0) {
         verifySignatureChain(signatures, trustPolicy, options, report);
-    } else {
-        // Check legacy v1.1 singular signature
-        const legacy = manifest.security && manifest.security.signature;
-        if (legacy) {
-            report.warnings.push(
-                'Archive uses legacy v1.1 security.signature (singular); full chain verification unavailable',
-            );
-            if (legacy.signed_by) {
-                report.passes.push(`legacy signature signed_by: ${legacy.signed_by}`);
-            }
-        } else {
-            report.warnings.push('No signatures declared — archive is unsigned');
-        }
-    }
-
-    // --- Crypto-verify caveat ---
-    // Until Ed25519/RS256/ES256 verification ships (Phase 3.2), tell users
-    // that structural verification != cryptographic verification.
-    if (Array.isArray(signatures) && signatures.length > 0) {
+        // Until Ed25519/RS256/ES256 verification ships (Phase 3.2), tell users
+        // that structural verification != cryptographic verification.
         report.warnings.push(
             'Structural signature-chain verification only; cryptographic ' +
                 'signature-value verification (Ed25519/RS256/ES256) is Phase 3.2 — ' +
                 "this command does NOT yet prove the archive wasn't tampered with.",
         );
+        return;
     }
-
-    return report;
+    // Check legacy v1.1 singular signature
+    const legacy = manifest.security && manifest.security.signature;
+    if (legacy) {
+        report.warnings.push(
+            'Archive uses legacy v1.1 security.signature (singular); full chain verification unavailable',
+        );
+        if (legacy.signed_by) {
+            report.passes.push(`legacy signature signed_by: ${legacy.signed_by}`);
+        }
+    } else {
+        report.warnings.push('No signatures declared — archive is unsigned');
+    }
 }
 
 function verifyContentHash(declared, contentBytes) {

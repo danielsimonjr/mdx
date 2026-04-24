@@ -204,13 +204,10 @@ function buildEpub({ manifest, markdown, sourceZip, outPath }) {
 }
 
 /**
- * Attempt to reorder ZIP entries so `entryName` is at index 0.
- *
- * KNOWN LIMITATION: adm-zip's `getEntries()` returns a snapshot of its
- * internal `entryTable`, not the live backing store, so mutating the
- * returned array doesn't affect write order. We try both paths
- * (internal entryTable and the returned array) and confirm either one
- * worked via assertion at the call site — no crash if neither works.
+ * Attempt to reorder ZIP entries so `entryName` is at index 0 via adm-zip's
+ * undocumented internal `entryTable`. Mutating the array returned by
+ * `zip.getEntries()` does NOT affect write order (it's a snapshot), so
+ * that path was removed as dead code.
  *
  * epubcheck emits a WARNING (not FATAL) when mimetype is not the first
  * entry, so a v1.0 EPUB that preserves STORED compression but has
@@ -222,22 +219,14 @@ function buildEpub({ manifest, markdown, sourceZip, outPath }) {
  * Tracked as Phase 3 cleanup.
  */
 function _forceFirstEntry(zip, entryName) {
-    // Path 1: mutate the entries-array snapshot. Works on some versions.
-    const entries = zip.getEntries();
-    const idx = entries.findIndex((e) => e.entryName === entryName);
-    if (idx > 0) {
-        const [target] = entries.splice(idx, 1);
-        entries.unshift(target);
-    }
-    // Path 2: if adm-zip exposes an `entryTable` property, rebuild it
-    // with our target first. This is an undocumented internal on some
-    // versions and a no-op on others.
+    // If adm-zip exposes an `entryTable` property, rebuild it with our
+    // target first. Undocumented internal on some versions; a no-op on
+    // others (the EPUB remains valid with an ordering warning).
     try {
         const zipImpl = zip._zip || zip;
         if (zipImpl && zipImpl.entryTable && zipImpl.entryTable[entryName]) {
             const oldTable = zipImpl.entryTable;
-            const targetEntry = oldTable[entryName];
-            const newTable = { [entryName]: targetEntry };
+            const newTable = { [entryName]: oldTable[entryName] };
             for (const k of Object.keys(oldTable)) {
                 if (k !== entryName) newTable[k] = oldTable[k];
             }

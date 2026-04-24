@@ -241,11 +241,21 @@ function renderCodeCell(cell, ctx) {
     return parts.join('\n');
 }
 
+// Jupyter output fields are often `string | string[]` where arrays contain
+// one entry per line (each typically already trailing a \n). Joining with
+// '' is correct; '\n' would double-space.
+function joinMultiline(v) {
+    return Array.isArray(v) ? v.join('') : (v || '');
+}
+
+function formatFencedOutput(type, body) {
+    return `::output{type="${type}"}\n\`\`\`\n${String(body).replace(/\n+$/, '')}\n\`\`\``;
+}
+
 function renderOutput(out, ctx) {
     if (out.output_type === 'stream') {
         ctx.onText();
-        const text = Array.isArray(out.text) ? out.text.join('') : (out.text || '');
-        return '::output{type="text"}\n```\n' + text.replace(/\n+$/, '') + '\n```';
+        return formatFencedOutput('text', joinMultiline(out.text));
     }
 
     if (out.output_type === 'error') {
@@ -263,7 +273,7 @@ function renderOutput(out, ctx) {
         }
         ctx.onText();
         const body = `${ename || 'Error'}: ${evalue}\n${tb}`.trim();
-        return '::output{type="text"}\n```\n' + body + '\n```';
+        return formatFencedOutput('text', body);
     }
 
     if (
@@ -275,8 +285,7 @@ function renderOutput(out, ctx) {
         // Same as JupyterLab — if a cell emits both html and plain, html wins.
         if (data['image/png'] || data['image/jpeg']) {
             const mime = data['image/png'] ? 'image/png' : 'image/jpeg';
-            const b64 = data[mime];
-            const bytes = Buffer.from(Array.isArray(b64) ? b64.join('') : b64, 'base64');
+            const bytes = Buffer.from(joinMultiline(data[mime]), 'base64');
             const assetPath = ctx.onImage(mime, bytes);
             return `::output{type="image" mime="${mime}" src="${assetPath}"}`;
         }
@@ -287,23 +296,21 @@ function renderOutput(out, ctx) {
                 const body = Array.isArray(data[mime]) ? data[mime].join('') : data[mime];
                 const serialized =
                     typeof body === 'string' ? body : JSON.stringify(body, null, 2);
-                return `::output{type="${type}"}\n\`\`\`\n${serialized.replace(/\n+$/, '')}\n\`\`\``;
+                return formatFencedOutput(type, serialized);
             }
         }
         if (data['text/plain']) {
             ctx.onText();
-            const text = Array.isArray(data['text/plain'])
-                ? data['text/plain'].join('')
-                : data['text/plain'];
-            return '::output{type="text"}\n```\n' + text.replace(/\n+$/, '') + '\n```';
+            return formatFencedOutput('text', joinMultiline(data['text/plain']));
         }
         // Dropped MIME types — warn per configured reason.
         for (const mime of Object.keys(data)) {
-            if (DROPPED_MIME_REASONS[mime]) {
-                ctx.onWarning(`dropped ${mime}: ${DROPPED_MIME_REASONS[mime]}`);
-            } else {
-                ctx.onWarning(`dropped unsupported MIME type in cell output: ${mime}`);
-            }
+            const reason = DROPPED_MIME_REASONS[mime];
+            ctx.onWarning(
+                reason
+                    ? `dropped ${mime}: ${reason}`
+                    : `dropped unsupported MIME type in cell output: ${mime}`,
+            );
         }
         return null;
     }

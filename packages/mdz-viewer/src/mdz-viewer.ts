@@ -91,7 +91,7 @@ class MDZViewerElement extends HTMLElement {
   connectedCallback(): void {
     this.#connected = true;
     const src = this.getAttribute("src");
-    if (src) void this.#loadFromSrc(src);
+    if (src) void this.#load(src);
   }
 
   disconnectedCallback(): void {
@@ -106,7 +106,7 @@ class MDZViewerElement extends HTMLElement {
   ): void {
     if (!this.#connected) return;
     if (name === "src" && newValue && newValue !== oldValue) {
-      void this.#loadFromSrc(newValue);
+      void this.#load(newValue);
     } else if (name === "theme") {
       this.#applyTheme();
     }
@@ -125,10 +125,6 @@ class MDZViewerElement extends HTMLElement {
   // -------------------------------------------------------------------------
   // Internal
   // -------------------------------------------------------------------------
-
-  async #loadFromSrc(src: string): Promise<void> {
-    await this.#load(src);
-  }
 
   async #load(source: ArrayBuffer | Uint8Array | Blob | string): Promise<void> {
     this.#setStatus("loading");

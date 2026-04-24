@@ -386,6 +386,12 @@ function renderInline(text, ctx) {
     // match across all patterns, emits the preceding plain-text segment,
     // emits the replacement as a pre-built XML segment, and continues
     // with what's after the match.
+    //
+    // Complexity: O(n * k) per call where n = text length and k = number
+    // of patterns (6). For typical paragraphs this is negligible; if we
+    // ever see documents where this is hot we can precompile a combined
+    // alternation regex with named groups — the linear scan stays the
+    // same but we avoid six separate .exec() calls per iteration.
     const patterns = [
         // [regex, builder(match, ...groups)]
         [
