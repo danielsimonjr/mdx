@@ -1084,11 +1084,12 @@ export async function computeChecksum(
   data: ArrayBuffer | Uint8Array,
   algorithm: string = "SHA-256"
 ): Promise<string> {
-  const buffer = data instanceof ArrayBuffer ? data : data.buffer;
-
   // Use Web Crypto API
   if (typeof crypto !== "undefined" && crypto.subtle) {
-    const hashBuffer = await crypto.subtle.digest(algorithm, buffer);
+    // TS lib now distinguishes ArrayBuffer from SharedArrayBuffer via
+    // Uint8Array<ArrayBufferLike>. crypto.subtle.digest wants a BufferSource
+    // backed by a plain ArrayBuffer. Cast through BufferSource explicitly.
+    const hashBuffer = await crypto.subtle.digest(algorithm, data as BufferSource);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
     return `${algorithm.toLowerCase().replace("-", "")}:${hashHex}`;

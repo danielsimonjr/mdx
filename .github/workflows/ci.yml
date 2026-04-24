@@ -19,11 +19,15 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install TypeScript
-        run: npm install -g typescript
+      - name: Install TypeScript + project deps
+        run: |
+          cd implementations/typescript
+          npm install
 
       - name: Type check
-        run: tsc implementations/typescript/mdx_format.ts --noEmit --target es2020 --moduleResolution node --skipLibCheck --ignoreDeprecations 6.0
+        run: |
+          cd implementations/typescript
+          npx tsc --noEmit --ignoreDeprecations 6.0
 
   test-typescript:
     name: TypeScript Unit Tests
