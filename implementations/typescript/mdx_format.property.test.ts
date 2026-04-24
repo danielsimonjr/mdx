@@ -13,6 +13,8 @@ import {
   getExtension,
   getMimeType,
   AssetCategory,
+  customSignerRole,
+  isCustomSignerRole,
   type SignatureEntry,
   type LocaleAvailable,
 } from "./mdx_format.js";
@@ -347,27 +349,23 @@ describe("customSignerRole runtime validation", () => {
   // Without this runtime check, the branded type is decorative.
 
   it("accepts reverse-DNS identifiers", () => {
-    const { customSignerRole } = require("./mdx_format.js") as typeof import("./mdx_format.js");
-    expect(() => customSignerRole("com.example.legal-counsel")).not.toThrow();
+expect(() => customSignerRole("com.example.legal-counsel")).not.toThrow();
     expect(() => customSignerRole("org.acme.reviewer.senior")).not.toThrow();
   });
 
   it("accepts URI-form identifiers", () => {
-    const { customSignerRole } = require("./mdx_format.js") as typeof import("./mdx_format.js");
-    expect(() => customSignerRole("https://example.com/roles/translator")).not.toThrow();
+expect(() => customSignerRole("https://example.com/roles/translator")).not.toThrow();
     expect(() => customSignerRole("urn:mdz:role:reviewer")).not.toThrow();
   });
 
   it("rejects built-in role names (use them directly)", () => {
-    const { customSignerRole } = require("./mdx_format.js") as typeof import("./mdx_format.js");
-    expect(() => customSignerRole("author")).toThrow(/built-in/);
+expect(() => customSignerRole("author")).toThrow(/built-in/);
     expect(() => customSignerRole("reviewer")).toThrow(/built-in/);
     expect(() => customSignerRole("notary")).toThrow(/built-in/);
   });
 
   it("rejects bare words that look like possible typos", () => {
-    const { customSignerRole } = require("./mdx_format.js") as typeof import("./mdx_format.js");
-    // "auther" (typo of author), "reviwer" (typo), "contributor" (plausible
+// "auther" (typo of author), "reviwer" (typo), "contributor" (plausible
     // built-in that isn't) — all must be rejected because accepting them
     // would silently make typos into "custom" roles.
     expect(() => customSignerRole("auther")).toThrow(/reverse-DNS/);
@@ -376,14 +374,12 @@ describe("customSignerRole runtime validation", () => {
   });
 
   it("rejects empty or non-string input", () => {
-    const { customSignerRole } = require("./mdx_format.js") as typeof import("./mdx_format.js");
-    expect(() => customSignerRole("")).toThrow();
+expect(() => customSignerRole("")).toThrow();
     expect(() => customSignerRole(undefined as unknown as string)).toThrow();
     expect(() => customSignerRole(42 as unknown as string)).toThrow();
   });
 
   it("isCustomSignerRole agrees with the constructor", () => {
-    const { customSignerRole, isCustomSignerRole } = require("./mdx_format.js") as typeof import("./mdx_format.js");
     const good = customSignerRole("com.example.special");
     expect(isCustomSignerRole(good)).toBe(true);
     expect(isCustomSignerRole("author")).toBe(false); // built-in
