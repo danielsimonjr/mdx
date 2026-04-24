@@ -21,6 +21,7 @@ const validateCommand = require('./commands/validate');
 const importIpynbCommand = require('./commands/import-ipynb');
 const exportJatsCommand = require('./commands/export-jats');
 const exportEpubCommand = require('./commands/export-epub');
+const importEpubCommand = require('./commands/import-epub');
 const verifyCommand = require('./commands/verify');
 
 // CLI Banner
@@ -99,6 +100,13 @@ program
   .description('Export an MDZ archive to EPUB 3.3 for Calibre / readium / iBooks')
   .option('-o, --output <path>', 'Output .epub path')
   .action(exportEpubCommand);
+
+// Import from EPUB (Phase 2.4) - reverse direction, best-effort interop
+program
+  .command('import-epub <file>')
+  .description('Import an EPUB 3.x package as an MDZ archive (refuses DRM-protected EPUBs)')
+  .option('-o, --output <path>', 'Output .mdz path (default: same name with .mdz)')
+  .action(importEpubCommand);
 
 // Verify command (Phase 3.1) - cryptographic verification of signatures
 program

@@ -370,14 +370,20 @@ for documents that don't need cells.
   - Multi-locale → EPUB region-of-interest + `xml:lang` tags
   - `::cell` source → `<pre><code>` with `prism`-style highlighting (outputs
     baked in as alt content since EPUB can't execute)
-- [ ] `epub-to-mdz` CLI: reverse direction, best-effort
-  - OPF → MDZ manifest
-  - XHTML → Markdown (via turndown)
-  - Drops EPUB features MDZ doesn't express (page lists, complex SSML); warns.
-- [ ] Fidelity matrix: which EPUB features round-trip, which lose data, which
-      are converted approximately. Publish this prominently.
-- [ ] CI job: roundtrip every example through `mdz → epub → mdz` and verify
-      text + assets survive (accept documented fidelity gaps).
+- [x] `epub-to-mdz` CLI — `mdz import-epub` ships at
+      `cli/src/commands/import-epub.js`. OPF parse with comment-strip,
+      CDATA-unwrap, and multi-language title selection; spine walk in
+      reading order; XHTML → Markdown via turndown; image dedup by
+      destination path with basename-collision disambiguation; chapter
+      breaks emitted as HTML comments (round-trip stable). Refuses
+      DRM-protected EPUBs (exit code 3). 15 node:test cases including
+      synthesized round-trip + DRM refusal.
+- [x] Fidelity matrix at `docs/format-internals/epub-mdz-fidelity.md`
+      with per-direction tables (export-side losses, import-side losses,
+      round-trip stacking).
+- [x] CI job — `validate-cli` runs `node --test test/import-epub.test.js`
+      including the synthesized round-trip integration test (timeout
+      120s for Windows-runner headroom).
 
 ### 2.5 Browser extension — universal
 

@@ -196,6 +196,72 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Added — Phase 2.4 EPUB bridge: reverse direction (2026-04-24)
+
+`mdz import-epub` ships at `cli/src/commands/import-epub.js`,
+completing the round-trip with the v0 export side. Best-effort
+ingest from EPUB 3.x packages authored elsewhere (Calibre / pandoc /
+Sigil / iBooks Author / journal pipelines):
+
+- **OPF parsing** with three real-world hardenings caught in review:
+  comment stripping (a `<!-- <item id="x"/> -->` would have been
+  parsed as a real manifest entry), CDATA unwrap (so `<dc:title>
+  <![CDATA[A & B]]></dc:title>` yields `A & B`, not the literal
+  CDATA wrapper), and multi-language title selection (picks the
+  `<dc:title xml:lang="X">` whose lang matches `<dc:language>`,
+  falling back to first).
+- **Namespace-prefix tolerance**: `<opf:item>` / `<opf:href>` and
+  default-namespace `<item>` parse identically.
+- **Mixed-case attributes**: `Media-Type`, `ID`, `Href` resolve
+  consistently (XML allows them).
+- **Spine walk in reading order**, joined into a single
+  `document.md` with HTML-comment chapter breaks
+  (`<!-- mdz:chapter-break -->`). Comments survive subsequent
+  re-export through marked → XHTML cleanly, so cycle stability is
+  preserved (the prior `---` HR separator accumulated `<hr/>` on
+  each round-trip).
+- **Image dedup by destination path** — a real `Map<destPath, …>`,
+  not the broken `Set<{...}>` (object-reference identity) flagged
+  in review. Same-bytes duplicates skip silently; basename
+  collisions (two distinct hrefs sharing a basename) disambiguate
+  by prefixing the EPUB-side directory into the MDZ filename so
+  neither is lost.
+- **Path rewriting** with trailing-boundary lookahead so
+  `Images/foo.png` rewrites cleanly without false-matching
+  `Images/foo.png.bak`.
+- **DRM detection** — `META-INF/encryption.xml` triggers exit 3
+  with a user-facing message. MDZ is open by design; importing
+  encrypted EPUBs is refused, not silently stripped.
+- **Manifest synthesis** preserves DataCite-conformant identifiers,
+  language, license (prefers explicit `<dc:license>` over
+  `<dc:rights>`), keywords, EPUB Accessibility 1.1 features.
+  Non-UUID `<dc:identifier>` (DOI / ISBN / opaque) mints a fresh
+  UUID. `custom.import_source` records provenance
+  (`{kind: "epub", epub_version, imported_at, tool}`).
+
+Documentation:
+
+- `docs/format-internals/epub-mdz-fidelity.md` — full fidelity
+  matrix with per-direction tables. Documents what survives
+  cleanly, what's converted approximately, what's dropped, and
+  what stacks across MDZ → EPUB → MDZ vs EPUB → MDZ → EPUB cycles.
+
+Tests (15 node:test cases at `cli/test/import-epub.test.js`):
+
+- OPF parsing helpers: rootfile extraction, metadata + manifest +
+  spine, entity-encoded titles, CDATA unwrap, language-matching
+  title, comment stripping.
+- Manifest synthesis: shape, license preference, UUID
+  normalization (urn:uuid: stripping + DOI/ISBN/opaque fallback).
+- XML escape contract.
+- Synthesized in-process round-trip (mdz → epub → mdz)
+  preserving title / language / authors / keywords / license /
+  body text. 120s timeout for Windows-runner safety.
+- DRM refusal exits 3.
+
+CI: `validate-cli` job runs the new test file; `cli/package.json`
+adds `turndown ^7.2.0`.
+
 ### Added — Phase 2.1 viewer: cross-references + citations + bibliography (2026-04-24)
 
 The `<mdz-viewer>` web component now renders the v2.1 directives
