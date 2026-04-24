@@ -57,6 +57,167 @@ against that niche. See [`docs/POSITIONING.md`](docs/POSITIONING.md) and
   SPDX license requirement, CSL-JSON bibliography requirement, stricter
   accessibility baseline.
 
+### Added — Phase 4 ecosystem + Phase 5 governance (2026-04-24)
+
+- **Rust binding** at `bindings/rust/` (0.1.0-alpha): `Archive::open`,
+  manifest deserialization, `verify_integrity` / `verify_content_id` /
+  `verify_signature_chain`. Structured error enums (`ArchiveError`,
+  `IntegrityError`), `Role` enum with spec §16.2 "custom URI"
+  acceptance, `License` untagged enum. ZIP-bomb defense via bounded
+  reader (measures actual inflated bytes, not central-directory metadata).
+  `FeatureDisabled` runtime error keeps the API stable across feature
+  sets. 13 integration tests.
+- **Pandoc Lua filter** at `integrations/pandoc/mdz-filter.lua`: handles
+  `::cell` / `::output` / `::include` / `::fig` / `::ref` / `::cite`
+  directives. Quote-aware attribute parser. Empty-cell-marker emits a
+  visible `mdz-cell-empty` placeholder. 4 golden-output fixtures with
+  pinned-expected enforcement.
+- **VS Code extension** at `integrations/vscode/`: 6 commands (preview /
+  view / validate / import-ipynb / export-jats / verify) with
+  shell-injection-safe `execFile` argv, in-flight invocation tracking,
+  bounded preview HTML (1 MiB cap). Pure helpers extracted to
+  `helpers.js`; 17 unit tests cover preview rendering + `runCliCore`.
+- **arXiv corpus fetcher** at `tools/corpus-fetcher/fetch_arxiv.py`:
+  TOS-compliant 3-second rate limit, permissive-license filter, HTTPS,
+  Python 3.12 `tarfile.extractall(filter="data")` for path-traversal
+  defense, crash-safe `finally`-block report writes, pandoc preflight,
+  PDF-instead-of-tarball early detection.
+- **Streaming proposal** at `docs/proposals/streaming.md`: HTTP-Range
+  + EOCD-prefetch strategy with three open questions resolved
+  (eager-manifest + deferred-asset hashing with `mdz-asset-unverified`
+  sentinel; cross-origin cache MUST NOT; streaming writes deferred to
+  Phase 5+).
+- **Delta-snapshots extension** at `spec/extensions/delta-snapshots-v1.md`:
+  git-style packfiles for `history/snapshots/` with three open questions
+  resolved (markdown-only, no binary delta in v1; `index.json` MUST be
+  covered by `scope: full-archive` signatures; plain-text + outer DEFLATE).
+- **Governance scaffolding** under `docs/governance/`: `CHARTER.md` (W3C
+  Community Group draft with canonical CCLA URL), `RFC_PROCESS.md`
+  (change-management workflow), `TRADEMARK.md` (nominative-fair-use
+  policy), `RELEASE_ENGINEERING.md` (versioning + reproducible-build
+  posture).
+- **Bibliography spec** at `spec/directives/references-csl.md`: CSL-JSON
+  v1.0.2 references format, `::cite[key]` directive, `::bibliography`
+  block, BibTeX round-trip via pandoc.
+- **Peer-review annotations spec** at
+  `spec/directives/peer-review-annotations.md`: extends v2.0 Web
+  Annotation layer with `role` (author/reviewer/editor/reader) + four
+  review-specific motivations + attributable-vs-pseudonymous identity
+  trade-off.
+- **Author-facing docs**: `docs/for-authors/DOI.md` (Zenodo / OSF /
+  Crossref / arXiv DOI workflows with versioned-DOI patterns and
+  DataCite `relationType` PascalCase convention).
+- **Decision docs**: `docs/decisions/content-addressing-evolution.md`
+  resolves the three Phase 1.5 questions (defer by-hash byte-dedup to
+  v3.0 option (c); reject multihash/CIDv1; loud `checksum` deprecation
+  now).
+- **CI** grew from 9 to 14 jobs: validate-rust-binding (cargo build +
+  test, default + no-default), validate-pandoc-filter (smoke + golden-
+  output), validate-vscode-extension (JSON + syntax + 17 unit tests),
+  validate-corpus-fetcher (py_compile + import smoke), parity harness
+  (Rust ↔ TS), Phase 2/3 viewer-sanitizer + accessibility tests,
+  property-test corpus seeded from the 52 conformance fixtures.
+
+### Added — Phase 4.6 review-debt resolution (2026-04-24)
+
+A 5-agent review pass (code-reviewer, test-analyzer, comment-analyzer,
+silent-failure-hunter, type-design-analyzer) on the Phase 4 + 5 work
+surfaced ~40 items. This batch resolves them.
+
+Security:
+
+- VS Code extension: `exec()` → `execFile()` + argv array across all
+  three CLI call sites. Paths with shell metacharacters can no longer
+  be reinterpreted.
+- Rust `Archive::open`: bounded reader replaces `file.size()`-trusting
+  buffer. A forged ZIP central-directory `size=1` header can no longer
+  bypass the 500 MiB ceiling. `debug_assert!` guards the u64→usize
+  initial-allocation cast for wasm32 / 32-bit targets.
+- Rust `verify_signature_chain`: rejects `signatures[0].prev_signature`
+  (chain-root invariant per spec §16).
+- Corpus fetcher: HTTPS endpoints, missing-license rejection, PDF-
+  detection, `filter="data"` tarfile extraction (CVE-2007-4559 / PEP 706).
+
+Type design:
+
+- Structured `ArchiveError` + `IntegrityError` enums replace
+  String-wrapped variants. Callers can `match` on cause, not substring.
+- `License` untagged enum (`Spdx(String) | Structured`) replaces
+  `Option<serde_json::Value>`.
+- `Role` enum with `#[serde(try_from = "String")]` enforces spec §16.2
+  custom-URI acceptance at parse time.
+- `WARN_INFLATED_BYTES` constant exposed for caller-side `tracing`
+  integration.
+
+Tests:
+
+- Rust: 13 integration tests (open / locale resolution / chain root +
+  multi-entry valid + tampered + missing / checksum mismatch / blake3
+  unsupported / locale strict-error / Role 5 closed variants + 5 custom
+  forms + empty / FeatureDisabled on all 3 methods).
+- VS Code: 17 node:test cases across `helpers.test.js` and
+  `runCliCore.test.js` (escapeHtml, buildPreviewHtml truncation, theme
+  XSS escape, argv-not-shell, in-flight dedupe, completion cleanup,
+  err.code fallback).
+- Python: `test_deprecation.py` pins the `compute_checksum` warning
+  contract (fires on every call under `simplefilter("always")`;
+  `compute_content_hash` is silent).
+- Pandoc: 4 input fixtures + diff runner; `01-plain-paragraph.expected.md`
+  pinned. Required-pin enforcement rejects future fixtures missing
+  their pin. Runner distinguishes PANDOC-CRASH from empty-output.
+- A11y fixtures expanded 5 → 23 across image-alt / heading-order /
+  link-name / document-language with ok / fail / combined / edge cases.
+
+Deprecations + spec polish:
+
+- `checksum` → `content_hash` louder deprecation: spec §9.3.1 paragraph,
+  `@deprecated` JSDoc on `MDXAssetEntry.checksum` with v3.0 removal
+  target, `DeprecationWarning` from Python `compute_checksum` (uses
+  stdlib `warnings.warn`; respects user filters — earlier once-flag
+  implementation was wrong and was removed). New `compute_content_hash`
+  is the silent v2 replacement.
+- Spec title rename: "MDX Format Specification" → "MDZ Format
+  Specification (Markdown Zipped Container)" (body usage clarified as
+  synonymous; full body rename deferred to v2.1).
+- v2.0 spec §9.3.1: full deprecation paragraph.
+- streaming.md / delta-snapshots-v1.md: open-questions resolved.
+
+Process:
+
+- `ROADMAP.md` Phase 4.6 section enumerates all review findings with
+  per-item status (done / deferred / external-blocked) and verification
+  citations. 5 → 58 items marked `[x]` after honest tool-verified audit.
+
+CI hygiene:
+
+- `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` env var resolves the
+  Node 20 deprecation warning ahead of the 2026-09-16 runner cutover.
+- vite `^5.4.19`, vitest `^2.1.9`, wrangler `^3.114.14` package.json
+  bumps to address esbuild + undici + vite Dependabot alerts (5
+  alerts; awaits committed lockfile for re-scan).
+
+### Added — Phase 2 enablers (2026-04-24)
+
+- **`mdz validate --profile <id-or-path>`** enforces conformance against
+  a profile (`mdz-core`, `mdz-advanced`, `scientific-paper-v1`,
+  `api-reference-v1`, or a path to a profile JSON). Required manifest
+  fields surface as ERROR; recommended fields as WARNING; required
+  extensions checked against `content.extensions[]`. New
+  `spec/profiles/mdz-core-v1.json` ships the genuine Core baseline
+  (Core is a strict subset of Advanced; aliasing them was an in-process
+  review catch).
+- **Property-test corpus seeding**: `tests/property/test_parser_properties.py`
+  loads every fixture under `tests/conformance/{positive,edge,roundtrip}/`
+  at import and feeds them via hypothesis `@example` to
+  `test_parser_never_crashes_on_random_input`. Hypothesis starts from
+  known-valid inputs and mutates outward.
+- **Signature-trust documentation** at `docs/security/SIGNATURE_TRUST.md`:
+  DID resolution chain (did:web / did:key / trust file / certificate
+  fallback), trust policies (default / strict / offline), revocation per
+  DID method, key-rotation patterns (forward chain / historical
+  verification / co-signed rotation), what conformant viewers MUST
+  surface to users.
+
 ### Hardened — v2.0 implementations (from PR review, 2026-04-24)
 
 Parser (`alignment_parser.py`) now fails loud instead of silent on:
