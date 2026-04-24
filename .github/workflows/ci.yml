@@ -109,6 +109,9 @@ jobs:
           done
           echo "All test files present"
 
+      - name: Run alignment fixture validator
+        run: python tests/alignment/validate_fixtures.py
+
   validate-cli:
     name: Validate CLI Tool
     runs-on: ubuntu-latest
