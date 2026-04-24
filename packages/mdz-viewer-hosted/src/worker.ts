@@ -250,7 +250,7 @@ function baseShell({ title, body }: { title: string; body: string }): string {
        production this will be replaced by a Cloudflare Assets binding
        (wrangler r2 publish) so the module ships as /viewer.js. -->
   <script type="module">
-    // TODO: replace with bundled viewer once `npm run build` in
+    // TODO: replace with bundled viewer once "npm run build" in
     // packages/mdz-viewer emits dist/mdz-viewer.js. For dev, this pulls
     // the viewer from the local package via the worker's binding.
     import '/viewer.js';
