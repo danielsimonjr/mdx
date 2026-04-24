@@ -29,13 +29,13 @@
     "open": "^8.4.2",
     "ora": "^5.4.1"
   },
-  "devDependencies": {
-    "pkg": "^5.8.1"
-  },
   "pkg": {
     "assets": [
       "templates/**/*"
     ],
     "outputPath": "dist"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^6.18.2"
   }
 }
