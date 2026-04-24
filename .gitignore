@@ -37,3 +37,14 @@ __pycache__/
 tmpclaude-ffc2-cwd
 *.db-wal
 *.db-shm
+
+# Claude Code Memory MCP database (session-local working state)
+memory.db
+memory.db-*
+
+# Dropbox selective sync marker (local-only)
+.dropboxignore
+
+# Local generator output (CI regenerates; not source of truth)
+implementations/python/example-document.mdx
+implementations/python/example-extracted/
