@@ -127,6 +127,10 @@ describe("property: sanitizePath never allows path traversal", () => {
 });
 
 describe("property: cleanObject preserves non-null values", () => {
+  // Use Object.hasOwn to avoid false positives from prototype chain —
+  // `"constructor" in result` returns true for any plain object because
+  // Object.prototype.constructor exists. Own-property check is what we
+  // actually want: "did this value end up on the returned object?"
   it("never drops a non-null, non-undefined value", () => {
     fc.assert(
       fc.property(
@@ -141,13 +145,16 @@ describe("property: cleanObject preserves non-null values", () => {
           ),
         ),
         (dict) => {
-          const result = cleanObject(dict as Record<string, unknown>);
+          const result = cleanObject(dict as Record<string, unknown>) as Record<
+            string,
+            unknown
+          >;
           for (const [k, v] of Object.entries(dict)) {
             if (v !== null && v !== undefined) {
-              if (!(k in result)) return false;
+              if (!Object.prototype.hasOwnProperty.call(result, k)) return false;
               if (result[k] !== v) return false;
             } else {
-              if (k in result) return false;
+              if (Object.prototype.hasOwnProperty.call(result, k)) return false;
             }
           }
           return true;
