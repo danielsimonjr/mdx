@@ -137,6 +137,9 @@ jobs:
       - name: Run alignment fixture validator
         run: python tests/alignment/validate_fixtures.py
 
+      - name: Run reference alignment parser conformance tests
+        run: python tests/alignment/test_parser.py
+
   validate-cli:
     name: Validate CLI Tool
     runs-on: ubuntu-latest
