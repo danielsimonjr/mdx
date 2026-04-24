@@ -195,13 +195,14 @@
     },
 
     "license": {
+      "description": "License declaration. Either a bare SPDX identifier (e.g. 'CC-BY-4.0', 'CC0-1.0', 'MIT') or a structured object whose 'type' field is an SPDX identifier plus an optional 'url' to the license text. Using the SPDX identifier (in either form) is what enables automated OA-compliance checking on Zenodo/OSF/Crossref.",
       "oneOf": [
-        { "type": "string" },
+        { "type": "string", "description": "SPDX license identifier" },
         {
           "type": "object",
           "required": ["type"],
           "properties": {
-            "type": { "type": "string" },
+            "type": { "type": "string", "description": "SPDX license identifier" },
             "url": { "type": "string", "format": "uri" }
           },
           "additionalProperties": false

@@ -372,6 +372,7 @@ pub struct SignerIdentity {
 /// Holds the inflated entry map + parsed manifest in memory. For archives
 /// larger than ~500 MB inflated, this will exhaust memory on low-end
 /// devices; streaming variants are Phase 4.4 work.
+#[derive(Debug)]
 pub struct Archive {
     manifest: Manifest,
     manifest_raw: Vec<u8>,
