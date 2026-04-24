@@ -5,14 +5,35 @@
 > which has a massive install base and dominates search results for "MDX file format."
 > While deployed usage is effectively zero, it's the cheapest possible time to rename.
 
+> **Posture:** MDZ is an **experimental research project** until at least one
+> external organization publishes in the format. Every feature the editor and
+> viewer ship targets "professional-grade UX" (polished, keyboard-first,
+> accessible, fast) — the "experimental" label is about *format maturity*, not
+> about tooling quality. Do not pitch the format as production-ready; do pitch
+> the tooling as best-in-class.
+
 > **Positioning:** MDZ is the **native file format for executable scientific
 > papers.** It replaces the duct-tape stack of `.ipynb` + Overleaf + `.zip` of
 > supplementary materials with one signed, content-addressed archive that
 > renders in any browser, validates reproducibility, and preserves provenance.
 > Every feature in this roadmap is evaluated against that niche.
 
-This document consolidates the strategic review completed 2026-04-24 into an
-actionable plan. It's organized in dependency order — each phase unblocks the next.
+> **Competitive landscape (named, not ignored).** We are not first. Competitors
+> include **Quarto** (Posit-backed, used by Nature journals, CLI-first, best
+> reproducibility story today), **Jupyter Book / MyST** (Executable Books
+> project, strongest community, weakest signing/provenance), **Curvenote**
+> (YC-backed, arXiv-partnered, closest to this niche, proprietary backend),
+> **Manubot** (git-first academic writing, weak on interactivity), and
+> **Stencila** (dormant but influential). MDZ differentiates on: one
+> self-contained archive (vs. Quarto's build artifacts), signed provenance
+> chain (vs. Jupyter Book), open format (vs. Curvenote), and ZIP-container
+> portability (vs. everyone). Before Phase 2 ships anything, section
+> `docs/COMPETITIVE.md` must exist and be kept current — if a competitor
+> shipped what we're planning, we cut the feature.
+
+This document consolidates the strategic review completed 2026-04-24 (including
+independent review on the same date) into an actionable plan. It's organized in
+dependency order — each phase unblocks the next except where marked "rolling."
 
 ---
 
@@ -54,14 +75,15 @@ unsupported in writers but still parseable by readers.
 ### 0.2 Scope narrowing — executable scientific papers
 
 **Who we serve:** researchers (grad students, postdocs, faculty, lab PIs)
-submitting preprints to arXiv / bioRxiv / chemRxiv / Zenodo / OSF / SSRN who
-currently duct-tape together:
+submitting preprints to **arXiv, bioRxiv, chemRxiv, Zenodo, OSF, medRxiv**
+(SSRN dropped — Elsevier-owned, PDF-centric, wrong fit for reproducibility)
+who currently duct-tape together:
 
 - `.tex` or `.docx` for the manuscript
 - `.ipynb` for code and plots
 - separate `.zip` of supplementary data
-- an orcid.org profile for identity
-- a DOI minted post-hoc
+- an ORCID profile for identity
+- a DOI minted post-hoc via Crossref / DataCite
 
 MDZ collapses all of this into one signed, content-addressed, reproducible
 archive. Every v2.0 feature maps to a concrete scientific-paper need:
@@ -71,17 +93,52 @@ archive. Every v2.0 feature maps to a concrete scientific-paper need:
 | `::cell` + kernels | Figures regenerate from source data; reviewers re-run analyses |
 | Content-addressed IDs | Permanent citation hash, independent of URL |
 | Multi-signature | Author + corresponding-author + reviewer + journal editorial board |
-| DIDs (did:orcid, did:ror) | Authors resolve to ORCID; institutions resolve to ROR |
+| DIDs | `did:web` resolving to an ORCID record or an institutional ROR page — no unregistered DID methods invented |
 | Provenance (`derived_from`) | Preprint → revised → published version chain |
-| Accessibility | WCAG compliance that most journals now require |
-| Multi-locale | Global-South journals publishing in local language + English |
+| Accessibility | WCAG 2.1 AA baseline (the level most OA journals reference); WCAG 2.2 AA opt-in |
+| Multi-locale | Journals publishing in a local language + English |
 | `::include` | Shared methods sections, reusable boilerplate across papers |
 | Profiles (`scientific-paper-v1`) | Journals enforce structural requirements |
 | History DAG | Peer-review round-trips; preprint-vs-published diffs |
 
-**Deliverables unique to this vertical:**
+**Scientific-paper deliverables this niche requires (added per review —
+these are not optional for journal acceptance):**
+
+- [ ] **JATS-XML bridge** — `mdz-to-jats` and `jats-to-mdz` converters. PubMed
+      Central, Crossref deposit, and every mainstream journal ingest pipeline
+      runs on JATS 1.3. Without this path, MDZ can be authored but cannot be
+      published in any mainstream journal. Position this at Phase 2 priority
+      alongside the EPUB bridge.
+- [ ] **CSL / bibliography support** — `references.json` in CSL-JSON format
+      inside the archive; `::cite[key]` directive for in-text citations
+      resolving against it; a `bibliography` block for the rendered list.
+      Match Quarto / Pandoc conventions so existing `.bib` → `.csl-json`
+      tooling works unchanged.
+- [ ] **Figure, equation, table numbering + cross-references.** `::fig{id=f1}`,
+      `::eq{id=e1}`, `::tab{id=t1}` as labelable blocks; `::ref[f1]` renders
+      "Figure 1" auto-numbered by document order. Mirrors LaTeX `\label`/`\ref`
+      semantics. Must ship in v2.1 before Phase 2 viewer release.
+- [ ] **DOI minting integration** — documented workflow for Crossref (for
+      journal papers) and DataCite (for Zenodo/OSF). Not a format feature; a
+      publishing guide. Lives at `docs/for-authors/DOI.md`.
+- [ ] **Peer-review annotation spec** — extend the existing W3C Web Annotation
+      layer with reviewer-role + accept/reject/request-changes motivations,
+      signed reviewer identity. Needed for the "peer-review round-trips"
+      claim to be real.
+- [ ] **SPDX licensing metadata** — manifest requires `document.license.spdx`
+      field with SPDX identifier (`CC-BY-4.0`, `CC0-1.0`, `MIT`, etc.) for
+      automated OA compliance checking. Update the v2.0 schema.
+- [ ] **`.ipynb` → MDZ migration path** — `ipynb-to-mdz` CLI with documented
+      MIME-bundle → `::output` mapping (text/plain, image/png, application/json,
+      application/vnd.jupyter.widget-state+json → warning), metadata round-trip
+      for `kernelspec` / `language_info`, cell-level execution_count
+      preservation. This is the #1 adoption on-ramp.
+
+**General-purpose deliverables:**
 
 - [ ] `docs/POSITIONING.md` — one-page pitch for researchers
+- [ ] `docs/COMPETITIVE.md` — rolling comparison against Quarto, Jupyter Book,
+      Curvenote, Manubot, Stencila (see Posture block above)
 - [ ] `docs/for-authors/SUBMITTING.md` — how to convert an existing ipynb+tex
       workflow to MDZ
 - [ ] `docs/for-journals/EDITORIAL.md` — how a journal validates an MDZ
@@ -91,12 +148,21 @@ archive. Every v2.0 feature maps to a concrete scientific-paper need:
 - [ ] `spec/profiles/scientific-paper-v1.json` (already drafted) — tighten
       required sections (IMRaD), citation formats, DOI handling, data
       statement requirements
-- [ ] **Partnership outreach (Phase 0 exit criterion):** one arXiv endorser
-      or one journal editor has reviewed the positioning and said "yes, I'd
-      experiment with this." No further phases start without this signal.
+- [ ] **Phase 0 exit criterion (revised):** previous version required an
+      external editor to bless a format that doesn't exist yet — a deadlock.
+      Revised gate:
+      (a) one real paper converted end-to-end from ipynb+tex to MDZ that renders
+          correctly in the viewer prototype;
+      (b) one published comparison against Quarto and Curvenote showing concrete
+          differentiators;
+      (c) cold outreach to ≥20 journal editors / preprint server engineers
+          documenting responses (even "no interest" is acceptable — the deliverable
+          is the *data*, not the endorsement).
+      Phase 1 can start the moment (a) ships; Phase 2 requires (b) + (c).
 - [ ] Update `README.md` to lead with the scientific-paper use case.
-- [ ] Add `STATUS: experimental research project` banner to `README.md` until
-      at least one real paper is published as MDZ.
+- [ ] Add `STATUS: experimental research project (tooling is pro-grade; format
+      is not production-stable)` banner to `README.md` until at least one real
+      paper is published as MDZ at arXiv / Zenodo / OSF / a journal.
 
 ### 0.3 Extract enterprise features to extension profile
 
@@ -153,40 +219,87 @@ The single highest-leverage investment for interoperability.
       the AST. Same for TS→Py. This catches encoder/decoder divergence that
       per-impl tests miss.
 
-### 1.4 Fuzz testing
+### 1.4 Fuzz + property-based testing
 
-- [ ] Wire up `atheris` (Python) + `jazzer.js` (TypeScript) for coverage-guided fuzzing
-      of the parser and archive loader.
-- [ ] CI job: 5 minutes of fuzzing per parser per PR. Crashes block merge.
+Previous version named `atheris` and `jazzer.js` — both effectively unmaintained
+as of 2024 (Google archived atheris; Code Intelligence wound down jazzer.js).
+Use actively-maintained tooling instead:
+
+- [ ] **Python:** `hypothesis` for property-based testing (well-maintained,
+      ships hypothesis.strategies for Markdown-shaped input). `afl++` for
+      coverage-guided fuzzing if we need that later.
+- [ ] **TypeScript:** `fast-check` for property-based testing. No coverage-
+      guided JS fuzzer is currently well-maintained; treat this as a known gap.
+- [ ] CI job: property tests run every PR; 500 iterations per property.
+      Failures block merge.
 - [ ] Corpus seeded from the conformance suite.
 
-### 1.5 Content-addressing: commit fully or remove
+### 1.5 Content-addressing: evolve, don't restart
 
-The current half-done `content_id` + `assets/by-hash/` is worse than nothing.
+The v2.0 spec already ships `content_hash` with `sha256:` / `sha512:` / `blake3:`
+algorithms and the `assets/by-hash/sha256/<hex>` alias path (spec §9.2, §9.3,
+§10.3). Previous roadmap draft called this "half-done" — wrong, it's shipped.
 
-- [ ] Either adopt **multihash + CIDv1** format (aligns with IPFS ecosystem) and
-      switch `assets/by-hash/` to content-addressed storage with deduplication
-      (symlinks or tarball hardlinks within the ZIP via §10.3 extension)…
-- [ ] …or remove content-addressing from Core entirely and defer to Advanced profile.
-- [ ] Decision gate: does the scientific-paper niche care about content-addressing
-      vs. just content-hashing? Survey 10 potential users.
+The real questions for v3.0 (not v2.x):
+
+- [ ] Should `assets/by-hash/` avoid byte duplication? The current alias
+      duplicates bytes. Options: (a) keep duplication (simple, ZIP-friendly),
+      (b) require exactly-one-path per content-hash and use the `by-hash/`
+      path as canonical (breaking change), (c) define a manifest-only alias
+      table with no filesystem duplication.
+- [ ] Should we adopt **multihash + CIDv1** for alignment with IPFS / OCFL?
+      This is a v3.0 breaking change. Decision gate: does the scientific-paper
+      niche care? Survey ≥10 Zenodo/OSF users; they use OAI-PMH and BagIt,
+      neither of which is CID-native. Probable answer: no, defer indefinitely.
+- [ ] Document that `content_hash` is the canonical field and `checksum` is
+      deprecated (already done in v2.0 type defs; make it louder in the spec).
 
 ---
 
-## Phase 2 — Adoption enablers (12–16 weeks)
+## Phase 2 — Adoption enablers (18–24 months, not 12–16 weeks)
+
+The previous "12–16 weeks" target for this phase was wrong. A web component
+viewer alone is a 3-month build; a hosted service another month; the editor
+MVP (stripped down, see 2.3) is 4–6 months; EPUB bridge is 2 months; universal
+extension is 2 months. Sequenced with realistic parallelism for a small team
+(3–5 people): **18 months minimum, 24 months realistic.** With a solo
+maintainer, double it.
+
+**Sequencing within Phase 2 (dependency-ordered):**
+1. 2.1 viewer (blocks 2.2, 2.3, 2.5)
+2. 2.2 hosted rendering (blocks nothing but gates adoption growth)
+3. 2.3a editor MVP (blocks 2.3b)
+4. 2.4 EPUB bridge (independent, can run parallel)
+5. 2.5 browser extension (depends on 2.1)
+6. 2.3b editor Pro features (depends on 2.3a and real author feedback)
 
 ### 2.1 `<mdz-viewer>` web component — *the* highest-impact deliverable
 
-Without a great viewer, no one authors MDZ. Target: **50KB gzipped, 95% directive
-coverage, drop-in embed.**
+Without a great viewer, no one authors MDZ.
+
+**Realistic size budget** (previous "50KB gzipped" target was wrong — KaTeX
+alone is ~75KB gzipped without fonts, JSZip is ~40KB gzipped, highlight.js
+core is ~30KB gzipped):
+
+- Core shell (parse + render markdown + layout + ARIA): **target ≤80KB gzipped**
+- Math (KaTeX): lazy-loaded on first `$...$` or `::eq`, ~75KB gzipped
+- Syntax highlighting: lazy-loaded on first fenced code block, ~30KB gzipped
+- Archive loading (JSZip or fflate — prefer fflate, ~8KB gzipped): bundled
+- **Total first paint for text-only documents: ≤90KB gzipped**
+- **Total fully loaded with math+code+video: ≤250KB gzipped**
+
+Deliverables:
 
 - [ ] Framework-agnostic web component with shadow DOM isolation
-- [ ] Handles: CommonMark + GFM + math (KaTeX) + images + video + audio +
+- [ ] Handles: CommonMark + GFM + math (KaTeX, lazy) + images + video + audio +
       `::cell` + `::output` + `::include` + alignment/attributes + alt-text + ARIA
+      + cross-references (`::ref`) + citations (`::cite`)
 - [ ] Offline-first: uses IndexedDB for archive caching
 - [ ] Accessible by default: full keyboard navigation, screen-reader tested,
-      WCAG 2.2 AA out of the box
-- [ ] Published to npm as `@mdz-format/viewer`, CDN-available
+      **WCAG 2.1 AA baseline** (raises to 2.2 AA opt-in — 2.1 is what OA journals
+      currently reference)
+- [ ] Published to npm as `@mdz-format/viewer` (assumes `@mdz-format` scope is
+      reserved during Phase 0.1; if unavailable, fall back to `@mdz-core/viewer`)
 - [ ] Demo site: drop an `.mdz` file into `viewer.mdz-format.org`, get rendering
 
 ### 2.2 Hosted render-any-MDZ service
@@ -199,32 +312,49 @@ coverage, drop-in embed.**
 Goal: anyone can put `.mdz` in GitHub and share a rendering link. Removes the
 "no users because no viewer" chicken-and-egg.
 
-### 2.3 World-class desktop editor (Adobe Acrobat-class)
+### 2.3a Desktop editor MVP (4–6 months)
 
-The authoring experience needs to be better than Word for our niche. Model on
-Acrobat's PDF Pro: heavy-weight desktop app, polished, pro-grade.
+The first editor ships only what's *required* to produce a publishable paper.
+"Adobe Acrobat-class" is the long-term target (see 2.3b), not what v1.0 is.
 
-- [ ] **Tech stack:** Electron + Vite + CodeMirror 6 + web-component viewer (reuse 2.1)
-- [ ] **Split-pane editor:** source Markdown + live rendering + asset sidebar +
-      outline nav + annotations panel
-- [ ] **Visual authoring for directives:** GUI pickers for `::video`, `::cell`,
-      `::include` (no manual attribute typing required)
-- [ ] **Jupyter kernel integration:** run `::cell` blocks in-editor via JupyterLite
-      (WASM kernels, no Python install needed)
-- [ ] **Asset management:** drag-drop, auto-resize, AVIF/WebP variant generation,
-      content-hash computation on save
-- [ ] **Accessibility checker:** tab-inspect image alt text, heading order,
-      color contrast, reading order — export WCAG 2.2 AA compliance report
-- [ ] **Diff view for versions:** git-style side-by-side, block-level granularity
-- [ ] **Annotation layer:** W3C Web Annotation-compatible, comment threads,
-      track-changes, accept/reject
-- [ ] **Multi-locale side-by-side editing:** edit en-US and es-ES panes simultaneously,
-      flag untranslated sections
-- [ ] **Code-signed installers for Mac, Windows, Linux** (reuse signing infra from
-      MermaidJS desktop project)
-- [ ] **Auto-update via Squirrel** (same infra)
+- [ ] **Tech stack:** Electron + Vite + CodeMirror 6 + web-component viewer (reuse 2.1).
+      Auto-update via `electron-updater` (not Squirrel.Windows directly — Squirrel.Windows
+      is effectively unmaintained; `electron-updater` targets NSIS and Squirrel.Mac
+      through one API).
+- [ ] **Split-pane editor:** source Markdown + live rendering + asset sidebar
+- [ ] **Visual authoring for core directives:** GUI pickers for `::cell`,
+      `::include`, `::fig`, `::cite` (the scientific-paper four)
+- [ ] **Import from .ipynb:** drag-drop an ipynb, get an MDZ shell with cells
+      pre-populated. This is the on-ramp.
+- [ ] **Asset management:** drag-drop, content-hash computation on save
+- [ ] **Code-signed installers for Mac, Windows, Linux** (reuse signing infra
+      from the MermaidJS desktop project)
 
-**Milestone:** v1.0 ships with feature parity to Typora + Jupyter + basic PDF tools.
+**MVP milestone:** a grad student can author a reproducible paper end-to-end
+and export it to a journal as JATS-XML. Nothing more. Ship and listen.
+
+### 2.3b Editor Pro features (6–12 months after MVP, based on real feedback)
+
+Only build these after the MVP has real users and we know what they want:
+
+- [ ] Jupyter kernel execution via Pyodide (honest caveat: Pyodide is ~10MB
+      download, supports most pure-Python and a large-but-not-complete set of
+      C extensions; arbitrary `pip install` does NOT work for compiled wheels;
+      numpy/scipy/matplotlib/pandas work, tensorflow/torch do not. Reviewers
+      get "re-execute most cells" not "re-execute any cell")
+- [ ] Accessibility checker: image alt text, heading order, color contrast,
+      reading order — export WCAG 2.1 AA / 2.2 AA compliance report
+- [ ] Diff view for versions: block-level granularity
+- [ ] Peer-review annotation layer (W3C Web Annotation extension per Phase 0.2
+      peer-review spec) — threaded discussion, accept/reject. **Note:** this is
+      *asynchronous* annotation, not real-time collaboration; the non-goal holds.
+- [ ] Multi-locale side-by-side editing
+- [ ] AVIF/WebP variant generation
+- [ ] Visual authoring for non-core directives (`::video`, `::audio`, `::model`,
+      `::embed`, `::data`)
+
+**Pro milestone:** feature parity with Quarto authoring + basic Jupyter editing.
+*Not* parity with InDesign or Acrobat Pro. Those are not the competition.
 
 ### 2.4 EPUB ↔ MDZ bridge
 
@@ -260,7 +390,13 @@ Replace the Chrome-only extension with a universal one.
 
 ---
 
-## Phase 3 — Security and conformance (ongoing, starts Phase 2)
+## Phase 3 — Security and conformance (starts *before* Phase 2 ships)
+
+**Critical sequencing:** 3.1 (CSP profile + signature trust model + threat
+model) is a **hard prerequisite for Phase 2.2 hosted rendering.** Launching
+`view.mdz-format.org` with user-supplied archives and no CSP enforcement is
+how we become the next vector for XSS / malicious include chains. Move 3.1
+into the early weeks of Phase 2 scheduling even though it's numbered later.
 
 ### 3.1 Security model
 
@@ -353,52 +489,117 @@ Only after there's real adoption:
 
 ---
 
-## Immediate next steps (this week)
+## Immediate next steps (this week / month)
 
 If this roadmap is approved, the first concrete actions are:
 
-1. **Merge rename PR.** Touch every file, every URL, every type name.
-2. **Publish `STATUS: experimental` banner** in README.
-3. **Start on `<mdz-viewer>` skeleton** — this is a 3-month build, earlier it
-   starts the sooner everything downstream unblocks.
-4. **Survey 10 potential users** (arXiv/Zenodo regulars) on the scientific-paper
-   positioning — validate the niche before building for it.
-5. **Ship the formal grammar** as `spec/grammar/mdz-directives.abnf` — ~3 days
-   of focused work.
+1. **Decide the funding model** (`docs/FUNDING.md`) — this gates everything
+   else because it determines Phase 2 scope. Can be decided in a week;
+   execution (grant application, sponsor outreach) runs parallel to everything
+   below.
+2. **Write `docs/COMPETITIVE.md`** — honest comparison against Quarto, Jupyter
+   Book, Curvenote, Manubot, Stencila. If this document can't clearly name
+   MDZ's differentiators *today*, the roadmap is an expensive way to learn
+   nothing — rewrite the positioning first.
+3. **Merge rename PR** — touch every file, every URL, every type name; update
+   CLAUDE.md from "Markdown eXtended Container" to "Markdown Zipped Container."
+4. **Publish the revised `STATUS` banner** in README ("experimental research
+   project; tooling is pro-grade; format is not production-stable").
+5. **Ship the formal grammar draft** as `spec/grammar/mdz-directives.abnf`
+   — plan ≤2 weeks of work, not "3 days" (the prior estimate assumed no
+   iteration with the parser rebuild; realistically it co-evolves).
+6. **Start on `<mdz-viewer>` skeleton** — this is a 3-month build for the
+   core shell; math/highlight/video lazy-loaded over months 3–6.
+7. **Survey ≥20 potential users** (arXiv/Zenodo/OSF regulars, journal
+   production editors) on the scientific-paper positioning — validate the
+   niche AND the JATS-XML requirement before building for it.
+8. **Draft `spec/directives/cite-and-ref.md`** — cross-reference + citation
+   directives must land in v2.1 before the Phase 2 viewer ships, or the
+   viewer can't render real papers.
 
 ---
 
 ## Success metrics (end of 2027)
 
-Concrete, falsifiable, biased toward the scientific-paper niche:
+Concrete, falsifiable, biased toward the scientific-paper niche.
+**Flagged [STRETCH]** = requires external party cooperation not yet secured;
+count as a bonus, not a plan.
 
 **Niche-specific (primary):**
 - 10+ scientific papers published as MDZ at arXiv / bioRxiv / Zenodo / OSF
-- 1+ peer-reviewed journal accepts MDZ as a submission format
-- 1+ preprint server (arXiv / Zenodo / OSF) natively renders MDZ uploads
-- A reviewer has re-executed a `::cell` block in a submitted paper and
-  confirmed a result — the reproducibility loop closes for the first time
+  (via the viewer + hosted rendering service — doesn't require native preprint
+  server support)
+- A reviewer has re-executed a `::cell` block in a submitted paper via the
+  hosted viewer and confirmed a result — the reproducibility loop closes
 - 3+ authors have used the desktop editor end-to-end to produce a submission
+- `mdz-to-jats` round-trips for the 10+ published papers without data loss
+- [STRETCH] 1+ peer-reviewed journal accepts MDZ as a submission format
+- [STRETCH] 1+ preprint server (arXiv / Zenodo / OSF) natively renders MDZ
+  uploads — arXiv and Zenodo engineering roadmaps are set 2 years out; this
+  requires a champion inside the organization we do not yet have. Outreach
+  plan lives at `docs/PARTNERSHIPS.md`.
 
 **Ecosystem:**
 - `<mdz-viewer>` on npm with >1,000 weekly downloads
 - Conformance suite: 3+ independent implementations pass 100% of Core
 - Desktop editor: 500+ active weekly users across Mac/Win/Linux
-- W3C Community Group chartered
 - Zero CVEs in the reference implementations (or all resolved within SLA)
+- [STRETCH] W3C Community Group chartered (requires 5+ W3C member company
+  endorsements; not on hand)
+
+## Resourcing reality check
+
+This roadmap implies roughly **3–5 FTE for 2 years** to land Phase 2 as
+described:
+
+- 1 FTE viewer/web-component engineer
+- 1 FTE desktop editor engineer (Electron/CodeMirror)
+- 0.5 FTE spec / grammar / conformance suite
+- 0.5 FTE Python reference impl + JATS bridge
+- 0.5 FTE devrel / outreach / docs
+- 0.5–1.5 FTE security review, accessibility testing, CI
+
+Absent a funding source (grant, sponsorship, adjacent product) this plan
+**cannot execute as written with a solo maintainer** — expect 4–5x the
+timeline. Before Phase 1 formally commits, decide:
+
+- (a) Apply for NumFOCUS / Sloan / Mozilla open-source grants targeting
+      scientific tooling. Quarto, Jupyter, and MyST all went this route.
+- (b) Find an institutional sponsor (a university press, a funded OA journal,
+      a nonprofit like CZI).
+- (c) Run MDZ as a side project with ruthlessly smaller scope — in which
+      case drop the editor from Phase 2 entirely; ship viewer + EPUB bridge
+      + CLI only.
+
+Track the funding-model decision at `docs/FUNDING.md`.
 
 ---
 
 ## What we're NOT doing
 
-Explicit non-goals — listing these prevents scope creep:
+Explicit non-goals — listing these prevents scope creep. Each carries a precise
+definition so it can't be silently re-invoked:
 
-- **Real-time collaboration.** MDZ is a file format, not a CRDT. Google Docs
-  and HedgeDoc serve that need. Add CRDT layer in a separate project if needed.
-- **Full WYSIWYG at Adobe InDesign level.** Desktop editor targets "great for
-  Markdown + structure," not pixel-perfect layout.
-- **DRM / rights management.** Signing is for authenticity, not access control.
-- **Binary compatibility with DOCX / PDF.** Bridges only, not equivalence.
-- **Generic workflow engine.** `::cell` runs code; it doesn't orchestrate Airflow.
+- **Real-time collaborative editing (CRDT).** MDZ is a file format, not a CRDT.
+  Google Docs and HedgeDoc serve that need. The editor's annotation layer is
+  *asynchronous* — threaded comments + accept/reject that ship as part of a
+  saved archive — not live cursors / concurrent text streams. If we want the
+  latter, it's a separate project layered on top.
+- **Full-bleed WYSIWYG page layout (InDesign / Affinity Publisher).** The
+  "Adobe Acrobat-class" framing applies to *UX polish and pro-grade install
+  experience*, not to desktop publishing capability. MDZ documents reflow;
+  they don't have a master-page / spread model. If a journal needs camera-ready
+  typesetting, they run MDZ → LaTeX → PDF, not MDZ → InDesign.
+- **DRM / rights management.** Signing proves authenticity, not access control.
+- **Binary compatibility with DOCX / PDF.** Bridges only (see 2.4 for EPUB;
+  JATS bridge is Phase 2). Not equivalence.
+- **Generic workflow engine / Airflow replacement.** `::cell` runs individual
+  code blocks with declared kernel + requirements. It does not orchestrate
+  DAGs across documents, schedule reruns, or manage dependencies between
+  papers. If a reader wants "run all cells in the correct order," the viewer
+  does that one-shot; it does not integrate with Dagster / Prefect / Airflow.
+- **Competing with Quarto on authoring breadth.** Quarto supports HTML / PDF /
+  reveal.js / Word / dashboards / books / websites from one source. MDZ
+  authoring targets *one output*: an MDZ archive. Convert later via bridges.
 
 If someone proposes one of these, the answer is "separate project, or later phase."
