@@ -1,0 +1,1 @@
+{"expected_violations": [], "wcag_level": "AA", "description": "Section component starting at h2 (no h1); current runner does not flag — intentional, since not every document fragment has a top-level h1."}

@@ -340,8 +340,9 @@ pub struct IntegrityConfig {
 /// A single signature-chain entry.
 #[derive(Debug, Clone, Deserialize)]
 pub struct SignatureEntry {
-    /// Role of this signer (author, reviewer, editor, publisher, notary, or custom).
-    pub role: String,
+    /// Role of this signer. Parsed at load time into the [`Role`] enum so
+    /// callers can `match` instead of comparing strings.
+    pub role: Role,
     /// Signer identity (name + optional DID).
     pub signer: SignerIdentity,
     /// Signature algorithm (Ed25519, RS256, ES256).
@@ -351,6 +352,59 @@ pub struct SignatureEntry {
     /// Hash of the previous chain entry's signature (required on all but the first).
     #[serde(default)]
     pub prev_signature: Option<String>,
+}
+
+/// Signer role. The spec defines five closed variants plus a custom
+/// namespace (`custom:<name>`); the enum rejects anything else at parse
+/// time, catching typos / spec drift before a signature is written.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(try_from = "String")]
+pub enum Role {
+    /// Manuscript author / co-author.
+    Author,
+    /// Peer reviewer.
+    Reviewer,
+    /// Journal editor / editorial board member.
+    Editor,
+    /// Publisher (journal, preprint server, institutional press).
+    Publisher,
+    /// Trusted-timestamp notary (e.g. `did:web:timestamp.example.com`).
+    Notary,
+    /// Custom role — must match `^custom:[a-z0-9_-]+$` per spec §16.
+    Custom(String),
+}
+
+impl std::convert::TryFrom<String> for Role {
+    type Error = String;
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        match s.as_str() {
+            "author" => Ok(Role::Author),
+            "reviewer" => Ok(Role::Reviewer),
+            "editor" => Ok(Role::Editor),
+            "publisher" => Ok(Role::Publisher),
+            "notary" => Ok(Role::Notary),
+            other if other.starts_with("custom:") => {
+                let tail = &other[7..];
+                if !tail.is_empty()
+                    && tail.chars().all(|c| c.is_ascii_lowercase()
+                        || c.is_ascii_digit()
+                        || c == '_'
+                        || c == '-')
+                {
+                    Ok(Role::Custom(tail.to_string()))
+                } else {
+                    Err(format!(
+                        "invalid custom role '{}' — must match custom:[a-z0-9_-]+",
+                        s
+                    ))
+                }
+            }
+            _ => Err(format!(
+                "unknown signer role '{}' — expected author/reviewer/editor/publisher/notary or custom:<name>",
+                s
+            )),
+        }
+    }
 }
 
 /// Identity of a signer.
@@ -474,6 +528,12 @@ impl Archive {
     }
 
     /// Raw bytes of `manifest.json` (for re-hashing during integrity checks).
+    ///
+    /// **Invariant:** the returned slice is byte-identical to the bytes
+    /// passed to [`Archive::open`]. This is load-bearing for
+    /// [`Archive::verify_integrity`] — a future lazy-parse optimization
+    /// MUST preserve this exact-bytes guarantee or integrity-hash
+    /// verification will silently drift.
     pub fn manifest_bytes(&self) -> &[u8] {
         &self.manifest_raw
     }
@@ -483,7 +543,11 @@ impl Archive {
         self.entries.len()
     }
 
-    /// Iterate archive entry paths in lexicographic order.
+    /// Iterate archive entry paths in **stable lexicographic order**.
+    ///
+    /// Backed by a `BTreeMap`; ordering is guaranteed and matters for
+    /// reproducible content-hashing (a reader building a merkle tree
+    /// over entries gets the same root hash on every run).
     pub fn entry_paths(&self) -> impl Iterator<Item = &str> {
         self.entries.keys().map(|s| s.as_str())
     }
@@ -500,9 +564,13 @@ impl Archive {
     /// 1. First preferred tag that matches `content.locales.available[].tag`.
     /// 2. First tag in `content.locales.fallback`.
     /// 3. `content.locales.default`.
-    /// 4. Top-level `content.entry_point`.
+    /// 4. Top-level `content.entry_point` (only when `locales` is absent —
+    ///    if `locales` is declared but the `default` tag is not in
+    ///    `available[]`, that's a manifest error and this method returns
+    ///    [`ArchiveError::EntryNotFound`] rather than silently serving
+    ///    the wrong language).
     pub fn document_content(&self, preferred: &[&str]) -> Result<String, Error> {
-        let entry_point = self.resolve_entry_point(preferred);
+        let entry_point = self.resolve_entry_point(preferred)?;
         let bytes = self
             .entries
             .get(&entry_point)
@@ -515,9 +583,9 @@ impl Archive {
         })
     }
 
-    fn resolve_entry_point(&self, preferred: &[&str]) -> String {
+    fn resolve_entry_point(&self, preferred: &[&str]) -> Result<String, Error> {
         let Some(locales) = &self.manifest.content.locales else {
-            return self.manifest.content.entry_point.clone();
+            return Ok(self.manifest.content.entry_point.clone());
         };
         let find_tag = |tag: &str| {
             locales
@@ -526,12 +594,23 @@ impl Archive {
                 .find(|a| a.tag == tag)
                 .map(|a| a.entry_point.clone())
         };
-        preferred
-            .iter()
-            .find_map(|p| find_tag(p))
-            .or_else(|| locales.fallback.iter().find_map(|f| find_tag(f)))
-            .or_else(|| find_tag(&locales.default))
-            .unwrap_or_else(|| self.manifest.content.entry_point.clone())
+        if let Some(ep) = preferred.iter().find_map(|p| find_tag(p)) {
+            return Ok(ep);
+        }
+        if let Some(ep) = locales.fallback.iter().find_map(|f| find_tag(f)) {
+            return Ok(ep);
+        }
+        find_tag(&locales.default).ok_or_else(|| {
+            // `locales` was declared but the declared `default` tag is
+            // missing from `available[]` — a manifest bug. Silently
+            // falling through to `content.entry_point` here would risk
+            // serving an unintended language (e.g. an English top-level
+            // document to a Japanese-declared archive). Fail loud.
+            Error::Manifest(format!(
+                "content.locales.default '{}' not found in content.locales.available[]",
+                locales.default
+            ))
+        })
     }
 
     /// Verify `security.integrity.manifest_checksum` against the SHA-256 of
@@ -539,33 +618,51 @@ impl Archive {
     /// [`Error::Integrity`] otherwise, or `Ok(())` with no-op if no
     /// checksum is declared.
     ///
-    /// Available only with the `verify` feature (default).
-    #[cfg(feature = "verify")]
+    /// Builds without the `verify` feature return [`Error::FeatureDisabled`]
+    /// at runtime rather than failing to compile — keeps the public API
+    /// surface stable across feature sets.
     pub fn verify_integrity(&self) -> Result<(), Error> {
-        let Some(declared) = self
-            .manifest
-            .security
-            .as_ref()
-            .and_then(|s| s.integrity.as_ref())
-            .and_then(|i| i.manifest_checksum.as_ref())
-        else {
-            return Ok(());
-        };
-        check_hash("manifest_checksum", declared, &self.manifest_raw)
+        #[cfg(not(feature = "verify"))]
+        return Err(Error::FeatureDisabled {
+            feature: "verify",
+            method: "verify_integrity",
+        });
+        #[cfg(feature = "verify")]
+        {
+            let Some(declared) = self
+                .manifest
+                .security
+                .as_ref()
+                .and_then(|s| s.integrity.as_ref())
+                .and_then(|i| i.manifest_checksum.as_ref())
+            else {
+                return Ok(());
+            };
+            check_hash("manifest_checksum", declared, &self.manifest_raw)
+        }
     }
 
     /// Verify `document.content_id` against the entry-point bytes.
-    #[cfg(feature = "verify")]
+    ///
+    /// Returns [`Error::FeatureDisabled`] when built without `verify`.
     pub fn verify_content_id(&self) -> Result<(), Error> {
-        let Some(declared) = &self.manifest.document.content_id else {
-            return Ok(());
-        };
-        let entry_point = &self.manifest.content.entry_point;
-        let bytes = self
-            .entries
-            .get(entry_point)
-            .ok_or_else(|| ArchiveError::EntryNotFound(entry_point.clone()))?;
-        check_hash("content_id", declared, bytes)
+        #[cfg(not(feature = "verify"))]
+        return Err(Error::FeatureDisabled {
+            feature: "verify",
+            method: "verify_content_id",
+        });
+        #[cfg(feature = "verify")]
+        {
+            let Some(declared) = &self.manifest.document.content_id else {
+                return Ok(());
+            };
+            let entry_point = &self.manifest.content.entry_point;
+            let bytes = self
+                .entries
+                .get(entry_point)
+                .ok_or_else(|| ArchiveError::EntryNotFound(entry_point.clone()))?;
+            check_hash("content_id", declared, bytes)
+        }
     }
 
     /// Check the structural integrity of the signature chain.
@@ -574,35 +671,52 @@ impl Archive {
     /// `sha256(bytes(prev.signature))`. Does NOT cryptographically verify
     /// signature bytes — that requires DID resolution + crypto primitives
     /// and is Phase 3.2 work (same caveat as the Node reference verifier).
-    #[cfg(feature = "verify")]
+    ///
+    /// Returns [`Error::FeatureDisabled`] when built without `verify`.
     pub fn verify_signature_chain(&self) -> Result<(), Error> {
-        let Some(security) = &self.manifest.security else {
-            return Ok(());
-        };
-        let sigs = &security.signatures;
-        // Root signer (signatures[0]) MUST NOT carry prev_signature — it is the
-        // chain anchor. A present value means corruption, a mid-chain entry
-        // placed as root, or a re-rooting attack.
-        if sigs.first().is_some_and(|s| s.prev_signature.is_some()) {
-            return Err(IntegrityError::SignatureChain(
-                "signatures[0] must not have prev_signature (chain root)".into(),
-            )
-            .into());
-        }
-        for (i, entry) in sigs.iter().enumerate().skip(1) {
-            let expected = format!("sha256:{}", sha256_hex(sigs[i - 1].signature.as_bytes()));
-            match &entry.prev_signature {
-                Some(ps) if ps == &expected => {}
-                Some(ps) => return Err(IntegrityError::SignatureChain(format!(
-                    "signatures[{}].prev_signature '{}' does not match sha256 of signatures[{}]",
-                    i, ps, i - 1
-                )).into()),
-                None => return Err(IntegrityError::SignatureChain(format!(
-                    "signatures[{}] missing prev_signature (breaks chain)", i
-                )).into()),
+        #[cfg(not(feature = "verify"))]
+        return Err(Error::FeatureDisabled {
+            feature: "verify",
+            method: "verify_signature_chain",
+        });
+        #[cfg(feature = "verify")]
+        {
+            let Some(security) = &self.manifest.security else {
+                return Ok(());
+            };
+            let sigs = &security.signatures;
+            // Root signer (signatures[0]) MUST NOT carry prev_signature — it is the
+            // chain anchor. A present value means corruption, a mid-chain entry
+            // placed as root, or a re-rooting attack.
+            if sigs.first().is_some_and(|s| s.prev_signature.is_some()) {
+                return Err(IntegrityError::SignatureChain(
+                    "signatures[0] must not have prev_signature (chain root)".into(),
+                )
+                .into());
             }
+            for (i, entry) in sigs.iter().enumerate().skip(1) {
+                let expected =
+                    format!("sha256:{}", sha256_hex(sigs[i - 1].signature.as_bytes()));
+                match &entry.prev_signature {
+                    Some(ps) if ps == &expected => {}
+                    Some(ps) => {
+                        return Err(IntegrityError::SignatureChain(format!(
+                            "signatures[{}].prev_signature '{}' does not match sha256 of signatures[{}]",
+                            i, ps, i - 1
+                        ))
+                        .into())
+                    }
+                    None => {
+                        return Err(IntegrityError::SignatureChain(format!(
+                            "signatures[{}] missing prev_signature (breaks chain)",
+                            i
+                        ))
+                        .into())
+                    }
+                }
+            }
+            Ok(())
         }
-        Ok(())
     }
 }
 

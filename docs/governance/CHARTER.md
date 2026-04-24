@@ -118,8 +118,10 @@ Patterned on the W3C TAG and on IETF rough-consensus traditions:
 ## Intellectual property
 
 - The CG operates under the **W3C Community Contributor License
-  Agreement** (CLA) — contributions are licensed back to the community
-  royalty-free.
+  Agreement (CLA)** as defined in the W3C Community and Business Group
+  Process (<https://www.w3.org/community/about/process/>) — contributions
+  are licensed back to the community royalty-free. The canonical CLA
+  text lives at <https://www.w3.org/community/about/agreements/cla/>.
 - No patent commitments beyond what the W3C CG framework requires.
 - Reference-implementation code is MIT-licensed; the spec itself is
   CC-BY-4.0.

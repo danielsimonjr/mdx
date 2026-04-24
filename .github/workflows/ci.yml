@@ -7,6 +7,12 @@ on:
     branches: [master, main]
   workflow_dispatch:
 
+# Opt into Node.js 24 runtime for JavaScript actions before the 2026-09-16
+# runner cutover. Cheaper than bumping every action's version pin and gets
+# us off the deprecation warning on every run.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   validate-typescript:
     name: Validate TypeScript
@@ -350,11 +356,21 @@ jobs:
           cargo test
 
       - name: Cargo build (no default features)
-        # Ensures the `verify`-gated methods still compile when the
-        # feature is disabled — catches accidental hard dependencies.
+        # Ensures the FeatureDisabled runtime path still compiles when
+        # the `verify` feature is off — catches accidental hard deps.
         run: |
           cd bindings/rust
           cargo build --no-default-features
+
+      - name: Cargo test (no default features)
+        # Exercises the FeatureDisabled runtime path in tests.
+        run: |
+          cd bindings/rust
+          cargo test --no-default-features
+
+      - name: Cross-impl parity harness (Rust parses TS-written archive)
+        run: |
+          python tests/parity/rust_ts_manifest_parity.py examples/example-document.mdx
 
   validate-pandoc-filter:
     name: Validate Pandoc Lua Filter (Phase 4.2)
@@ -375,16 +391,8 @@ jobs:
           echo "" | pandoc --lua-filter=integrations/pandoc/mdz-filter.lua \
             --from=markdown --to=markdown
 
-      - name: Run golden-output fixtures (if any)
-        # Phase 4.2 fixture pack lives in integrations/pandoc/tests/.
-        # Missing directory is not a failure — the job just smoke-tests
-        # the filter until fixtures ship.
-        run: |
-          if [ -d integrations/pandoc/tests ]; then
-            bash integrations/pandoc/tests/run.sh
-          else
-            echo "No pandoc fixtures yet — skipping."
-          fi
+      - name: Run golden-output fixtures
+        run: bash integrations/pandoc/tests/run.sh
 
   validate-vscode-extension:
     name: Validate VS Code Extension (Phase 4.2)
@@ -402,13 +410,18 @@ jobs:
           cd integrations/vscode
           node -e "JSON.parse(require('fs').readFileSync('package.json', 'utf8'))"
 
-      - name: Syntax-check extension.js
-        run: node --check integrations/vscode/src/extension.js
+      - name: Syntax-check extension.js + helpers.js
+        run: |
+          node --check integrations/vscode/src/extension.js
+          node --check integrations/vscode/src/helpers.js
 
       - name: Validate TextMate grammar JSON
         run: |
           cd integrations/vscode
           node -e "JSON.parse(require('fs').readFileSync('syntaxes/mdz.tmLanguage.json', 'utf8'))"
+
+      - name: Run helper unit tests
+        run: node --test integrations/vscode/test/*.test.js
 
   validate-corpus-fetcher:
     name: Validate Corpus Fetcher (Phase 4.3)

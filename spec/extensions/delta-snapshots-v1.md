@@ -223,24 +223,32 @@ A conformant writer producing `delta-snapshots-v1` archives:
    or when chain depth approaches 50.
 4. MUST list `"delta-snapshots-v1"` in `manifest.content.extensions[]`.
 
-## Open questions
+## Resolutions (2026-04-24)
 
-1. **Binary assets in history.** Do we delta-encode large PNG/video
-   assets that changed between versions? Binary diffs are much less
-   effective than text diffs; probably not worth the complexity. Current
-   proposal keeps binary assets in full, only deltas the markdown.
-   Open for feedback.
+1. **Binary assets in history — RESOLVED.** Decision: the v1 extension
+   does NOT delta-encode binary assets. Markdown deltas only. Binary
+   assets changing between versions are stored in full under
+   `history/snapshots/<version>/assets/...`, deduplicated via
+   `assets/by-hash/` when identical. This keeps the extension simple
+   and the format transparent. If the Phase 4.3 arXiv corpus shows a
+   binary-asset-heavy use case where this is expensive (>50% of
+   history size), revisit in a v2 extension with an explicit binary
+   delta algorithm (bsdiff or VCDIFF/RFC 3284). Tracked in ROADMAP
+   Phase 4.5.
 
-2. **Should `index.json` be cryptographically signed alongside
-   `manifest.json`?** The integrity-checksum scope in v2.0 §16 covers
-   the manifest only. Tampering with `index.json` could let an attacker
-   substitute a patch that reconstructs a different "v1.1.0" than what
-   was originally published. Phase 3.2 signature work should include
-   index.json in `scope: full-archive` coverage.
+2. **`index.json` cryptographic signing — RESOLVED, gated on Phase 3.2.**
+   Decision: the Phase 3.2 `security.signatures[].scope` MUST include
+   `"full-archive"` when `delta-snapshots-v1` is declared. A
+   `scope: "manifest"` signature on an archive carrying
+   `history/snapshots/index.json` is insufficient — readers MUST
+   reject such archives as malformed per this extension. Spec hook:
+   add a conformance rule to §16 when the extension is activated.
 
-3. **Compression.** Deltas are stored as plain text; DEFLATE in the
-   outer ZIP compresses them further. Deltas are already small — no
-   case for a custom encoding.
+3. **Compression — RESOLVED.** Decision: plain text patches + DEFLATE
+   from the outer ZIP. No custom encoding. Patch sizes in typical
+   scientific-paper revisions are small (bytes to low KB) and the
+   on-disk cost of DEFLATE overhead is negligible. Revisit only if
+   the corpus shows patch corpora >10 MB per archive.
 
 ## Next steps
 

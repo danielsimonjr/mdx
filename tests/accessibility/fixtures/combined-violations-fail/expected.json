@@ -1,0 +1,1 @@
+{"expected_violations": ["document-language", "image-alt", "link-name"], "wcag_level": "AA", "description": "Three concurrent violations: missing alt + vague link + missing language."}

@@ -1,0 +1,1 @@
+{"expected_violations": ["image-alt"], "wcag_level": "AA", "description": "Single image with empty alt. Fails 1.1.1."}

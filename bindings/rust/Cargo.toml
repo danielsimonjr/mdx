@@ -33,6 +33,9 @@ tempfile = "3"
 # Test-only: synthesize ZIP archives for integration tests. The main crate
 # consumes ZIPs in read-only mode; we only need the writer for tests.
 zip = { version = "2.2", default-features = false, features = ["deflate"] }
+# Test-only: compute expected chain hashes in integration tests.
+sha2 = "0.10"
+hex = "0.4"
 
 [features]
 default = ["verify"]

@@ -105,22 +105,57 @@ Comprehensive example now exercises previously-partial v2.0 features:
 
 ### Added — v2.0.0 Draft
 
-MDX Format Specification v2.0.0 Draft at `spec/MDX_FORMAT_SPECIFICATION_v2.0.md`, with matching JSON Schema at `spec/manifest-v2.schema.json`. Fully backward-compatible with v1.1 — all v1.1 manifests (with `mdx_version` updated to `2.0.0`) validate as minimal v2.0 documents.
+<!-- markdownlint-disable MD013 -->
+MDX Format Specification v2.0.0 Draft at
+`spec/MDX_FORMAT_SPECIFICATION_v2.0.md`, with matching JSON Schema at
+`spec/manifest-v2.schema.json`. Fully backward-compatible with v1.1 —
+all v1.1 manifests (with `mdx_version` updated to `2.0.0`) validate
+as minimal v2.0 documents.
 
 Ten capability additions:
 
-1. **Internationalization** (§8) — `content.locales` multi-locale bundle with per-asset locale alternatives and deterministic fallback resolution.
-2. **Content-addressed storage** (§9) — optional `assets/by-hash/<algo>/<digest>` layout, `content_hash` on every asset (supersedes `checksum`), `document.content_id` for verifiable content identity.
-3. **Streaming-friendly archive ordering** (§10) — normative ZIP local-header order: manifest → entry points → styles → data → media by size. Enables progressive fetch over byte-range HTTP.
-4. **Computational cells** (§11) — `::cell` directive with cached `::output` blocks, `interactivity.kernels[]` declaring kernel specs (Jupyter-compatible), capability Level 5 "Notebook" for execution.
-5. **Transclusion** (§12) — `::include` directive for archive-internal and cross-document content composition, `content.includes[]` declarations, hash-pinned external includes, circular-reference detection.
-6. **Document profiles** (§13) — `document.profile` URI pointing to structural requirements (required sections, required manifest fields, validation rules); two reference profiles: `scientific-paper/v1`, `api-reference/v1`.
-7. **Rich accessibility model** (§14) — `document.accessibility` top-level with features/hazards/reading-level/API-compliance claims; per-asset `accessibility` with long descriptions, audio description tracks, sign-language tracks, MathML fallbacks, sonification, tactile alternatives.
-8. **Provenance and fork graph** (§15) — `document.derived_from[]` for source chains, multi-parent versions via `parent_versions[]`, optional `history/graph.json` DAG for fork/merge history.
-9. **Multi-signature + DID identity** (§16) — `security.signatures[]` array with roles (author/reviewer/publisher/notary), W3C DID-based signer identity, signature chains via `prev_signature`, JCS canonicalization.
-10. **Responsive asset variants + content negotiation** (§17) — per-asset `variants[]` for resolution/format/media-condition alternatives, `content.variants[]` for document-level audience variants (short/long, technical/layperson).
+1. **Internationalization** (§8) — `content.locales` multi-locale bundle
+   with per-asset locale alternatives and deterministic fallback
+   resolution.
+2. **Content-addressed storage** (§9) — optional
+   `assets/by-hash/<algo>/<digest>` layout, `content_hash` on every
+   asset (supersedes `checksum`), `document.content_id` for verifiable
+   content identity.
+3. **Streaming-friendly archive ordering** (§10) — normative ZIP
+   local-header order: manifest → entry points → styles → data →
+   media by size. Enables progressive fetch over byte-range HTTP.
+4. **Computational cells** (§11) — `::cell` directive with cached
+   `::output` blocks, `interactivity.kernels[]` declaring kernel specs
+   (Jupyter-compatible), capability Level 5 "Notebook" for execution.
+5. **Transclusion** (§12) — `::include` directive for archive-internal
+   and cross-document content composition, `content.includes[]`
+   declarations, hash-pinned external includes, circular-reference
+   detection.
+6. **Document profiles** (§13) — `document.profile` URI pointing to
+   structural requirements (required sections, required manifest
+   fields, validation rules); two reference profiles:
+   `scientific-paper/v1`, `api-reference/v1`.
+7. **Rich accessibility model** (§14) — `document.accessibility`
+   top-level with features/hazards/reading-level/API-compliance
+   claims; per-asset `accessibility` with long descriptions, audio
+   description tracks, sign-language tracks, MathML fallbacks,
+   sonification, tactile alternatives.
+8. **Provenance and fork graph** (§15) — `document.derived_from[]` for
+   source chains, multi-parent versions via `parent_versions[]`,
+   optional `history/graph.json` DAG for fork/merge history.
+9. **Multi-signature + DID identity** (§16) — `security.signatures[]`
+   array with roles (author/reviewer/publisher/notary), W3C DID-based
+   signer identity, signature chains via `prev_signature`, JCS
+   canonicalization.
+10. **Responsive asset variants + content negotiation** (§17) —
+    per-asset `variants[]` for resolution/format/media-condition
+    alternatives, `content.variants[]` for document-level audience
+    variants (short/long, technical/layperson).
 
-Viewer capability levels extended to Level 5 (Notebook). Conformance updated to require multi-locale support at Level ≥ 0 and accessibility surfacing at Level ≥ 3.
+Viewer capability levels extended to Level 5 (Notebook). Conformance
+updated to require multi-locale support at Level ≥ 0 and
+accessibility surfacing at Level ≥ 3.
+<!-- markdownlint-enable MD013 -->
 
 ### Deprecated (retained for backward compat)
 

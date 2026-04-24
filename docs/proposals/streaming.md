@@ -223,26 +223,28 @@ cache API.
 
 ## Open questions
 
-1. **Should signature verification work under streaming?** The
-   manifest_checksum hashes the manifest bytes, which are loaded eagerly
-   — so yes. The content_id hashes the entry_point bytes, also loaded
-   eagerly — so yes. Per-asset content_hashes are verified on asset
-   fetch, not archive load — which means a fetched-but-unverified asset
-   could briefly render. Readers MUST attach a sentinel class like
-   `mdz-asset-unverified` to images until their hash is checked.
+**Resolutions (2026-04-24):**
 
-2. **Cache poisoning across origins.** Same-origin cache is safe. A
-   cross-origin cache (paper on site A references an asset already
-   downloaded for paper on site B) opens an attack vector: site B could
-   publish a paper whose hash collides with a legitimate site-A asset
-   and substitute malicious content. Defense: bind cache to origin, OR
-   require signatures on any cached asset (then the attack requires
-   compromising a signer's key).
+1. **Signature verification under streaming — RESOLVED.** Decision:
+   eager verification of manifest_checksum + content_id (both based on
+   bytes we load eagerly); deferred per-asset hash verification with
+   the `mdz-asset-unverified` sentinel class required on any element
+   awaiting verification. This is what the viewer 0.1 already does.
+   Promoted to normative in the spec draft's §16 when this proposal
+   lands.
 
-3. **Editor implications.** Editors need to write archives, which is
-   much easier when the whole thing fits in memory. Streaming writes
-   are out-of-scope for Phase 4.4; desktop editors will continue to
-   impose their own (higher) memory ceiling.
+2. **Cross-origin cache poisoning — RESOLVED.** Decision: bind cache
+   to origin. No cross-origin sharing until a separate proposal
+   addresses the attack surface (requires signed-asset enforcement
+   + revocation, which is Phase 3.2 work). The v1 streaming
+   implementation MUST NOT use a cross-origin cache. Documented as a
+   normative MUST NOT.
+
+3. **Editor implications — RESOLVED, deferred.** Decision: streaming
+   writes are OUT of scope for Phase 4.4 (read-side only). Desktop
+   editors keep a higher in-memory ceiling (configurable, default
+   2 GB). Streaming editor writes revisit in Phase 5+ if someone
+   actually hits the ceiling.
 
 ---
 

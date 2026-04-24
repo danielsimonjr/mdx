@@ -360,7 +360,12 @@ export interface BaseAssetMetadata {
   size_bytes: number;
   /**
    * Checksum for integrity verification (format: "algorithm:hex").
-   * DEPRECATED in v2.0 — use `content_hash`. Retained for backward compat.
+   *
+   * @deprecated v2.0 — use `content_hash`. The `checksum` field is retained
+   *   so v1.x archives continue to parse, but readers SHOULD prefer
+   *   `content_hash` when both are present. Scheduled for removal in v3.0;
+   *   writers targeting v2.0+ MUST emit `content_hash` instead. See
+   *   `docs/decisions/content-addressing-evolution.md` Q3.
    */
   checksum?: string;
   /** Human-readable description */

@@ -635,6 +635,33 @@ Every asset MAY carry a `content_hash` field:
 
 Format: `<algo>:<hex-digest>`, same as the `checksum` field. `content_hash` is semantically equivalent to `checksum` and supersedes it. Writers SHOULD emit both for backward compatibility; readers MUST accept either.
 
+#### 9.3.1 `checksum` field — deprecated alias
+
+The v1.x `checksum` field is **deprecated as of v2.0** and scheduled for
+**removal in v3.0**. Every v2.0-or-later writer SHOULD emit
+`content_hash` as the canonical field and MAY additionally emit
+`checksum` (set to the same value) during the transition window for
+readers that predate v2.0. Writers emitting *only* `checksum` on a
+v2.0-or-later manifest violate this clause; validators SHOULD surface
+a warning.
+
+Readers MUST accept `checksum` as an alias for `content_hash` on any
+archive whose `mdx_version` is in the v1.x range. On v2.0-or-later
+archives, readers SHOULD prefer `content_hash` when both fields are
+present (silently) and emit a warning when only `checksum` is
+present. Reference implementations surface this as:
+
+- TypeScript: `@deprecated` JSDoc tag on `MDXAssetEntry.checksum` —
+  IDE tooling surfaces the deprecation at the edit site.
+- Python: `warnings.warn(..., DeprecationWarning)` the first time
+  `compute_checksum` is called in a process.
+
+Rationale: two equally-authoritative integrity fields invited silent
+drift between writers. Forcing a single canonical name (`content_hash`)
+ahead of v3.0 gives an on-ramp without breaking v1.x archives. See
+`docs/decisions/content-addressing-evolution.md` for the full
+rationale + removal plan.
+
 ### 9.4 `document.content_id`
 
 A document MAY declare a content-level identifier:

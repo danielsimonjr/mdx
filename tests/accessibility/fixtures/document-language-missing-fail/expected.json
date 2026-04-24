@@ -1,0 +1,1 @@
+{"expected_violations": ["document-language"], "wcag_level": "AA", "description": "manifest.document.language is missing. Fails 3.1.1."}

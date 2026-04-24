@@ -32,8 +32,40 @@ def generate_uuid() -> str:
     return str(uuid.uuid4())
 
 
+_CHECKSUM_DEPRECATION_EMITTED = False
+
+
 def compute_checksum(data: bytes) -> str:
-    """Compute SHA-256 checksum."""
+    """Compute SHA-256 checksum in the legacy v1.x `checksum` format.
+
+    .. deprecated:: 2.0.0
+       The ``checksum`` manifest field was renamed to ``content_hash`` in
+       MDZ v2.0. v1.x archives continue to parse for backward compat, but
+       new archives SHOULD populate ``content_hash`` instead. The
+       ``checksum`` field is scheduled for removal in v3.0. Use
+       :func:`compute_content_hash` to compute the v2.0 value.
+
+       See ``docs/decisions/content-addressing-evolution.md`` Q3.
+    """
+    global _CHECKSUM_DEPRECATION_EMITTED
+    if not _CHECKSUM_DEPRECATION_EMITTED:
+        import warnings
+        warnings.warn(
+            "mdx_format.compute_checksum emits the deprecated v1.x `checksum` "
+            "field; use compute_content_hash for new archives (v2.0+). "
+            "Removal target: v3.0.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        _CHECKSUM_DEPRECATION_EMITTED = True
+    return f"sha256:{hashlib.sha256(data).hexdigest()}"
+
+
+def compute_content_hash(data: bytes) -> str:
+    """Compute SHA-256 content hash in the v2.0 ``<algorithm>:<hex>`` format.
+
+    Use this for the ``content_hash`` manifest field on v2.0+ archives.
+    """
     return f"sha256:{hashlib.sha256(data).hexdigest()}"
 
 

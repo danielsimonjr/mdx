@@ -1,0 +1,1 @@
+{"expected_violations": [], "wcag_level": "AA", "description": "Table with header row. Runner does not verify <thead> semantics — browser-level check."}

@@ -487,6 +487,148 @@ against its parent, not a full copy. Relevant once documents commonly have >20 v
 
 ---
 
+## Phase 4.6 — Review-debt resolution (post-2026-04-24 audit)
+
+Added after an honest self-enumeration of items the Phase 4+5 review
+cycle skipped. Items are split by origin so credit + blame are clear.
+
+### 4.6.1 Skipped review findings (code-review / silent-failure / type-design)
+
+- [ ] **Rust `resolve_entry_point`** — error when `locales` is declared
+      but the `default` tag is missing from `available[]`. Current code
+      silently falls through to the top-level entry_point. Flagged by
+      silent-failure-hunter.
+- [ ] **Rust wasm32 32-bit `usize` cast** — document or `debug_assert!`
+      the truncation in `Vec::with_capacity(file.size() as usize)`.
+      Flagged by silent-failure-hunter.
+- [ ] **Rust `SignatureEntry.role` enum** — replace `String` with a
+      `Role` enum (author/reviewer/editor/publisher/notary/custom)
+      + `TryFrom<String>` that runs the CUSTOM_SIGNER_ROLE_PATTERN
+      from the v2.0 spec. Flagged by type-design-analyzer.
+- [ ] **Rust `entry_paths` ordering docstring** — state that
+      lexicographic ordering is stable (via `BTreeMap`) and matters
+      for reproducible hashing. Flagged by type-design-analyzer.
+- [ ] **Rust `manifest_bytes` invariant docstring** — document that
+      the returned slice is byte-identical to the parsed input, and
+      that any future lazy-parse optimization must preserve this
+      invariant for `verify_integrity` correctness. Flagged by
+      type-design-analyzer.
+- [ ] **Rust `FeatureDisabled` actually wired** — the enum variant
+      was added but methods are still `#[cfg(feature = "verify")]`
+      gated. Either remove the cfg and return `Err(FeatureDisabled)`
+      at runtime (stable API surface across feature sets), or add a
+      prominent crate-doc paragraph explaining the gating. Flagged
+      by type-design-analyzer.
+- [ ] **CHARTER.md CCLA exact name + link** — currently says "W3C
+      Community Contributor License Agreement" without the canonical
+      URL. Flagged by comment-analyzer (suggestion #13).
+
+### 4.6.2 Skipped tests + coverage
+
+- [ ] **Pandoc golden-output fixture pack** — currently the CI job
+      smoke-tests "filter loads" only; no coverage of `::cell`,
+      `::include`, `::fig`, `::cite` directive rewriting. Create
+      `integrations/pandoc/tests/` with ≥3 fixtures + a diff runner.
+- [ ] **VS Code extension functional tests** — CI currently runs
+      `node --check` (syntax) and `JSON.parse` (manifest) only.
+      Add `integrations/vscode/test/` covering `runCli` in-flight
+      map, `buildPreviewHtml` truncation, `resolveFileUri` at unit
+      level without booting the VS Code extension host.
+- [ ] **Cross-implementation parity harness** — TypeScript writes a
+      canonical archive, Rust reads it, emits parsed manifest as
+      JSON, byte-compared against the TS-emitted manifest. Catches
+      encoder/decoder divergence that per-impl tests miss. Named as
+      "critical" by test-analyzer; unimplemented.
+- [ ] **Rust integration tests — additional chain cases** — add
+      positive case with correctly-hashed chain entries, negative
+      tampered-hash case, negative missing-prev-signature case,
+      blake3 unsupported-algorithm case, manifest_checksum mismatch
+      case. Only root-level invariant is currently covered.
+
+### 4.6.3 Skipped deprecations + spec follow-ups
+
+- [ ] **`checksum` → `content_hash` louder deprecation:**
+  - [ ] One full paragraph in `spec/MDX_FORMAT_SPECIFICATION_v2.0.md`
+        §9.2 (not a parenthetical).
+  - [ ] `@deprecated` JSDoc tag in `implementations/typescript/mdx_format.ts`
+        with removal version (v3.0).
+  - [ ] `DeprecationWarning` emitted at manifest load in
+        `implementations/python/mdx_format.py` when a loaded manifest
+        uses `checksum`.
+- [ ] **Streaming proposal open questions** — Q1 signature verification
+      under streaming, Q2 cross-origin cache poisoning, Q3 editor
+      implications. Answer or explicitly mark as empirically-pending
+      with the concrete blocker.
+- [ ] **Delta-snapshots open questions** — Q1 binary assets, Q2
+      cryptographic signing of `index.json` (phase 3.2 dependency),
+      Q3 compression. Pick a side or document the gating decision.
+
+### 4.6.4 Phase 0 / 1 items claimed done but unverified
+
+- [ ] **Repository `.mdx` → `.mdz` audit** — the rename commit landed
+      but I claimed ROADMAP completion without running the
+      `grep -rIn 'mdx' .` pass called for in §0.1. Actually do it.
+- [ ] **npm `@mdz-format` scope reservation** — not verified.
+- [ ] **Spec prose-grammar removal** — verify nothing outside
+      `spec/grammar/*.abnf` duplicates the directive grammar.
+- [ ] **Chevrotain TypeScript parser** — audit 2026-04-24 found ZERO
+      `chevrotain` references in `implementations/` or `spec/`. The
+      Phase 1.2 ROADMAP item "New TypeScript parser built on Chevrotain"
+      is NOT done. Action: either ship Chevrotain (estimated 2–4 weeks)
+      or downgrade the spec to "Lark (Python) is the reference parser;
+      TS consumers use the regex-based legacy parser until Phase 2.3".
+      Preferred path: downgrade + revisit in Phase 2.3 when the editor
+      build needs a real TS parser anyway.
+- [x] **`.expected.json` per conformance fixture** — audit 2026-04-24:
+      52 `.md` fixtures, 52 `.expected*.json` pairs. 100% coverage
+      across positive/negative/roundtrip/edge. Resolved.
+- [ ] **`basicMarkdownToHTML` retirement** — audit 2026-04-24 found the
+      method still present at `implementations/typescript/mdx_format.ts:3363`.
+      Currently guarded by a `toHTML()`-level `console.warn` (once per
+      process) rather than deleted. The Phase 1.2 ROADMAP item expected
+      full removal. Action: decide — keep the toy renderer as a
+      deprecated-but-present helper through v3.0 (current state), OR
+      fully remove and point callers at `@mdz-format/viewer`.
+- [ ] **Conformance Core vs Advanced split** — Phase 0.3 claims the
+      split is done. Verify `spec/profiles/mdz-advanced-v1.json`
+      actually requires advanced features and that the parser
+      differentiates.
+
+### 4.6.5 Accessibility conformance expansion
+
+- [ ] **A11y fixtures 5 → 50** — Phase 3.3 target is 50. Only 5
+      stub categories exist. Expand to at least 20 in-session,
+      spanning: color contrast, form labels, `aria-labelledby`,
+      landmark roles, table headers, focus order, language tags,
+      skip links. Remaining 30 deferred to Phase 3.3 completion.
+
+### 4.6.6 CI hygiene
+
+- [ ] **Dependabot 5 moderate vulnerabilities on master** — audit
+      with `gh api repos/:owner/:repo/dependabot/alerts` and remediate
+      or consciously accept.
+- [ ] **Node 20 actions deprecation** — `actions/checkout@v4`,
+      `actions/setup-node@v4`, `actions/setup-python@v5` must move
+      to Node-24-compatible versions before 2026-09-16 runner
+      removal.
+- [ ] **`--locked` Cargo build** — currently commented out; commit
+      `Cargo.lock` and re-enable so CI reproduces deterministically.
+- [ ] **CHANGELOG.md line-length** — ~15 lines over 80 columns
+      around L108–L120 (pre-existing violations). Wrap to satisfy
+      markdownlint without `continue-on-error: true` swallowing
+      them.
+
+### 4.6.7 External / blocked items (not actionable in-session)
+
+- [ ] **Phase 0 exit criterion** — one real paper end-to-end.
+      Requires a real paper.
+- [ ] **npm `@mdz-format` scope** — requires npm account action.
+- [ ] **Journal outreach** — Phase 0.2.
+- [ ] **W3C charter submission** — Phase 5.
+- [ ] **Funding decisions** — Phase 0.
+
+---
+
 ## Phase 5 — Governance (Q4 2027+)
 
 Only after there's real adoption:

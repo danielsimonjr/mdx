@@ -1,0 +1,1 @@
+{"expected_violations": ["link-name"], "wcag_level": "AA", "description": "\"Read more\" and \"more\" are vague link texts. Fails 2.4.4."}
