@@ -311,12 +311,28 @@ export interface BaseAssetMetadata {
   mime_type: string;
   /** File size in bytes */
   size_bytes: number;
-  /** Checksum for integrity verification (format: "algorithm:hex") */
+  /**
+   * Checksum for integrity verification (format: "algorithm:hex").
+   * DEPRECATED in v2.0 — use `content_hash`. Retained for backward compat.
+   */
   checksum?: string;
   /** Human-readable description */
   description?: string;
   /** Attribution or credit information */
   credit?: string;
+
+  // --------------------------------------------------------------------------
+  // v2.0 additions — all OPTIONAL, available on every asset type
+  // --------------------------------------------------------------------------
+
+  /** Content hash (v2.0 §9.3). Same format as `checksum`; supersedes it. */
+  content_hash?: string;
+  /** Per-asset accessibility metadata (v2.0 §14.3) */
+  accessibility?: AssetAccessibility;
+  /** Resolution/format alternatives for responsive delivery (v2.0 §17.2) */
+  variants?: AssetVariant[];
+  /** Per-locale alternatives for this asset (v2.0 §8.3) */
+  locales?: AssetLocaleAlternative[];
 }
 
 /**
@@ -734,6 +750,199 @@ export interface DocumentInfo {
   subject?: string;
   /** Path to cover image */
   cover_image?: string;
+
+  // --------------------------------------------------------------------------
+  // v2.0 additions (§1.1) — all OPTIONAL, backward-compatible
+  // --------------------------------------------------------------------------
+
+  /** Content-addressed identifier of the document (v2.0 §9.4). Format: `<algo>:<hex>`. */
+  content_id?: string;
+  /** Document profile URI for machine-checkable structural validation (v2.0 §13). */
+  profile?: string;
+  /** Source documents this was derived from (v2.0 §15.2). */
+  derived_from?: DerivedFromEntry[];
+  /** Document-level accessibility metadata (v2.0 §14.2). */
+  accessibility?: DocumentAccessibility;
+}
+
+// ============================================================================
+// v2.0 — Derived-from / Provenance (§15)
+// ============================================================================
+
+/**
+ * A single upstream source for a v2.0 document's provenance chain.
+ */
+export interface DerivedFromEntry {
+  /** Source document identifier (URN, URL, or UUID) */
+  id: string;
+  /** Optional: specific version of the source */
+  version?: string;
+  /** Relationship to this document */
+  relation: "fork" | "merge-source" | "translation-of" | "derivative-work";
+  /** Optional explanatory notes */
+  notes?: string;
+}
+
+// ============================================================================
+// v2.0 — Accessibility (§14)
+// ============================================================================
+
+/**
+ * EPUB-aligned accessibility feature enumeration (v2.0 §14.2).
+ */
+export type AccessibilityFeature =
+  | "captions"
+  | "audio-description"
+  | "sign-language"
+  | "long-description"
+  | "mathml"
+  | "structural-navigation"
+  | "display-transformability"
+  | "transcript"
+  | "sonification"
+  | "tactile-alternative"
+  | "reading-order"
+  | "synchronized-audio-text";
+
+/**
+ * Document-level accessibility metadata (v2.0 §14.2).
+ */
+export interface DocumentAccessibility {
+  /** Human-readable accessibility summary */
+  summary?: string;
+  /** Reading level hint (e.g., "grade-6", "grade-11", "expert") */
+  reading_level?: string;
+  /** Content warnings (violence, medical imagery, etc.) */
+  content_warnings?: string[];
+  /** Declared accessibility features */
+  features?: AccessibilityFeature[];
+  /** Known hazards (flashing, motion simulation, sound) */
+  hazards?: Array<"flashing" | "motion-simulation" | "sound" | "none" | "unknown">;
+  /** Compliance claims (e.g., "WCAG-2.2-AA") */
+  api_compliance?: string[];
+}
+
+/**
+ * Per-asset accessibility metadata (v2.0 §14.3).
+ */
+export interface AssetAccessibility {
+  /** Inline long description (Markdown) */
+  long_description?: string;
+  /** Path to external long-description file */
+  long_description_path?: string;
+  /** Path to audio description track (MP3/WebM) */
+  audio_description_track?: string;
+  /** Path to sign-language interpretation video */
+  sign_language_track?: string;
+  /** Path to extended-description VTT */
+  extended_descriptions?: string;
+  /** Path to text transcript */
+  transcript?: string;
+  /** MathML fallback representation */
+  mathml?: string;
+  /** Path to audio sonification of data */
+  sonification?: string;
+  /** Path to tactile/braille alternative */
+  tactile_alternative?: string;
+}
+
+// ============================================================================
+// v2.0 — Asset Variants and Locale Alternatives (§17, §8)
+// ============================================================================
+
+/**
+ * Per-asset variant for responsive delivery (v2.0 §17.2).
+ */
+export interface AssetVariant {
+  /** Archive-relative path to this variant's file */
+  path: string;
+  /** Override MIME type (useful for format alternatives) */
+  mime_type?: string;
+  /** Content hash for this variant */
+  content_hash?: string;
+  /** File size in bytes */
+  size_bytes?: number;
+  /** Pixel dimensions */
+  width?: number;
+  height?: number;
+  /** Display density (e.g., "1x", "2x", "3x") */
+  density?: string;
+  /** Format tokens this variant serves (e.g., ["avif"], ["webp"]) */
+  formats?: string[];
+  /** CSS-media-query-like conditions */
+  media_conditions?: string;
+}
+
+/**
+ * Per-asset locale alternative (v2.0 §8.3).
+ */
+export interface AssetLocaleAlternative {
+  /** BCP 47 language tag */
+  tag: string;
+  /** Archive-relative path to the localized asset */
+  path: string;
+  /** Localized alt-text (for images) */
+  alt_text?: string;
+}
+
+// ============================================================================
+// v2.0 — Content locales, variants, includes (§8, §12, §17)
+// ============================================================================
+
+/**
+ * One entry in a `content.locales.available[]` array (v2.0 §8.2).
+ */
+export interface LocaleAvailable {
+  /** BCP 47 language tag */
+  tag: string;
+  /** Path to this locale's primary markdown file */
+  entry_point: string;
+  /** Localized document title */
+  title?: string;
+  /** Localized cover image path */
+  cover_image?: string;
+}
+
+/**
+ * Multi-locale content bundle (v2.0 §8.2).
+ */
+export interface ContentLocales {
+  /** BCP 47 tag of the default locale */
+  default: string;
+  /** One entry per supported locale */
+  available: LocaleAvailable[];
+  /** Ordered fallback chain when no exact match found */
+  fallback?: string[];
+}
+
+/**
+ * Document-level variant (v2.0 §17.3).
+ */
+export interface ContentVariant {
+  /** Variant identifier (e.g., "short", "technical") */
+  id: string;
+  /** Path to this variant's primary markdown */
+  entry_point: string;
+  /** Intended audience (e.g., "executive-summary", "specialist") */
+  audience?: string;
+  /** Variant title */
+  title?: string;
+  /** Variant description */
+  description?: string;
+}
+
+/**
+ * Declared transclusion target (v2.0 §12.3).
+ */
+export interface ContentInclude {
+  /** Local identifier for this include */
+  id: string;
+  /** Archive-relative path, mdx:// URI, or https:// URL */
+  target: string;
+  /** Content hash pinning for external targets */
+  content_hash?: string;
+  /** Whether this include is considered trusted (default false) */
+  trusted?: boolean;
 }
 
 /**
@@ -762,6 +971,17 @@ export interface ContentConfig {
   extensions?: string[];
   /** Additional content files */
   additional_files?: AdditionalFile[];
+
+  // --------------------------------------------------------------------------
+  // v2.0 additions
+  // --------------------------------------------------------------------------
+
+  /** Transclusion targets declared up-front for prefetching (v2.0 §12.3) */
+  includes?: ContentInclude[];
+  /** Multi-locale content bundle (v2.0 §8) */
+  locales?: ContentLocales;
+  /** Document-level variants (v2.0 §17.3) */
+  variants?: ContentVariant[];
 }
 
 /**
@@ -916,7 +1136,29 @@ export interface InteractivityConfig {
   /** Optional browser capabilities */
   optional_capabilities?: string[];
   /** Fallback behavior when capabilities aren't available */
-  fallback_behavior?: "show-static-preview" | "show-message" | "hide";
+  fallback_behavior?:
+    | "show-static-preview"
+    | "show-message"
+    | "hide"
+    | "show-cached-output";
+  /** Computational-cell kernel declarations (v2.0 §11.5) */
+  kernels?: KernelSpec[];
+}
+
+/**
+ * Kernel declaration for computational cells (v2.0 §11.5).
+ */
+export interface KernelSpec {
+  /** Kernel identifier referenced by `::cell{kernel=...}` */
+  id: string;
+  /** Archive-relative path to the Jupyter-style kernelspec JSON */
+  spec_path?: string;
+  /** Language the kernel runs */
+  language: string;
+  /** Language version */
+  version?: string;
+  /** Package/library requirements for re-execution */
+  requirements?: string[];
 }
 
 /**
@@ -941,6 +1183,8 @@ export interface HistoryConfig {
   enabled?: boolean;
   /** Path to versions.json file */
   versions_file?: string;
+  /** Path to fork/merge DAG (v2.0 §15.4) */
+  graph_file?: string;
   /** Directory for snapshots */
   snapshots_directory?: string;
   /** Retention policy */
@@ -981,8 +1225,12 @@ export interface PermissionsConfig {
   allow_external_links?: boolean;
   /** Allow loading external images */
   allow_external_images?: boolean;
+  /** Allow external `::include` targets (v2.0 §12.4) */
+  allow_external_includes?: boolean;
   /** Allow script execution */
   allow_scripts?: boolean;
+  /** Allow computational-cell kernel execution (v2.0 §11.6) */
+  allow_kernels?: boolean;
   /** Script sandbox level */
   script_sandbox?: "strict" | "relaxed" | "none";
 }
@@ -993,10 +1241,58 @@ export interface PermissionsConfig {
 export interface SecurityConfig {
   /** Integrity verification */
   integrity?: IntegrityConfig;
-  /** Digital signature */
+  /**
+   * Digital signature (v1.1 singular form).
+   * DEPRECATED in v2.0 — use `signatures[]`. Still accepted by readers.
+   */
   signature?: SignatureConfig;
+  /** Multi-signature chain (v2.0 §16.2) */
+  signatures?: SignatureEntry[];
   /** Permissions */
   permissions?: PermissionsConfig;
+}
+
+// ============================================================================
+// v2.0 — Multi-signature + DID identity (§16)
+// ============================================================================
+
+/**
+ * Identity of a signer, optionally including a W3C Decentralized Identifier.
+ */
+export interface SignerIdentity {
+  name: string;
+  email?: string;
+  url?: string;
+  /** W3C DID per did-core (v2.0 §16.4) */
+  did?: string;
+  /** Specific key identifier within the DID document */
+  key_id?: string;
+}
+
+/**
+ * One entry in v2.0's `security.signatures[]` (v2.0 §16.2).
+ */
+export interface SignatureEntry {
+  /** Role of this signer (author, reviewer, editor, publisher, notary, or custom URI) */
+  role: "author" | "reviewer" | "editor" | "publisher" | "notary" | string;
+  /** Signer identity */
+  signer: SignerIdentity;
+  /** Signature algorithm */
+  algorithm: "Ed25519" | "RS256" | "ES256";
+  /** What the signature covers */
+  scope?: "manifest-only" | "manifest-and-content" | "full-archive";
+  /** Canonicalization method for the signed data */
+  canonicalization?: "jcs";
+  /** When the signature was made (ISO 8601) */
+  timestamp?: string;
+  /** Base64 signature bytes */
+  signature: string;
+  /** Optional certificate chain */
+  certificate?: string;
+  /** Hash of the previous signature entry (signature chaining, v2.0 §16.3) */
+  prev_signature?: string;
+  /** URL to check for revocation status */
+  revocation_url?: string;
 }
 
 /**
@@ -1601,6 +1897,132 @@ export class MDXManifest {
    */
   isValid(): boolean {
     return this.validate().length === 0;
+  }
+
+  // ==========================================================================
+  // v2.0 helpers — §8 Internationalization
+  // ==========================================================================
+
+  /**
+   * Add a locale to `content.locales.available` and ensure a default exists.
+   * First locale added becomes the default unless one is already set.
+   */
+  addLocale(locale: LocaleAvailable): void {
+    if (!this._data.content.locales) {
+      this._data.content.locales = {
+        default: locale.tag,
+        available: [],
+      };
+    }
+    this._data.content.locales.available.push(locale);
+    this.updateModified();
+  }
+
+  /** Get the list of available locale tags, or [] if none declared. */
+  getLocaleTags(): string[] {
+    return (this._data.content.locales?.available ?? []).map((l) => l.tag);
+  }
+
+  /**
+   * Resolve the effective locale for a viewer preference (v2.0 §8.4).
+   * Returns a locale entry from `available[]`, or null if none declared.
+   */
+  resolveLocale(preferred: string[]): LocaleAvailable | null {
+    const loc = this._data.content.locales;
+    if (!loc) return null;
+    for (const pref of preferred) {
+      const match = loc.available.find((a) => a.tag === pref);
+      if (match) return match;
+    }
+    for (const fb of loc.fallback ?? []) {
+      const match = loc.available.find((a) => a.tag === fb);
+      if (match) return match;
+    }
+    return loc.available.find((a) => a.tag === loc.default) ?? null;
+  }
+
+  // ==========================================================================
+  // v2.0 helpers — §12 Transclusion
+  // ==========================================================================
+
+  /** Register a transclusion target for prefetching (v2.0 §12.3). */
+  addInclude(include: ContentInclude): void {
+    if (!this._data.content.includes) this._data.content.includes = [];
+    this._data.content.includes.push(include);
+    this.updateModified();
+  }
+
+  // ==========================================================================
+  // v2.0 helpers — §17 Document Variants
+  // ==========================================================================
+
+  /** Declare a document-level content variant (v2.0 §17.3). */
+  addVariant(variant: ContentVariant): void {
+    if (!this._data.content.variants) this._data.content.variants = [];
+    this._data.content.variants.push(variant);
+    this.updateModified();
+  }
+
+  // ==========================================================================
+  // v2.0 helpers — §13 Profiles
+  // ==========================================================================
+
+  /** Set the document profile URI (v2.0 §13.2). */
+  setProfile(uri: string): void {
+    this._data.document.profile = uri;
+    this.updateModified();
+  }
+
+  // ==========================================================================
+  // v2.0 helpers — §14 Accessibility
+  // ==========================================================================
+
+  /** Set document-level accessibility metadata (v2.0 §14.2). */
+  setAccessibility(a11y: DocumentAccessibility): void {
+    this._data.document.accessibility = a11y;
+    this.updateModified();
+  }
+
+  // ==========================================================================
+  // v2.0 helpers — §15 Provenance
+  // ==========================================================================
+
+  /** Record a derived-from entry for provenance tracking (v2.0 §15.2). */
+  addDerivedFrom(entry: DerivedFromEntry): void {
+    if (!this._data.document.derived_from) {
+      this._data.document.derived_from = [];
+    }
+    this._data.document.derived_from.push(entry);
+    this.updateModified();
+  }
+
+  // ==========================================================================
+  // v2.0 helpers — §16 Multi-Signature
+  // ==========================================================================
+
+  /**
+   * Add a signature entry (v2.0 §16.2).
+   * If a legacy singular `security.signature` is present, the new entry is
+   * added to `signatures[]` without removing the legacy field (viewers are
+   * expected to accept either).
+   */
+  addSignature(entry: SignatureEntry): void {
+    if (!this._data.security) this._data.security = {};
+    if (!this._data.security.signatures) this._data.security.signatures = [];
+    this._data.security.signatures.push(entry);
+    this.updateModified();
+  }
+
+  // ==========================================================================
+  // v2.0 helpers — §11 Computational Cells
+  // ==========================================================================
+
+  /** Register a kernel spec for computational cells (v2.0 §11.5). */
+  addKernel(spec: KernelSpec): void {
+    if (!this._data.interactivity) this._data.interactivity = {};
+    if (!this._data.interactivity.kernels) this._data.interactivity.kernels = [];
+    this._data.interactivity.kernels.push(spec);
+    this.updateModified();
   }
 }
 

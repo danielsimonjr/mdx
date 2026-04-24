@@ -365,3 +365,150 @@ describe("MDXManifest", () => {
     expect(b.title).toBe("Through JSON");
   });
 });
+
+// =============================================================================
+// MDXManifest — v2.0 helpers
+// =============================================================================
+
+describe("MDXManifest v2.0 helpers — §8 i18n", () => {
+  it("addLocale seeds content.locales and sets first locale as default", () => {
+    const m = new MDXManifest();
+    m.addLocale({ tag: "en-US", entry_point: "document.md", title: "Hello" });
+    m.addLocale({ tag: "es-ES", entry_point: "locales/es/document.md", title: "Hola" });
+
+    const obj = m.toObject();
+    expect(obj.content.locales?.default).toBe("en-US");
+    expect(obj.content.locales?.available.map((l) => l.tag)).toEqual(["en-US", "es-ES"]);
+    expect(m.getLocaleTags()).toEqual(["en-US", "es-ES"]);
+  });
+
+  it("resolveLocale honors preference, falls back to default, returns null when no locales", () => {
+    const empty = new MDXManifest();
+    expect(empty.resolveLocale(["en-US"])).toBeNull();
+
+    const m = new MDXManifest();
+    m.addLocale({ tag: "en-US", entry_point: "document.md" });
+    m.addLocale({ tag: "ja-JP", entry_point: "locales/ja/document.md" });
+
+    // Direct match
+    expect(m.resolveLocale(["ja-JP"])?.tag).toBe("ja-JP");
+    // No match → default
+    expect(m.resolveLocale(["de-DE"])?.tag).toBe("en-US");
+  });
+});
+
+describe("MDXManifest v2.0 helpers — §12 transclusion", () => {
+  it("addInclude records includes for prefetching", () => {
+    const m = new MDXManifest();
+    m.addInclude({ id: "legal", target: "shared/legal.md" });
+    m.addInclude({
+      id: "preamble",
+      target: "mdx://urn:mdx:doc:shared/document.md#preamble",
+      content_hash: "sha256:abc",
+    });
+    expect(m.toObject().content.includes).toHaveLength(2);
+    expect(m.toObject().content.includes?.[0].id).toBe("legal");
+  });
+});
+
+describe("MDXManifest v2.0 helpers — §17 variants", () => {
+  it("addVariant appends to content.variants", () => {
+    const m = new MDXManifest();
+    m.addVariant({ id: "short", entry_point: "variants/short/document.md", audience: "executive-summary" });
+    m.addVariant({ id: "technical", entry_point: "variants/technical/document.md", audience: "specialist" });
+
+    const obj = m.toObject();
+    expect(obj.content.variants).toHaveLength(2);
+    expect(obj.content.variants?.map((v) => v.id)).toEqual(["short", "technical"]);
+  });
+});
+
+describe("MDXManifest v2.0 helpers — §13 profiles", () => {
+  it("setProfile assigns document.profile", () => {
+    const m = new MDXManifest();
+    m.setProfile("https://mdx-format.org/profiles/scientific-paper/v1");
+    expect(m.toObject().document.profile).toBe(
+      "https://mdx-format.org/profiles/scientific-paper/v1",
+    );
+  });
+
+  it("setProfile updates modified timestamp when called after a delay", async () => {
+    const m = new MDXManifest();
+    const before = m.toObject().document.modified;
+    await new Promise((r) => setTimeout(r, 5));
+    m.setProfile("https://mdx-format.org/profiles/api-reference/v1");
+    expect(m.toObject().document.modified).not.toBe(before);
+  });
+});
+
+describe("MDXManifest v2.0 helpers — §14 accessibility", () => {
+  it("setAccessibility populates document.accessibility", () => {
+    const m = new MDXManifest();
+    m.setAccessibility({
+      summary: "All video has captions.",
+      features: ["captions", "long-description"],
+      hazards: ["none"],
+      api_compliance: ["WCAG-2.2-AA"],
+    });
+    const a11y = m.toObject().document.accessibility;
+    expect(a11y?.features).toContain("captions");
+    expect(a11y?.api_compliance).toEqual(["WCAG-2.2-AA"]);
+  });
+});
+
+describe("MDXManifest v2.0 helpers — §15 provenance", () => {
+  it("addDerivedFrom chains multiple upstream sources", () => {
+    const m = new MDXManifest();
+    m.addDerivedFrom({ id: "urn:mdx:doc:upstream", version: "2.1.0", relation: "fork" });
+    m.addDerivedFrom({ id: "urn:mdx:doc:translation-src", relation: "translation-of" });
+
+    const df = m.toObject().document.derived_from;
+    expect(df).toHaveLength(2);
+    expect(df?.[0].relation).toBe("fork");
+    expect(df?.[1].relation).toBe("translation-of");
+  });
+});
+
+describe("MDXManifest v2.0 helpers — §16 multi-signature", () => {
+  it("addSignature populates security.signatures[] and preserves order", () => {
+    const m = new MDXManifest();
+    m.addSignature({
+      role: "author",
+      signer: { name: "Alice", did: "did:web:alice.example.com" },
+      algorithm: "Ed25519",
+      scope: "full-archive",
+      signature: "base64-sig-a",
+    });
+    m.addSignature({
+      role: "reviewer",
+      signer: { name: "Bob" },
+      algorithm: "Ed25519",
+      scope: "manifest-only",
+      signature: "base64-sig-b",
+    });
+
+    const sigs = m.toObject().security?.signatures;
+    expect(sigs).toHaveLength(2);
+    expect(sigs?.[0].role).toBe("author");
+    expect(sigs?.[0].signer.did).toBe("did:web:alice.example.com");
+    expect(sigs?.[1].role).toBe("reviewer");
+  });
+});
+
+describe("MDXManifest v2.0 helpers — §11 computational cells", () => {
+  it("addKernel registers kernels under interactivity.kernels[]", () => {
+    const m = new MDXManifest();
+    m.addKernel({
+      id: "python3",
+      language: "python",
+      version: "3.11",
+      requirements: ["numpy>=1.25"],
+    });
+    m.addKernel({ id: "node20", language: "javascript", version: "20" });
+
+    const kernels = m.toObject().interactivity?.kernels;
+    expect(kernels).toHaveLength(2);
+    expect(kernels?.[0].id).toBe("python3");
+    expect(kernels?.[0].requirements).toContain("numpy>=1.25");
+  });
+});
