@@ -1,12 +1,17 @@
-// Unit tests for the MDX TypeScript reference implementation.
-// Targets pure utility functions and the MDXManifest class.
-// Integration tests for MDXDocument (JSZip-backed roundtrip) are out of
-// scope for this file — they'd need a real file system or a mocked JSZip
-// and belong in a separate integration test.
+// Unit tests for the MDZ TypeScript reference implementation (formerly MDX).
+// Targets pure utility functions and the MDZManifest class.
+// Integration tests for MDZDocument (JSZip-backed roundtrip) live in a
+// separate file (*.integration.test.ts).
 
 import { describe, it, expect } from "vitest";
 import {
-  // Constants
+  // Constants (current)
+  MDZ_VERSION,
+  MDZ_MIME_TYPE,
+  MDZ_EXTENSION,
+  MDX_MIME_TYPE_LEGACY,
+  MDX_EXTENSION_LEGACY,
+  // Deprecated aliases (still exported through 2027-01-01)
   MDX_VERSION,
   MDX_MIME_TYPE,
   MDX_EXTENSION,
@@ -25,7 +30,7 @@ import {
   sanitizePath,
   cleanObject,
   // Classes
-  MDXManifest,
+  MDZManifest,
   // Maps
   EXTENSION_TO_CATEGORY,
   EXTENSION_TO_MIME,
@@ -36,16 +41,43 @@ import {
 // =============================================================================
 
 describe("constants", () => {
-  it("MDX_VERSION is v2.0.0", () => {
-    expect(MDX_VERSION).toBe("2.0.0");
+  it("MDZ_VERSION is v2.0.0", () => {
+    expect(MDZ_VERSION).toBe("2.0.0");
   });
 
-  it("MDX_MIME_TYPE is the registered application/vnd.mdx-container+zip", () => {
-    expect(MDX_MIME_TYPE).toBe("application/vnd.mdx-container+zip");
+  it("MDZ_MIME_TYPE is the new application/vnd.mdz-container+zip", () => {
+    expect(MDZ_MIME_TYPE).toBe("application/vnd.mdz-container+zip");
   });
 
-  it("MDX_EXTENSION is .mdx (dot-prefixed)", () => {
-    expect(MDX_EXTENSION).toBe(".mdx");
+  it("MDZ_EXTENSION is .mdz (dot-prefixed)", () => {
+    expect(MDZ_EXTENSION).toBe(".mdz");
+  });
+
+  it("MDX_MIME_TYPE_LEGACY preserves the pre-rename MIME type for backward compat", () => {
+    expect(MDX_MIME_TYPE_LEGACY).toBe("application/vnd.mdx-container+zip");
+  });
+
+  it("MDX_EXTENSION_LEGACY preserves the pre-rename .mdx extension for backward compat", () => {
+    expect(MDX_EXTENSION_LEGACY).toBe(".mdx");
+  });
+});
+
+describe("deprecated MDX* aliases (remove after 2027-01-01)", () => {
+  // Verifying the backward-compat promise in CHANGELOG under "Renamed MDX → MDZ":
+  // existing consumers importing the old names must still compile and run.
+  it("MDX_VERSION is an alias of MDZ_VERSION", () => {
+    expect(MDX_VERSION).toBe(MDZ_VERSION);
+  });
+
+  it("MDX_MIME_TYPE is an alias of MDZ_MIME_TYPE (the new type, not legacy)", () => {
+    // Source-compat for callers who imported MDX_MIME_TYPE before the rename —
+    // they now write the new MIME type, which is what they should have been
+    // doing anyway.
+    expect(MDX_MIME_TYPE).toBe(MDZ_MIME_TYPE);
+  });
+
+  it("MDX_EXTENSION is an alias of MDZ_EXTENSION (the new ext, not legacy)", () => {
+    expect(MDX_EXTENSION).toBe(MDZ_EXTENSION);
   });
 });
 
@@ -181,8 +213,12 @@ describe("getMimeType", () => {
     expect(getMimeType("a.mp3")).toBe("audio/mpeg");
   });
 
-  it("maps the .mdx extension to the MDX MIME type", () => {
-    expect(getMimeType("doc.mdx")).toBe(MDX_MIME_TYPE);
+  it("maps the .mdz extension to the current MDZ MIME type", () => {
+    expect(getMimeType("doc.mdz")).toBe(MDZ_MIME_TYPE);
+  });
+
+  it("maps the legacy .mdx extension to the legacy MIME type (pre-rename archives)", () => {
+    expect(getMimeType("doc.mdx")).toBe(MDX_MIME_TYPE_LEGACY);
   });
 
   it("returns application/octet-stream for unknown extensions", () => {
@@ -282,14 +318,14 @@ describe("EXTENSION_TO_MIME map", () => {
 });
 
 // =============================================================================
-// MDXManifest class
+// MDZManifest class
 // =============================================================================
 
-describe("MDXManifest", () => {
+describe("MDZManifest", () => {
   // Nested-document construction: title lives at data.document.title.
-  // Constructor accepts Partial<MDXManifestData>.
+  // Constructor accepts Partial<MDZManifestData>.
   it("constructs with defaults when given no args", () => {
-    const m = new MDXManifest();
+    const m = new MDZManifest();
     expect(m.title).toBe("Untitled Document");
     expect(m.documentId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -299,19 +335,19 @@ describe("MDXManifest", () => {
   });
 
   it("title setter updates the title and refreshes modified", () => {
-    const m = new MDXManifest();
+    const m = new MDZManifest();
     m.title = "Test Doc";
     expect(m.title).toBe("Test Doc");
   });
 
   it("addAuthor accepts name-only author objects", () => {
-    const m = new MDXManifest();
+    const m = new MDZManifest();
     m.addAuthor({ name: "Alice" });
     expect(m.authors.some((a) => a.name === "Alice")).toBe(true);
   });
 
   it("addAuthor accepts email and URL optional fields", () => {
-    const m = new MDXManifest();
+    const m = new MDZManifest();
     m.addAuthor({
       name: "Bob",
       email: "bob@example.com",
@@ -323,18 +359,21 @@ describe("MDXManifest", () => {
   });
 
   it("toObject returns a structured object with mdx_version and nested document/content", () => {
-    const m = new MDXManifest();
+    // Note: the manifest field is still named `mdx_version` for backward
+    // compat — renaming to mdz_version would break every existing archive.
+    // See CHANGELOG under "Renamed MDX → MDZ" for the policy.
+    const m = new MDZManifest();
     m.title = "Doc";
     m.subtitle = "Sub";
     const obj = m.toObject();
-    expect(obj.mdx_version).toBe(MDX_VERSION);
+    expect(obj.mdx_version).toBe(MDZ_VERSION);
     expect(obj.document.title).toBe("Doc");
     expect(obj.document.subtitle).toBe("Sub");
     expect(obj.content.entry_point).toBe("document.md");
   });
 
   it("toJSON returns a valid JSON string that parses back to the toObject shape", () => {
-    const m = new MDXManifest();
+    const m = new MDZManifest();
     m.title = "Roundtrip";
     const json = m.toJSON();
     expect(typeof json).toBe("string");
@@ -343,36 +382,36 @@ describe("MDXManifest", () => {
   });
 
   it("two manifests constructed independently have different document IDs", () => {
-    const a = new MDXManifest();
-    const b = new MDXManifest();
+    const a = new MDZManifest();
+    const b = new MDZManifest();
     expect(a.documentId).not.toBe(b.documentId);
   });
 
   it("fromObject restores manifest state exactly", () => {
-    const original = new MDXManifest();
+    const original = new MDZManifest();
     original.title = "Original";
     original.addAuthor({ name: "A" });
     const data = original.toObject();
-    const restored = MDXManifest.fromObject(data);
+    const restored = MDZManifest.fromObject(data);
     expect(restored.title).toBe("Original");
     expect(restored.authors.map((a) => a.name)).toEqual(["A"]);
   });
 
   it("fromJSON parses a JSON string produced by toJSON", () => {
-    const a = new MDXManifest();
+    const a = new MDZManifest();
     a.title = "Through JSON";
-    const b = MDXManifest.fromJSON(a.toJSON());
+    const b = MDZManifest.fromJSON(a.toJSON());
     expect(b.title).toBe("Through JSON");
   });
 });
 
 // =============================================================================
-// MDXManifest — v2.0 helpers
+// MDZManifest — v2.0 helpers
 // =============================================================================
 
-describe("MDXManifest v2.0 helpers — §8 i18n", () => {
+describe("MDZManifest v2.0 helpers — §8 i18n", () => {
   it("addLocale seeds content.locales and sets first locale as default", () => {
-    const m = new MDXManifest();
+    const m = new MDZManifest();
     m.addLocale({ tag: "en-US", entry_point: "document.md", title: "Hello" });
     m.addLocale({ tag: "es-ES", entry_point: "locales/es/document.md", title: "Hola" });
 
@@ -383,10 +422,10 @@ describe("MDXManifest v2.0 helpers — §8 i18n", () => {
   });
 
   it("resolveLocale honors preference, falls back to default, returns null when no locales", () => {
-    const empty = new MDXManifest();
+    const empty = new MDZManifest();
     expect(empty.resolveLocale(["en-US"])).toBeNull();
 
-    const m = new MDXManifest();
+    const m = new MDZManifest();
     m.addLocale({ tag: "en-US", entry_point: "document.md" });
     m.addLocale({ tag: "ja-JP", entry_point: "locales/ja/document.md" });
 
@@ -397,9 +436,9 @@ describe("MDXManifest v2.0 helpers — §8 i18n", () => {
   });
 });
 
-describe("MDXManifest v2.0 helpers — §12 transclusion", () => {
+describe("MDZManifest v2.0 helpers — §12 transclusion", () => {
   it("addInclude records includes for prefetching", () => {
-    const m = new MDXManifest();
+    const m = new MDZManifest();
     m.addInclude({ id: "legal", target: "shared/legal.md" });
     m.addInclude({
       id: "preamble",
@@ -411,9 +450,9 @@ describe("MDXManifest v2.0 helpers — §12 transclusion", () => {
   });
 });
 
-describe("MDXManifest v2.0 helpers — §17 variants", () => {
+describe("MDZManifest v2.0 helpers — §17 variants", () => {
   it("addVariant appends to content.variants", () => {
-    const m = new MDXManifest();
+    const m = new MDZManifest();
     m.addVariant({ id: "short", entry_point: "variants/short/document.md", audience: "executive-summary" });
     m.addVariant({ id: "technical", entry_point: "variants/technical/document.md", audience: "specialist" });
 
@@ -423,9 +462,9 @@ describe("MDXManifest v2.0 helpers — §17 variants", () => {
   });
 });
 
-describe("MDXManifest v2.0 helpers — §13 profiles", () => {
+describe("MDZManifest v2.0 helpers — §13 profiles", () => {
   it("setProfile assigns document.profile", () => {
-    const m = new MDXManifest();
+    const m = new MDZManifest();
     m.setProfile("https://mdx-format.org/profiles/scientific-paper/v1");
     expect(m.toObject().document.profile).toBe(
       "https://mdx-format.org/profiles/scientific-paper/v1",
@@ -433,7 +472,7 @@ describe("MDXManifest v2.0 helpers — §13 profiles", () => {
   });
 
   it("setProfile updates modified timestamp when called after a delay", async () => {
-    const m = new MDXManifest();
+    const m = new MDZManifest();
     const before = m.toObject().document.modified;
     await new Promise((r) => setTimeout(r, 5));
     m.setProfile("https://mdx-format.org/profiles/api-reference/v1");
@@ -441,9 +480,9 @@ describe("MDXManifest v2.0 helpers — §13 profiles", () => {
   });
 });
 
-describe("MDXManifest v2.0 helpers — §14 accessibility", () => {
+describe("MDZManifest v2.0 helpers — §14 accessibility", () => {
   it("setAccessibility populates document.accessibility", () => {
-    const m = new MDXManifest();
+    const m = new MDZManifest();
     m.setAccessibility({
       summary: "All video has captions.",
       features: ["captions", "long-description"],
@@ -456,9 +495,9 @@ describe("MDXManifest v2.0 helpers — §14 accessibility", () => {
   });
 });
 
-describe("MDXManifest v2.0 helpers — §15 provenance", () => {
+describe("MDZManifest v2.0 helpers — §15 provenance", () => {
   it("addDerivedFrom chains multiple upstream sources", () => {
-    const m = new MDXManifest();
+    const m = new MDZManifest();
     m.addDerivedFrom({ id: "urn:mdx:doc:upstream", version: "2.1.0", relation: "fork" });
     m.addDerivedFrom({ id: "urn:mdx:doc:translation-src", relation: "translation-of" });
 
@@ -469,9 +508,9 @@ describe("MDXManifest v2.0 helpers — §15 provenance", () => {
   });
 });
 
-describe("MDXManifest v2.0 helpers — §16 multi-signature", () => {
+describe("MDZManifest v2.0 helpers — §16 multi-signature", () => {
   it("addSignature populates security.signatures[] and preserves order", () => {
-    const m = new MDXManifest();
+    const m = new MDZManifest();
     m.addSignature({
       role: "author",
       signer: { name: "Alice", did: "did:web:alice.example.com" },
@@ -499,9 +538,9 @@ describe("MDXManifest v2.0 helpers — §16 multi-signature", () => {
   });
 });
 
-describe("MDXManifest v2.0 helpers — §11 computational cells", () => {
+describe("MDZManifest v2.0 helpers — §11 computational cells", () => {
   it("addKernel registers kernels under interactivity.kernels[]", () => {
-    const m = new MDXManifest();
+    const m = new MDZManifest();
     m.addKernel({
       id: "python3",
       language: "python",
@@ -518,14 +557,14 @@ describe("MDXManifest v2.0 helpers — §11 computational cells", () => {
 });
 
 // =============================================================================
-// MDXManifest — v2.0 structural invariants (enforced by validate())
+// MDZManifest — v2.0 structural invariants (enforced by validate())
 // =============================================================================
 
-describe("MDXManifest.validate — invariants beyond JSON Schema", () => {
+describe("MDZManifest.validate — invariants beyond JSON Schema", () => {
   it("flags content.locales.default that is not in available[].tag", () => {
     // Construct via fromObject to bypass addLocale's first-locale-is-default
     // helper, simulating a hand-built manifest with a bad default.
-    const m = MDXManifest.fromObject({
+    const m = MDZManifest.fromObject({
       mdx_version: "2.0.0",
       document: {
         id: "00000000-0000-4000-8000-000000000000",
@@ -551,7 +590,7 @@ describe("MDXManifest.validate — invariants beyond JSON Schema", () => {
   });
 
   it("flags duplicate locale tags", () => {
-    const m = MDXManifest.fromObject({
+    const m = MDZManifest.fromObject({
       mdx_version: "2.0.0",
       document: {
         id: "00000000-0000-4000-8000-000000000000",
@@ -575,7 +614,7 @@ describe("MDXManifest.validate — invariants beyond JSON Schema", () => {
   });
 
   it("flags mutually-exclusive security.signature + security.signatures", () => {
-    const m = new MDXManifest();
+    const m = new MDZManifest();
     m.toObject().security = {
       signature: { signed_by: "legacy", algorithm: "RS256", signature: "x" },
       signatures: [
@@ -592,7 +631,7 @@ describe("MDXManifest.validate — invariants beyond JSON Schema", () => {
   });
 
   it("flags missing prev_signature on signatures[1+]", () => {
-    const m = MDXManifest.fromObject({
+    const m = MDZManifest.fromObject({
       mdx_version: "2.0.0",
       document: {
         id: "00000000-0000-4000-8000-000000000000",
@@ -624,7 +663,7 @@ describe("MDXManifest.validate — invariants beyond JSON Schema", () => {
   });
 
   it("passes validation when locales are consistent and signature chain is intact", () => {
-    const m = new MDXManifest();
+    const m = new MDZManifest();
     m.addLocale({ tag: "en-US", entry_point: "document.md" });
     m.addLocale({ tag: "ja-JP", entry_point: "locales/ja/document.md" });
     m.addSignature({
@@ -649,9 +688,9 @@ describe("MDXManifest.validate — invariants beyond JSON Schema", () => {
 // addSignature chain enforcement (fail at insertion time)
 // =============================================================================
 
-describe("MDXManifest.addSignature", () => {
+describe("MDZManifest.addSignature", () => {
   it("refuses to add entry 1+ without prev_signature", () => {
-    const m = new MDXManifest();
+    const m = new MDZManifest();
     m.addSignature({
       role: "author",
       signer: { name: "A" },
@@ -670,7 +709,7 @@ describe("MDXManifest.addSignature", () => {
   });
 
   it("refuses to mix legacy signature with signatures[]", () => {
-    const m = new MDXManifest();
+    const m = new MDZManifest();
     m.toObject().security = {
       signature: { signed_by: "legacy", algorithm: "RS256", signature: "x" },
     };
@@ -706,7 +745,7 @@ describe("v1.1 → v2.0 loader compatibility", () => {
         markdown_variant: "CommonMark",
       },
     };
-    const m = MDXManifest.fromObject(v11Shape);
+    const m = MDZManifest.fromObject(v11Shape);
 
     // v1.1 fields survive
     expect(m.title).toBe("Legacy Doc");
@@ -727,7 +766,7 @@ describe("v1.1 → v2.0 loader compatibility", () => {
   });
 
   it("accepts legacy security.signature as the only signature", () => {
-    const m = MDXManifest.fromObject({
+    const m = MDZManifest.fromObject({
       mdx_version: "2.0.0",
       document: {
         id: "22222222-2222-4222-8222-222222222222",
@@ -752,9 +791,9 @@ describe("v1.1 → v2.0 loader compatibility", () => {
 // Full v2.0 manifest JSON roundtrip
 // =============================================================================
 
-describe("MDXManifestData JSON roundtrip (v2.0)", () => {
+describe("MDZManifestData JSON roundtrip (v2.0)", () => {
   it("preserves every v2.0 field through toJSON → fromJSON", () => {
-    const original = new MDXManifest();
+    const original = new MDZManifest();
     original.title = "Round Trip";
     original.addLocale({ tag: "en-US", entry_point: "document.md", title: "Hi" });
     original.addLocale({ tag: "ja-JP", entry_point: "locales/ja/document.md" });
@@ -788,7 +827,7 @@ describe("MDXManifestData JSON roundtrip (v2.0)", () => {
     });
 
     const json = original.toJSON();
-    const restored = MDXManifest.fromJSON(json);
+    const restored = MDZManifest.fromJSON(json);
     const r = restored.toObject();
 
     expect(r.content.locales?.default).toBe("en-US");

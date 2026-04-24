@@ -83,9 +83,10 @@ program
 
 // Default action when file is passed directly
 program
-  .argument('[file]', 'MDX file to open')
+  .argument('[file]', 'MDZ (or legacy MDX) file to open')
   .action((file) => {
-    if (file && file.endsWith('.mdx')) {
+    // Accept both .mdz (current) and .mdx (legacy through 2027-01-01).
+    if (file && (file.endsWith('.mdz') || file.endsWith('.mdx'))) {
       // Default behavior: show info
       infoCommand(file, {});
     } else if (!file) {

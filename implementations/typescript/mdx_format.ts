@@ -1,26 +1,28 @@
 /**
- * MDX Format Reference Implementation (TypeScript)
+ * MDZ Format Reference Implementation (TypeScript)
  * =================================================
  *
- * A TypeScript library for creating, reading, and manipulating MDX
- * (Markdown eXtended Container) files.
+ * A TypeScript library for creating, reading, and manipulating MDZ
+ * (Markdown Zipped Container) files. **Renamed from MDX on 2026-04-24**;
+ * the legacy `MDX*` names continue to be exported as deprecated aliases.
  *
  * This implementation provides:
- * - MDXDocument: Main class for working with MDX files
- * - MDXManifest: Manifest creation and validation
- * - Full type definitions for the MDX format
+ * - MDZDocument: Main class for working with MDZ files
+ * - MDZManifest: Manifest creation and validation
+ * - Full type definitions for the MDZ format
  * - Browser and Node.js compatibility via JSZip
+ * - Deprecated MDX* aliases for backward compatibility (remove after 2027-01-01)
  *
  * @example
  * ```typescript
- * // Create a new MDX document
- * const doc = MDXDocument.create("My Document", { author: "Author Name" });
+ * // Create a new MDZ document
+ * const doc = MDZDocument.create("My Document", { author: "Author Name" });
  * doc.setContent("# Hello World\n\nThis is my document.");
  * await doc.addImage(imageData, "figure.png", { altText: "Description" });
  * const blob = await doc.save();  // Returns a Blob
  *
- * // Read an existing MDX document
- * const doc = await MDXDocument.open(arrayBuffer);  // Pass ArrayBuffer or Uint8Array
+ * // Read an existing MDZ document (also accepts legacy .mdx archives)
+ * const doc = await MDZDocument.open(arrayBuffer);
  * console.log(doc.title);
  * console.log(doc.getContent());
  * ```
@@ -34,14 +36,48 @@ import JSZip from "jszip";
 // Constants
 // ============================================================================
 
-/** Current MDX specification version */
-export const MDX_VERSION = "2.0.0";
+/** Current MDZ specification version */
+export const MDZ_VERSION = "2.0.0";
 
-/** MIME type for MDX container files */
-export const MDX_MIME_TYPE = "application/vnd.mdx-container+zip";
+/** MIME type for MDZ container files (new, preferred) */
+export const MDZ_MIME_TYPE = "application/vnd.mdz-container+zip";
 
-/** Default file extension */
-export const MDX_EXTENSION = ".mdx";
+/**
+ * Legacy MIME type from the pre-rename era. Readers MUST accept both
+ * through 2027-01-01 per the backward-compat policy (CHANGELOG.md entry
+ * under "Renamed: MDX → MDZ"). Writers SHOULD emit MDZ_MIME_TYPE.
+ */
+export const MDX_MIME_TYPE_LEGACY = "application/vnd.mdx-container+zip";
+
+/** Default file extension (new, preferred) */
+export const MDZ_EXTENSION = ".mdz";
+
+/** Legacy extension, still accepted by readers through 2027-01-01. */
+export const MDX_EXTENSION_LEGACY = ".mdx";
+
+// ---------------------------------------------------------------------------
+// Deprecated name aliases (remove after 2027-01-01)
+// ---------------------------------------------------------------------------
+
+/**
+ * @deprecated Use `MDZ_VERSION`. Kept for backward compatibility; will be
+ * removed after 2027-01-01. Both point at the same value.
+ */
+export const MDX_VERSION = MDZ_VERSION;
+
+/**
+ * @deprecated Use `MDZ_MIME_TYPE` (the new preferred type) or
+ * `MDX_MIME_TYPE_LEGACY` (the old type, still accepted on read). Kept as
+ * an alias of `MDZ_MIME_TYPE` for source-compat with code written before
+ * the rename.
+ */
+export const MDX_MIME_TYPE = MDZ_MIME_TYPE;
+
+/**
+ * @deprecated Use `MDZ_EXTENSION` (new `.mdz`) or `MDX_EXTENSION_LEGACY`
+ * (old `.mdx`). Kept as an alias of `MDZ_EXTENSION` for source-compat.
+ */
+export const MDX_EXTENSION = MDZ_EXTENSION;
 
 // ============================================================================
 // Enumerations
@@ -263,8 +299,10 @@ export const EXTENSION_TO_MIME: Record<string, string> = {
   // Default
   ".txt": "text/plain",
   ".md": "text/markdown",
-  // MDX container itself
-  ".mdx": MDX_MIME_TYPE,
+  // MDZ container (new, preferred)
+  ".mdz": MDZ_MIME_TYPE,
+  // MDX container (legacy; readers accept through 2027-01-01)
+  ".mdx": MDX_MIME_TYPE_LEGACY,
 };
 
 // ============================================================================
@@ -1351,7 +1389,7 @@ export interface ExtensionConfig {
 /**
  * Complete MDX manifest structure.
  */
-export interface MDXManifestData {
+export interface MDZManifestData {
   /** JSON Schema URL (optional) */
   $schema?: string;
   /** MDX specification version */
@@ -1545,7 +1583,7 @@ export function cleanObject<T extends object>(obj: PlainObject<T>): Partial<T> {
 }
 
 // ============================================================================
-// MDXManifest Class
+// MDZManifest Class
 // ============================================================================
 
 /**
@@ -1556,19 +1594,19 @@ export function cleanObject<T extends object>(obj: PlainObject<T>): Partial<T> {
  *
  * @example
  * ```typescript
- * const manifest = new MDXManifest();
+ * const manifest = new MDZManifest();
  * manifest.title = "My Document";
  * manifest.addAuthor({ name: "John Doe", email: "john@example.com" });
  * ```
  */
-export class MDXManifest {
-  private _data: MDXManifestData;
+export class MDZManifest {
+  private _data: MDZManifestData;
 
   /**
-   * Creates a new MDXManifest instance.
+   * Creates a new MDZManifest instance.
    * @param data - Optional initial manifest data
    */
-  constructor(data?: Partial<MDXManifestData>) {
+  constructor(data?: Partial<MDZManifestData>) {
     const now = isoTimestamp();
     this._data = {
       mdx_version: MDX_VERSION,
@@ -1600,10 +1638,10 @@ export class MDXManifest {
   /**
    * Creates a manifest from a plain object.
    * @param data - The manifest data object
-   * @returns A new MDXManifest instance
+   * @returns A new MDZManifest instance
    */
-  static fromObject(data: MDXManifestData): MDXManifest {
-    const manifest = new MDXManifest();
+  static fromObject(data: MDZManifestData): MDZManifest {
+    const manifest = new MDZManifest();
     manifest._data = data;
     return manifest;
   }
@@ -1611,17 +1649,17 @@ export class MDXManifest {
   /**
    * Creates a manifest from a JSON string.
    * @param json - The JSON string
-   * @returns A new MDXManifest instance
+   * @returns A new MDZManifest instance
    */
-  static fromJSON(json: string): MDXManifest {
-    return MDXManifest.fromObject(JSON.parse(json));
+  static fromJSON(json: string): MDZManifest {
+    return MDZManifest.fromObject(JSON.parse(json));
   }
 
   /**
    * Converts the manifest to a plain object.
    * @returns The manifest data object
    */
-  toObject(): MDXManifestData {
+  toObject(): MDZManifestData {
     return this._data;
   }
 
@@ -2169,7 +2207,7 @@ export class MDXManifest {
 }
 
 // ============================================================================
-// MDXDocument Class
+// MDZDocument Class
 // ============================================================================
 
 /**
@@ -2219,29 +2257,29 @@ export interface HTMLExportOptions {
  * @example
  * ```typescript
  * // Create a new document
- * const doc = MDXDocument.create("My Report", { author: "Jane Doe" });
+ * const doc = MDZDocument.create("My Report", { author: "Jane Doe" });
  * doc.setContent("# Introduction\n\nThis is my report...");
  * await doc.addImage("figure1.png", { altText: "Figure 1" });
  * await doc.save("report.mdx");
  *
  * // Open an existing document
- * const doc = await MDXDocument.open(fileData);
+ * const doc = await MDZDocument.open(fileData);
  * console.log(doc.content);
  * ```
  */
-export class MDXDocument {
-  private _manifest: MDXManifest;
+export class MDZDocument {
+  private _manifest: MDZManifest;
   private _content: string;
   private _assets: Map<string, Uint8Array>;
   private _versions: VersionEntry[];
   private _annotations: Annotation[];
 
   /**
-   * Creates a new MDXDocument instance.
+   * Creates a new MDZDocument instance.
    * This constructor is private; use static factory methods instead.
    */
   private constructor() {
-    this._manifest = new MDXManifest();
+    this._manifest = new MDZManifest();
     this._content = "";
     this._assets = new Map();
     this._versions = [];
@@ -2257,19 +2295,19 @@ export class MDXDocument {
    *
    * @param title - Document title
    * @param options - Additional creation options
-   * @returns A new MDXDocument instance
+   * @returns A new MDZDocument instance
    *
    * @example
    * ```typescript
-   * const doc = MDXDocument.create("My Document", {
+   * const doc = MDZDocument.create("My Document", {
    *   author: "John Doe",
    *   authorEmail: "john@example.com",
    *   description: "A sample document",
    * });
    * ```
    */
-  static create(title: string, options: CreateDocumentOptions = {}): MDXDocument {
-    const doc = new MDXDocument();
+  static create(title: string, options: CreateDocumentOptions = {}): MDZDocument {
+    const doc = new MDZDocument();
     doc._manifest.title = title;
 
     if (options.description) {
@@ -2302,23 +2340,23 @@ export class MDXDocument {
    * Opens an existing MDX file from binary data.
    *
    * @param data - The MDX file data (ArrayBuffer, Uint8Array, or Blob)
-   * @returns Promise resolving to the MDXDocument
+   * @returns Promise resolving to the MDZDocument
    * @throws Error if the file is not a valid MDX archive
    *
    * @example
    * ```typescript
    * // From file input
    * const file = fileInput.files[0];
-   * const doc = await MDXDocument.open(file);
+   * const doc = await MDZDocument.open(file);
    *
    * // From ArrayBuffer
    * const response = await fetch("document.mdx");
    * const data = await response.arrayBuffer();
-   * const doc = await MDXDocument.open(data);
+   * const doc = await MDZDocument.open(data);
    * ```
    */
-  static async open(data: ArrayBuffer | Uint8Array | Blob): Promise<MDXDocument> {
-    const doc = new MDXDocument();
+  static async open(data: ArrayBuffer | Uint8Array | Blob): Promise<MDZDocument> {
+    const doc = new MDZDocument();
 
     // Load the ZIP archive
     const zip = new JSZip();
@@ -2330,7 +2368,7 @@ export class MDXDocument {
       throw new Error("Invalid MDX file: missing manifest.json");
     }
     const manifestText = await manifestFile.async("text");
-    doc._manifest = MDXManifest.fromJSON(manifestText);
+    doc._manifest = MDZManifest.fromJSON(manifestText);
 
     // Read main content
     const entryPoint = doc._manifest.entryPoint;
@@ -2379,11 +2417,11 @@ export class MDXDocument {
    * Opens an MDX file from a File object (browser).
    *
    * @param file - The File object
-   * @returns Promise resolving to the MDXDocument
+   * @returns Promise resolving to the MDZDocument
    */
-  static async openFile(file: File): Promise<MDXDocument> {
+  static async openFile(file: File): Promise<MDZDocument> {
     const arrayBuffer = await file.arrayBuffer();
-    return MDXDocument.open(arrayBuffer);
+    return MDZDocument.open(arrayBuffer);
   }
 
   // --------------------------------------------------------------------------
@@ -2405,7 +2443,7 @@ export class MDXDocument {
   }
 
   /** The document manifest */
-  get manifest(): MDXManifest {
+  get manifest(): MDZManifest {
     return this._manifest;
   }
 
@@ -3088,7 +3126,7 @@ export class MDXDocument {
       compressionOptions: {
         level: options.compressionLevel ?? 6,
       },
-      mimeType: MDX_MIME_TYPE,
+      mimeType: MDZ_MIME_TYPE,
     });
   }
 
@@ -3467,11 +3505,11 @@ ${processedContent}
   /**
    * Creates a clone of this document.
    *
-   * @returns A new MDXDocument with the same content
+   * @returns A new MDZDocument with the same content
    */
-  clone(): MDXDocument {
-    const doc = new MDXDocument();
-    doc._manifest = MDXManifest.fromObject(
+  clone(): MDZDocument {
+    const doc = new MDZDocument();
+    doc._manifest = MDZManifest.fromObject(
       JSON.parse(JSON.stringify(this._manifest.toObject()))
     );
     doc._content = this._content;
@@ -3515,7 +3553,26 @@ ${processedContent}
 }
 
 // ============================================================================
+// Deprecated MDX* aliases (remove after 2027-01-01)
+// ============================================================================
+//
+// Kept so code written before the 2026-04-24 MDX → MDZ rename continues to
+// compile and run unchanged. These aliases point at the exact same runtime
+// values and types as their MDZ* counterparts — there's no behavioral
+// difference, only a name difference.
+//
+// New code MUST use the MDZ* names. Linters / style guides should flag any
+// new usage of the MDX* aliases.
+
+/** @deprecated Use `MDZDocument`. */
+export const MDXDocument = MDZDocument;
+/** @deprecated Use `MDZManifest`. */
+export const MDXManifest = MDZManifest;
+/** @deprecated Use `MDZManifestData`. */
+export type MDXManifestData = MDZManifestData;
+
+// ============================================================================
 // Export Default
 // ============================================================================
 
-export default MDXDocument;
+export default MDZDocument;

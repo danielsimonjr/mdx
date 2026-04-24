@@ -8,15 +8,15 @@
 
 import { describe, it, expect } from "vitest";
 import {
-  MDXDocument,
-  MDXManifest,
+  MDZDocument,
+  MDZManifest,
   MDX_VERSION,
   SnapshotType,
 } from "./mdx_format.js";
 
-describe("v2.0 manifest roundtrip through MDXDocument.save/open", () => {
+describe("v2.0 manifest roundtrip through MDZDocument.save/open", () => {
   it("preserves locales, variants, includes, profile, accessibility, derived_from across save+open", async () => {
-    const doc = MDXDocument.create("v2.0 Roundtrip", { author: "Alice" });
+    const doc = MDZDocument.create("v2.0 Roundtrip", { author: "Alice" });
     doc.setContent("# v2 doc\n\nBody.\n");
 
     const m = doc.manifest;
@@ -52,7 +52,7 @@ describe("v2.0 manifest roundtrip through MDXDocument.save/open", () => {
     });
 
     const buf = await doc.saveAsArrayBuffer();
-    const reopened = await MDXDocument.open(buf);
+    const reopened = await MDZDocument.open(buf);
     const rm = reopened.manifest.toObject();
 
     // mdx_version tagged 2.0.x
@@ -87,7 +87,7 @@ describe("v2.0 manifest roundtrip through MDXDocument.save/open", () => {
   });
 
   it("preserves multi-signature chain through roundtrip", async () => {
-    const doc = MDXDocument.create("Signed Doc");
+    const doc = MDZDocument.create("Signed Doc");
     doc.setContent("# Signed\n\nContent.\n");
     doc.manifest.addSignature({
       role: "author",
@@ -106,7 +106,7 @@ describe("v2.0 manifest roundtrip through MDXDocument.save/open", () => {
     });
 
     const buf = await doc.saveAsArrayBuffer();
-    const reopened = await MDXDocument.open(buf);
+    const reopened = await MDZDocument.open(buf);
     const sigs = reopened.manifest.toObject().security?.signatures;
 
     expect(sigs).toHaveLength(2);
@@ -118,7 +118,7 @@ describe("v2.0 manifest roundtrip through MDXDocument.save/open", () => {
   });
 
   it("preserves parent_versions multi-parent ancestry on version entries", async () => {
-    const doc = MDXDocument.create("Forked Doc");
+    const doc = MDZDocument.create("Forked Doc");
     doc.setContent("# v1\n");
     doc.createVersion("1.0.0", "Initial", { name: "Alice" });
 
@@ -137,7 +137,7 @@ describe("v2.0 manifest roundtrip through MDXDocument.save/open", () => {
     (patchedDoc as unknown as { _versions?: typeof versions })._versions?.forEach(() => {});
 
     const buf = await patchedDoc.saveAsArrayBuffer();
-    const reopened = await MDXDocument.open(buf);
+    const reopened = await MDZDocument.open(buf);
     const vs = reopened.getVersionHistory();
     const merged = vs.find((v) => v.version === "2.0.0");
 
@@ -154,7 +154,7 @@ describe("v2.0 manifest roundtrip through MDXDocument.save/open", () => {
   it("loads a v1.1-shaped archive (no v2.0 fields) without error", async () => {
     // Build a manifest that has none of the v2.0 additions — exercising
     // the v1.1 → v2.0 loader compat path end-to-end through JSZip.
-    const m = new MDXManifest({
+    const m = new MDZManifest({
       mdx_version: "2.0.0",
       document: {
         id: "33333333-3333-4333-8333-333333333333",
@@ -165,13 +165,13 @@ describe("v2.0 manifest roundtrip through MDXDocument.save/open", () => {
       },
       content: { entry_point: "document.md", markdown_variant: "CommonMark" },
     });
-    const doc = MDXDocument.create("placeholder");
+    const doc = MDZDocument.create("placeholder");
     // Inject the legacy manifest into the doc
-    (doc as unknown as { _manifest: MDXManifest })._manifest = m;
+    (doc as unknown as { _manifest: MDZManifest })._manifest = m;
     doc.setContent("# Legacy\n");
 
     const buf = await doc.saveAsArrayBuffer();
-    const reopened = await MDXDocument.open(buf);
+    const reopened = await MDZDocument.open(buf);
     const rm = reopened.manifest.toObject();
 
     expect(rm.document.title).toBe("Legacy");
@@ -188,7 +188,7 @@ describe("v2.0 manifest roundtrip through MDXDocument.save/open", () => {
     // Per v2.0 §9, an asset may be addressed by its content hash. The
     // manifest asset entry can carry a content_hash; this must survive
     // the JSZip roundtrip.
-    const doc = MDXDocument.create("CA Test");
+    const doc = MDZDocument.create("CA Test");
     doc.setContent("# Has content_hash\n");
 
     const pngBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -200,7 +200,7 @@ describe("v2.0 manifest roundtrip through MDXDocument.save/open", () => {
     asset.content_hash = "sha256:deadbeef";
 
     const buf = await doc.saveAsArrayBuffer();
-    const reopened = await MDXDocument.open(buf);
+    const reopened = await MDZDocument.open(buf);
     const reopenedAsset = reopened.manifest
       .getAssets()
       .find((a) => a.path.endsWith("fig.png"));

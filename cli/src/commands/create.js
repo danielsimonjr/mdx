@@ -198,7 +198,7 @@ async function createCommand(name, options) {
             type: 'input',
             name: 'output',
             message: 'Output file:',
-            default: options.output || `${slugify(name || 'my-document')}.mdx`
+            default: options.output || `${slugify(name || 'my-document')}.mdz`
         }
     ]);
 
