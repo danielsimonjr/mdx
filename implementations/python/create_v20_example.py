@@ -169,7 +169,7 @@ document. For the full walkthrough, switch to the default variant.
 # ---------------------------------------------------------------------------
 
 
-def build_manifest(now: str, doc_id: str) -> dict:
+def build_manifest(now: str, doc_id: str, content_id: str) -> dict:
     png_hash = sha256_hash(PNG_1x1)
     csv_hash = sha256_hash(CSV_SAMPLE)
     cell_hash = sha256_hash(CELL_OUTPUT_PNG)
@@ -180,6 +180,10 @@ def build_manifest(now: str, doc_id: str) -> dict:
 
         "document": {
             "id": doc_id,
+            # §9.4 — content-addressed identifier of the document body.
+            # This is the hash of the primary entry_point file contents, so
+            # any byte-level change to document.md yields a new content_id.
+            "content_id": content_id,
             "title": "Comprehensive v2.0 Demo",
             "subtitle": "One archive exercising all ten new v2.0 sections",
             "description": (
@@ -309,6 +313,22 @@ def build_manifest(now: str, doc_id: str) -> dict:
                         {"path": "assets/images/cell-fig.webp", "mime_type": "image/webp", "formats": ["webp"]},
                         {"path": "assets/images/cell-fig@2x.png", "density": "2x", "width": 2, "height": 2},
                     ],
+                    # §8.3 — per-asset locale alternatives. The English
+                    # alt-text lives on the parent entry; translations live
+                    # here. A reader honoring the user's locale preference
+                    # should prefer the localized alt-text when available.
+                    "locales": [
+                        {
+                            "tag": "es-ES",
+                            "path": "assets/images/cell-fig.png",
+                            "alt_text": "Gráfica de onda sinusoidal (marcador de posición de demostración)",
+                        },
+                        {
+                            "tag": "ja-JP",
+                            "path": "assets/images/cell-fig.png",
+                            "alt_text": "正弦波プロット(デモ用プレースホルダー)",
+                        },
+                    ],
                 }
             ],
             "data": [
@@ -362,7 +382,28 @@ def build_manifest(now: str, doc_id: str) -> dict:
                     "canonicalization": "jcs",
                     "timestamp": now,
                     "signature": "ZXhhbXBsZS1zaWduYXR1cmUtcGxhY2Vob2xkZXItbm90LXZlcmlmaWFibGU=",
-                }
+                },
+                # §16.3 chain demo: the reviewer signature must carry a
+                # prev_signature pointing at the hash of the author entry
+                # above. Insertion or reordering between the two would
+                # break chain verification even if each individual
+                # signature remained cryptographically valid.
+                {
+                    "role": "reviewer",
+                    "signer": {
+                        "name": "Reviewer Example",
+                        "did": "did:web:reviewer.example.org",
+                    },
+                    "algorithm": "Ed25519",
+                    "scope": "manifest-only",
+                    "canonicalization": "jcs",
+                    "timestamp": now,
+                    "signature": "cmV2aWV3ZXItc2lnbmF0dXJlLXBsYWNlaG9sZGVyLWRlbW8tb25seQ==",
+                    "prev_signature": "sha256:"
+                    + hashlib.sha256(
+                        b"ZXhhbXBsZS1zaWduYXR1cmUtcGxhY2Vob2xkZXItbm90LXZlcmlmaWFibGU="
+                    ).hexdigest(),
+                },
             ],
             "permissions": {
                 "allow_external_links": True,
@@ -385,7 +426,10 @@ ORDERED_ENTRIES: list[tuple[str, bytes]] = []  # populated in main()
 def main() -> None:
     now = iso_now()
     doc_id = new_uuid()
-    manifest = build_manifest(now, doc_id)
+    # Content-addressed identifier = hash of the primary entry_point body.
+    # Computed before manifest assembly so it can be embedded in the manifest.
+    content_id = sha256_hash(MD_DEFAULT_EN.encode("utf-8"))
+    manifest = build_manifest(now, doc_id, content_id)
 
     # Build versions/graph for §15 demo
     versions = {

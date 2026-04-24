@@ -22,9 +22,10 @@ sys.path.insert(0, str(REPO_ROOT / "implementations" / "python"))
 if sys.platform == "win32" and hasattr(sys.stdout, "buffer"):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
-from alignment_parser import parse  # noqa: E402
+from alignment_parser import parse, ParseError  # noqa: E402
 
 FIXTURES = REPO_ROOT / "examples" / "v2" / "parser-fixtures"
+ERROR_FIXTURES = FIXTURES / "errors"
 
 
 # ---------------------------------------------------------------------------
@@ -174,6 +175,52 @@ def test_comprehensive_example_content_addressed_duplicate() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Negative tests — structural errors must raise ParseError, not be absorbed.
+# Each fixture encodes one failure mode; the parser must refuse it and report
+# a line number. Silently accepting any of these would mask data loss.
+# ---------------------------------------------------------------------------
+
+def _expect_parse_error(fixture_name: str, needle: str) -> ParseError:
+    """Parse a negative fixture, assert ParseError is raised, return it."""
+    text = (ERROR_FIXTURES / fixture_name).read_text(encoding="utf-8")
+    try:
+        parse(text)
+    except ParseError as e:
+        assert needle in str(e), (
+            f"expected ParseError containing {needle!r}, got: {e}"
+        )
+        assert e.line > 0, f"ParseError must carry a line number, got {e.line}"
+        return e
+    raise AssertionError(
+        f"fixture {fixture_name!r} parsed successfully; expected ParseError"
+    )
+
+
+def test_error_unterminated_fence() -> None:
+    _expect_parse_error("unterminated-fence.md", "unterminated fenced code block")
+
+
+def test_error_empty_cell_source() -> None:
+    _expect_parse_error("empty-cell-source.md", "fenced source code block")
+
+
+def test_error_empty_include_target() -> None:
+    _expect_parse_error("empty-include-target.md", "non-empty `target`")
+
+
+def test_error_output_missing_type() -> None:
+    _expect_parse_error("output-missing-type.md", "requires an explicit")
+
+
+def test_error_bad_execution_count() -> None:
+    _expect_parse_error("bad-execution-count.md", "execution_count must be an integer")
+
+
+def test_error_empty_output_body() -> None:
+    _expect_parse_error("empty-output-body.md", "inline fenced body")
+
+
+# ---------------------------------------------------------------------------
 # Test runner
 # ---------------------------------------------------------------------------
 
@@ -186,6 +233,12 @@ TESTS = [
     test_comprehensive_example_manifest_validates,
     test_comprehensive_example_archive_ordering,
     test_comprehensive_example_content_addressed_duplicate,
+    test_error_unterminated_fence,
+    test_error_empty_cell_source,
+    test_error_empty_include_target,
+    test_error_output_missing_type,
+    test_error_bad_execution_count,
+    test_error_empty_output_body,
 ]
 
 

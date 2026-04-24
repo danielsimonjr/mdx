@@ -224,6 +224,11 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Install ajv-cli
         run: npm install -g ajv-cli ajv-formats
 
@@ -234,17 +239,26 @@ jobs:
         run: ajv compile -s spec/manifest-v2.schema.json --spec=draft2020 -c ajv-formats
 
       - name: Validate example manifest against v1.1 schema
+        # No `|| echo` fallback — a validation failure here is a real
+        # regression in either the schema or the example, and must
+        # break CI so it can't slip into a release.
         run: |
           cd examples
           unzip -p example-document.mdx manifest.json > manifest.json
-          ajv validate -s ../spec/manifest.schema.json -d manifest.json --spec=draft2020 -c ajv-formats || echo "v1.1 schema validation completed with warnings"
+          ajv validate -s ../spec/manifest.schema.json -d manifest.json --spec=draft2020 -c ajv-formats
 
       - name: Validate example manifest against v2.0 schema (backward compat)
         run: |
           cd examples
-          # Regenerate manifest from the example MDX
           unzip -p example-document.mdx manifest.json > manifest.json
-          ajv validate -s ../spec/manifest-v2.schema.json -d manifest.json --spec=draft2020 -c ajv-formats || echo "v2.0 schema validation completed with warnings"
+          ajv validate -s ../spec/manifest-v2.schema.json -d manifest.json --spec=draft2020 -c ajv-formats
+
+      - name: Run schema negative-rejection tests
+        # These assert that invalid manifests are REJECTED. Without
+        # them, a schema regression that accidentally relaxed
+        # constraints would pass CI unnoticed (all positive examples
+        # would still validate).
+        run: python tests/v2.0/test_schema_negatives.py
 
   markdown-lint:
     name: Lint Markdown

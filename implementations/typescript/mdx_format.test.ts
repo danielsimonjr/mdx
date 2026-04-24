@@ -512,3 +512,292 @@ describe("MDXManifest v2.0 helpers — §11 computational cells", () => {
     expect(kernels?.[0].requirements).toContain("numpy>=1.25");
   });
 });
+
+// =============================================================================
+// MDXManifest — v2.0 structural invariants (enforced by validate())
+// =============================================================================
+
+describe("MDXManifest.validate — invariants beyond JSON Schema", () => {
+  it("flags content.locales.default that is not in available[].tag", () => {
+    // Construct via fromObject to bypass addLocale's first-locale-is-default
+    // helper, simulating a hand-built manifest with a bad default.
+    const m = MDXManifest.fromObject({
+      mdx_version: "2.0.0",
+      document: {
+        id: "00000000-0000-4000-8000-000000000000",
+        title: "T",
+        created: "2026-01-01T00:00:00Z",
+        modified: "2026-01-01T00:00:00Z",
+      },
+      content: {
+        entry_point: "document.md",
+        locales: {
+          default: "fr-FR",
+          available: [
+            { tag: "en-US", entry_point: "document.md" },
+            { tag: "ja-JP", entry_point: "locales/ja/document.md" },
+          ],
+        },
+      },
+    });
+    const errors = m.validate();
+    expect(errors.some((e) => e.includes("fr-FR") && e.includes("not one of"))).toBe(
+      true,
+    );
+  });
+
+  it("flags duplicate locale tags", () => {
+    const m = MDXManifest.fromObject({
+      mdx_version: "2.0.0",
+      document: {
+        id: "00000000-0000-4000-8000-000000000000",
+        title: "T",
+        created: "2026-01-01T00:00:00Z",
+        modified: "2026-01-01T00:00:00Z",
+      },
+      content: {
+        entry_point: "document.md",
+        locales: {
+          default: "en-US",
+          available: [
+            { tag: "en-US", entry_point: "document.md" },
+            { tag: "en-US", entry_point: "other.md" },
+          ],
+        },
+      },
+    });
+    const errors = m.validate();
+    expect(errors.some((e) => e.includes("duplicate tag"))).toBe(true);
+  });
+
+  it("flags mutually-exclusive security.signature + security.signatures", () => {
+    const m = new MDXManifest();
+    m.toObject().security = {
+      signature: { signed_by: "legacy", algorithm: "RS256", signature: "x" },
+      signatures: [
+        {
+          role: "author",
+          signer: { name: "Alice" },
+          algorithm: "Ed25519",
+          signature: "sig0",
+        },
+      ],
+    };
+    const errors = m.validate();
+    expect(errors.some((e) => e.includes("mutually exclusive"))).toBe(true);
+  });
+
+  it("flags missing prev_signature on signatures[1+]", () => {
+    const m = MDXManifest.fromObject({
+      mdx_version: "2.0.0",
+      document: {
+        id: "00000000-0000-4000-8000-000000000000",
+        title: "T",
+        created: "2026-01-01T00:00:00Z",
+        modified: "2026-01-01T00:00:00Z",
+      },
+      content: { entry_point: "document.md" },
+      security: {
+        signatures: [
+          {
+            role: "author",
+            signer: { name: "A" },
+            algorithm: "Ed25519",
+            signature: "sig0",
+          },
+          {
+            role: "reviewer",
+            signer: { name: "B" },
+            algorithm: "Ed25519",
+            signature: "sig1",
+            // prev_signature missing
+          },
+        ],
+      },
+    });
+    const errors = m.validate();
+    expect(errors.some((e) => e.includes("prev_signature"))).toBe(true);
+  });
+
+  it("passes validation when locales are consistent and signature chain is intact", () => {
+    const m = new MDXManifest();
+    m.addLocale({ tag: "en-US", entry_point: "document.md" });
+    m.addLocale({ tag: "ja-JP", entry_point: "locales/ja/document.md" });
+    m.addSignature({
+      role: "author",
+      signer: { name: "Alice" },
+      algorithm: "Ed25519",
+      signature: "sig0",
+    });
+    m.addSignature({
+      role: "reviewer",
+      signer: { name: "Bob" },
+      algorithm: "Ed25519",
+      signature: "sig1",
+      prev_signature: "sha256:abc",
+    });
+    expect(m.validate()).toEqual([]);
+    expect(m.isValid()).toBe(true);
+  });
+});
+
+// =============================================================================
+// addSignature chain enforcement (fail at insertion time)
+// =============================================================================
+
+describe("MDXManifest.addSignature", () => {
+  it("refuses to add entry 1+ without prev_signature", () => {
+    const m = new MDXManifest();
+    m.addSignature({
+      role: "author",
+      signer: { name: "A" },
+      algorithm: "Ed25519",
+      signature: "sig0",
+    });
+    expect(() =>
+      m.addSignature({
+        role: "reviewer",
+        signer: { name: "B" },
+        algorithm: "Ed25519",
+        signature: "sig1",
+        // no prev_signature — addSignature must throw
+      }),
+    ).toThrow(/prev_signature/);
+  });
+
+  it("refuses to mix legacy signature with signatures[]", () => {
+    const m = new MDXManifest();
+    m.toObject().security = {
+      signature: { signed_by: "legacy", algorithm: "RS256", signature: "x" },
+    };
+    expect(() =>
+      m.addSignature({
+        role: "author",
+        signer: { name: "A" },
+        algorithm: "Ed25519",
+        signature: "sig0",
+      }),
+    ).toThrow(/legacy/);
+  });
+});
+
+// =============================================================================
+// v1.1 → v2.0 loader backward-compat
+// =============================================================================
+
+describe("v1.1 → v2.0 loader compatibility", () => {
+  it("loads a v1.1-shaped manifest via fromObject and exposes v2.0 accessors as empty", () => {
+    // Simulate a v1.1 manifest (no v2.0 fields) that's been bumped to 2.0.0.
+    const v11Shape = {
+      mdx_version: "2.0.0",
+      document: {
+        id: "11111111-1111-4111-8111-111111111111",
+        title: "Legacy Doc",
+        created: "2025-01-01T00:00:00Z",
+        modified: "2025-01-02T00:00:00Z",
+        authors: [{ name: "Legacy Author" }],
+      },
+      content: {
+        entry_point: "document.md",
+        markdown_variant: "CommonMark",
+      },
+    };
+    const m = MDXManifest.fromObject(v11Shape);
+
+    // v1.1 fields survive
+    expect(m.title).toBe("Legacy Doc");
+    expect(m.authors[0].name).toBe("Legacy Author");
+
+    // v2.0 accessors return sensible empties, not undefined crashes
+    expect(m.getLocaleTags()).toEqual([]);
+    expect(m.resolveLocale(["en-US"])).toBeNull();
+    expect(m.toObject().content.includes).toBeUndefined();
+    expect(m.toObject().content.variants).toBeUndefined();
+    expect(m.toObject().document.accessibility).toBeUndefined();
+    expect(m.toObject().document.derived_from).toBeUndefined();
+    expect(m.toObject().security?.signatures).toBeUndefined();
+    expect(m.toObject().interactivity?.kernels).toBeUndefined();
+
+    // Validation passes — no v2.0 features means no invariants to violate
+    expect(m.validate()).toEqual([]);
+  });
+
+  it("accepts legacy security.signature as the only signature", () => {
+    const m = MDXManifest.fromObject({
+      mdx_version: "2.0.0",
+      document: {
+        id: "22222222-2222-4222-8222-222222222222",
+        title: "T",
+        created: "2026-01-01T00:00:00Z",
+        modified: "2026-01-01T00:00:00Z",
+      },
+      content: { entry_point: "document.md" },
+      security: {
+        signature: {
+          signed_by: "legacy@example.com",
+          algorithm: "RS256",
+          signature: "base64-legacy",
+        },
+      },
+    });
+    expect(m.validate()).toEqual([]);
+  });
+});
+
+// =============================================================================
+// Full v2.0 manifest JSON roundtrip
+// =============================================================================
+
+describe("MDXManifestData JSON roundtrip (v2.0)", () => {
+  it("preserves every v2.0 field through toJSON → fromJSON", () => {
+    const original = new MDXManifest();
+    original.title = "Round Trip";
+    original.addLocale({ tag: "en-US", entry_point: "document.md", title: "Hi" });
+    original.addLocale({ tag: "ja-JP", entry_point: "locales/ja/document.md" });
+    original.addInclude({
+      id: "legal",
+      target: "shared/legal.md",
+      content_hash: "sha256:abc",
+    });
+    original.addVariant({
+      id: "short",
+      entry_point: "variants/short/document.md",
+      audience: "exec",
+    });
+    original.setProfile("https://mdx-format.org/profiles/api-reference/v1");
+    original.setAccessibility({
+      summary: "Fully captioned.",
+      features: ["captions", "long-description"],
+      hazards: ["none"],
+    });
+    original.addDerivedFrom({
+      id: "urn:mdx:doc:upstream",
+      version: "2.1.0",
+      relation: "fork",
+    });
+    original.addKernel({ id: "python3", language: "python", version: "3.11" });
+    original.addSignature({
+      role: "author",
+      signer: { name: "Alice", did: "did:web:alice.example.com" },
+      algorithm: "Ed25519",
+      signature: "sig0",
+    });
+
+    const json = original.toJSON();
+    const restored = MDXManifest.fromJSON(json);
+    const r = restored.toObject();
+
+    expect(r.content.locales?.default).toBe("en-US");
+    expect(r.content.locales?.available.map((l) => l.tag)).toEqual(["en-US", "ja-JP"]);
+    expect(r.content.includes?.[0].content_hash).toBe("sha256:abc");
+    expect(r.content.variants?.[0].audience).toBe("exec");
+    expect(r.document.profile).toMatch(/api-reference/);
+    expect(r.document.accessibility?.features).toContain("captions");
+    expect(r.document.derived_from?.[0].relation).toBe("fork");
+    expect(r.interactivity?.kernels?.[0].language).toBe("python");
+    expect(r.security?.signatures?.[0].signer.did).toBe("did:web:alice.example.com");
+
+    // Validates clean after full roundtrip
+    expect(restored.validate()).toEqual([]);
+  });
+});

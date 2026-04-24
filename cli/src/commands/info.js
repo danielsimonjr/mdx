@@ -216,6 +216,13 @@ async function infoCommand(file, options) {
 
     } catch (error) {
         spinner.fail(chalk.red(`Error: ${error.message}`));
+        // Print the stack trace to stderr so it isn't silently swallowed
+        // when the CLI is used in an automation pipeline. Users who pipe
+        // stdout still get clean output; scripts that capture stderr see
+        // the root cause. DEBUG=1 forces full detail regardless.
+        if (error.stack) {
+            console.error(error.stack);
+        }
         process.exit(1);
     }
 }

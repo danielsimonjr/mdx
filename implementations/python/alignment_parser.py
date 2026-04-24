@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-"""Reference Markdown alignment parser for MDX v1.1.
+"""Reference Markdown parser for MDX v1.1 + v2.0.
 
 Implements the block-attribute and alignment grammar from
-`spec/MDX_FORMAT_SPECIFICATION_v1.1.md` §4.4 (lines 636–974):
+`spec/MDX_FORMAT_SPECIFICATION_v1.1.md` §4.4 plus the v2.0 directives
+(`::cell`, `::output`, `::include`) from
+`spec/MDX_FORMAT_SPECIFICATION_v2.0.md` §11 and §12.
+
+v1.1 block-attribute grammar:
 
 - Shorthand alignment: `{:.<name>}` on its own line → class `align-<name>`
   applied to the immediately-following block.
@@ -13,16 +17,27 @@ Implements the block-attribute and alignment grammar from
   plain `:::` line closes the innermost open container.
 - Inline directive attributes: `::name[label]{attributes}` embeds
   attributes directly in the directive line itself.
-- Precedence: inline > block > container (inline attributes win when a
-  block has an `align-*` class from multiple sources).
-- Malformed markers (unclosed braces, bare `{word}` with no `.` prefix)
-  degrade gracefully: they are passed through as plain text and do NOT
-  affect the next block.
+- Precedence: inline > block > container.
+- Malformed *attribute* markers (unclosed braces, bare `{word}` with no
+  `.` prefix) degrade gracefully: passed through as plain text.
+
+v2.0 directive grammar (strict — errors are raised, not absorbed):
+
+- `::cell{...}` followed by a fenced code block is the source.
+- Zero or more `::output{type="..."}` blocks may follow, each with its
+  own fenced code block (unless an inline resource like `src=...` is
+  given, in which case the fence is optional).
+- `::include[key="value" ...]{...}` declares a transclusion target.
+
+Structural errors in v2.0 directives raise `ParseError` with a line
+number rather than being silently absorbed. This is intentional — v1.1
+chose graceful degradation because attribute markers are optional; v2.0
+directives carry semantic payload (executable code, external resources)
+where a silent parse failure would mask data loss.
 
 This is a *reference* parser — it emits a structured block list suitable
-for testing against the fixtures in `tests/alignment/`. Actual HTML
-rendering is out of scope; use the block output as input to any
-Markdown→HTML pipeline.
+for testing against the fixtures in `tests/alignment/` and
+`examples/v2/parser-fixtures/`. Actual HTML rendering is out of scope.
 
 Output shape:
 
@@ -45,6 +60,25 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+
+
+# ---------------------------------------------------------------------------
+# Errors
+# ---------------------------------------------------------------------------
+
+
+class ParseError(ValueError):
+    """Raised on structural errors in v2.0 directives.
+
+    Carries a 1-based line number so callers can surface precise
+    diagnostics. Silent fallback for v2.0 directives would mask data
+    loss (lost code cells, broken transclusions); we fail loud instead.
+    """
+
+    def __init__(self, message: str, line: int) -> None:
+        super().__init__(f"line {line}: {message}")
+        self.line = line
+        self.message = message
 
 
 # ---------------------------------------------------------------------------
@@ -218,8 +252,13 @@ def _consume_fenced_block(lines: list[str], start: int) -> tuple[str, str, int]:
     """Read a fenced code block starting at `lines[start]`.
 
     Returns (language, body_joined_with_newlines, next_index_after_close).
-    If the opening fence is missing, returns ("", "", start).
-    If no closing fence is found, body contains everything to EOF.
+    If the opening fence is missing, returns ("", "", start) so callers
+    can distinguish "no fence here" from parse error.
+
+    Raises `ParseError` if the opening fence has no matching close — the
+    alternative (silently absorbing everything to EOF) would let a
+    stray ``` at the top of a document swallow the entire rest of the
+    file without the author noticing.
     """
     if start >= len(lines):
         return "", "", start
@@ -234,8 +273,10 @@ def _consume_fenced_block(lines: list[str], start: int) -> tuple[str, str, int]:
             return lang, "\n".join(body_lines), i + 1
         body_lines.append(lines[i])
         i += 1
-    # Unclosed fence — degrade to "everything to EOF"
-    return lang, "\n".join(body_lines), i
+    raise ParseError(
+        "unterminated fenced code block (opened here, no matching ``` found before EOF)",
+        start + 1,
+    )
 
 
 def _skip_blank(lines: list[str], i: int) -> int:
@@ -329,15 +370,28 @@ def parse(text: str) -> list[dict]:
         # v2.0 — ::cell directive: source code + zero or more ::output blocks
         m = RE_CELL_OPEN.match(line)
         if m:
+            cell_line = i + 1  # 1-based for diagnostics
             cell_attrs = parse_attrs(m.group("attrs") or "")
             source_lang = ""
             source_body = ""
             cell_outputs: list[dict] = []
 
-            # Skip blanks, then try to consume the source fenced code block
+            # Skip blanks, then require a fenced source block.
             j = _skip_blank(lines, i + 1)
-            if j < len(lines) and RE_FENCE.match(lines[j]):
-                source_lang, source_body, j = _consume_fenced_block(lines, j)
+            if j >= len(lines) or not RE_FENCE.match(lines[j]):
+                raise ParseError(
+                    "::cell requires a fenced source code block immediately "
+                    "after the directive (found EOF or non-fence line)",
+                    cell_line,
+                )
+            source_lang, source_body, j = _consume_fenced_block(lines, j)
+            if not source_body.strip():
+                raise ParseError(
+                    "::cell source block is empty; empty cells are not valid "
+                    "(use `frozen=\"true\"` with an explicit source if you "
+                    "want a placeholder)",
+                    cell_line,
+                )
 
             # Consume zero or more ::output{} blocks, each optionally followed
             # by a fenced code block.
@@ -350,14 +404,28 @@ def parse(text: str) -> list[dict]:
                 if not om:
                     j = j2
                     break
+                output_line = j2 + 1
                 output_attrs = parse_attrs(om.group("attrs") or "")
+                if "type" not in output_attrs.kv:
+                    raise ParseError(
+                        "::output requires an explicit `type=\"...\"` "
+                        "attribute (e.g., text, image, html, json); silent "
+                        "defaulting would mask author/tool disagreement",
+                        output_line,
+                    )
                 j3 = _skip_blank(lines, j2 + 1)
                 out_body = ""
                 if j3 < len(lines) and RE_FENCE.match(lines[j3]):
                     _, out_body, j3 = _consume_fenced_block(lines, j3)
-                output_block: dict = {
-                    "type": output_attrs.kv.get("type", "text"),
-                }
+                # If no body and no src, the output block is semantically empty.
+                if not out_body and not output_attrs.kv.get("src"):
+                    raise ParseError(
+                        "::output must have either an inline fenced body or "
+                        "an `src=\"...\"` attribute; empty output blocks are "
+                        "not valid",
+                        output_line,
+                    )
+                output_block: dict = {"type": output_attrs.kv["type"]}
                 if output_attrs.kv.get("mime"):
                     output_block["mime"] = output_attrs.kv["mime"]
                 if output_attrs.kv.get("src"):
@@ -375,10 +443,15 @@ def parse(text: str) -> list[dict]:
                 "outputs": cell_outputs,
             }
             if "execution_count" in cell_attrs.kv:
+                raw = cell_attrs.kv["execution_count"]
                 try:
-                    cell_block["execution_count"] = int(cell_attrs.kv["execution_count"])
+                    cell_block["execution_count"] = int(raw)
                 except ValueError:
-                    cell_block["execution_count"] = cell_attrs.kv["execution_count"]
+                    raise ParseError(
+                        f"::cell execution_count must be an integer, "
+                        f"got {raw!r}",
+                        cell_line,
+                    )
             if cell_attrs.kv.get("frozen") == "true":
                 cell_block["frozen"] = True
             emit(cell_block, inline=cell_attrs)
@@ -392,11 +465,19 @@ def parse(text: str) -> list[dict]:
         # attrs like content_hash.
         m_inc = RE_INLINE_DIRECTIVE.match(line)
         if m_inc and m_inc.group("name") == "include":
+            include_line = i + 1
             # Parse both the bracket body (as key=value) AND the brace body.
             bracket_attrs = parse_attrs(m_inc.group("label") or "")
             brace_attrs = parse_attrs(m_inc.group("attrs") or "")
             combined_kv = {**bracket_attrs.kv, **brace_attrs.kv}
             target = combined_kv.get("target") or combined_kv.get("path") or ""
+            if not target.strip():
+                raise ParseError(
+                    "::include requires a non-empty `target` (or `path`) "
+                    "attribute; silently accepting would produce an include "
+                    "block pointing nowhere",
+                    include_line,
+                )
             include_block: dict = {
                 "type": "include",
                 "target": target,

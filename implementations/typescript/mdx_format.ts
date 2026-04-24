@@ -556,8 +556,18 @@ export interface VersionEntry {
   message: string;
   /** Snapshot information */
   snapshot?: VersionSnapshot;
-  /** Parent version (null for initial) */
+  /**
+   * Parent version (null for initial). For merges, prefer
+   * `parent_versions` — this field holds the "primary" parent when
+   * the version has a single parent.
+   */
   parent_version?: string | null;
+  /**
+   * Multi-parent ancestry for fork/merge DAG (v2.0 §15.4). Order is
+   * significant: `parent_versions[0]` is the mainline parent (same as
+   * `parent_version`); subsequent entries are merged-in branches.
+   */
+  parent_versions?: string[];
   /** Change summary */
   changes?: VersionChanges;
   /** Tags (e.g., "release", "draft") */
@@ -1270,11 +1280,44 @@ export interface SignerIdentity {
 }
 
 /**
+ * Built-in signer roles from the v2.0 spec (§16.2).
+ *
+ * Custom roles are supported via `CustomSignerRole` — a branded string
+ * type that prevents accidental mixing of typos with built-in roles
+ * while still allowing callers to opt in to a URI or application-
+ * specific value explicitly.
+ */
+export type BuiltInSignerRole =
+  | "author"
+  | "reviewer"
+  | "editor"
+  | "publisher"
+  | "notary";
+
+/**
+ * A custom signer role (e.g., a URI or application-defined identifier).
+ * Construct via `customSignerRole(...)`.
+ */
+export type CustomSignerRole = string & { readonly __customSignerRole: unique symbol };
+
+/**
+ * Opt-in constructor for a custom signer role. Making this explicit
+ * prevents the `| string` erase-the-union foot-gun: callers must decide
+ * "yes, this is a non-standard role" rather than getting it for free
+ * from literal string inference.
+ */
+export function customSignerRole(value: string): CustomSignerRole {
+  return value as CustomSignerRole;
+}
+
+export type SignerRole = BuiltInSignerRole | CustomSignerRole;
+
+/**
  * One entry in v2.0's `security.signatures[]` (v2.0 §16.2).
  */
 export interface SignatureEntry {
-  /** Role of this signer (author, reviewer, editor, publisher, notary, or custom URI) */
-  role: "author" | "reviewer" | "editor" | "publisher" | "notary" | string;
+  /** Role of this signer — one of the built-in roles or an explicit `customSignerRole(...)`. */
+  role: SignerRole;
   /** Signer identity */
   signer: SignerIdentity;
   /** Signature algorithm */
@@ -1460,17 +1503,38 @@ export function sanitizePath(path: string): string {
 }
 
 /**
- * Removes undefined and null values from an object.
- *
- * The generic `T extends object` constraint lets callers pass typed
- * interfaces (e.g. `Author`, `AssetMetadata`) directly without first
- * widening to `Record<string, unknown>`. That earlier widening was
- * what forced the noisy `as unknown as X` casts at call sites.
- *
- * @param obj - The object to clean
- * @returns A new object with only defined values (same key-value types as input)
+ * Plain-object-only constraint — excludes arrays, Maps, Sets, and
+ * Dates at the type level. These collection types would otherwise be
+ * accepted under `T extends object` and silently iterated by
+ * `Object.entries`, producing nonsense (indexed keys for arrays, empty
+ * result for Maps). Interfaces without a string index signature still
+ * satisfy this bound, so `cleanObject(author)` continues to type-check
+ * without the caller having to widen to `Record<string, unknown>`.
  */
-export function cleanObject<T extends object>(obj: T): Partial<T> {
+type PlainObject<T> = T extends ReadonlyArray<unknown>
+  ? never
+  : T extends Map<unknown, unknown>
+  ? never
+  : T extends Set<unknown>
+  ? never
+  : T extends Date
+  ? never
+  : T;
+
+/**
+ * Removes undefined and null values from a plain object.
+ *
+ * @param obj - The plain object to clean
+ * @returns A new object with only defined values (same shape as input)
+ */
+export function cleanObject<T extends object>(obj: PlainObject<T>): Partial<T> {
+  // Runtime guard: if TS's type-level exclusions are bypassed via `any`,
+  // fail fast rather than producing a silently-wrong result.
+  if (Array.isArray(obj) || obj instanceof Map || obj instanceof Set || obj instanceof Date) {
+    throw new TypeError(
+      `cleanObject expects a plain object, got ${obj.constructor?.name ?? typeof obj}`,
+    );
+  }
   const result: Partial<T> = {};
   for (const [key, value] of Object.entries(obj) as Array<[keyof T, T[keyof T]]>) {
     if (value !== undefined && value !== null) {
@@ -1860,17 +1924,30 @@ export class MDXManifest {
 
   /**
    * Validates the manifest structure.
+   *
+   * Structural invariants enforced here that JSON Schema cannot express:
+   *
+   * 1. `content.locales.default` must be one of the tags in
+   *    `content.locales.available[]` — otherwise the default points
+   *    at a locale that doesn't exist.
+   * 2. `security.signature` (legacy v1.1 singular) and
+   *    `security.signatures` (v2.0 multi) are mutually exclusive —
+   *    writers must pick one to avoid ambiguity about which is
+   *    authoritative.
+   * 3. Signature chain: after the first entry, every
+   *    `security.signatures[i]` with `i > 0` must set
+   *    `prev_signature` so verifiers can detect insertion/removal of
+   *    middle entries.
+   *
    * @returns Array of validation error messages (empty if valid)
    */
   validate(): string[] {
     const errors: string[] = [];
 
-    // Check required root fields
     if (!this._data.mdx_version) {
       errors.push("Missing required field: mdx_version");
     }
 
-    // Check document section
     if (!this._data.document) {
       errors.push("Missing required field: document");
     } else {
@@ -1881,11 +1958,53 @@ export class MDXManifest {
       if (!doc.modified) errors.push("Missing required document field: modified");
     }
 
-    // Check content section
     if (!this._data.content) {
       errors.push("Missing required field: content");
-    } else if (!this._data.content.entry_point) {
-      errors.push("Missing required content field: entry_point");
+    } else {
+      if (!this._data.content.entry_point) {
+        errors.push("Missing required content field: entry_point");
+      }
+      // Invariant 1: locales.default must be in available[].tag
+      const locales = this._data.content.locales;
+      if (locales) {
+        const tags = locales.available.map((a) => a.tag);
+        if (!tags.includes(locales.default)) {
+          errors.push(
+            `content.locales.default "${locales.default}" is not one of ` +
+              `available[].tag: [${tags.join(", ")}]`,
+          );
+        }
+        // Also flag duplicate tags — ambiguous resolution.
+        const seen = new Set<string>();
+        for (const tag of tags) {
+          if (seen.has(tag)) {
+            errors.push(`content.locales.available has duplicate tag: "${tag}"`);
+          }
+          seen.add(tag);
+        }
+      }
+    }
+
+    // Invariants 2 & 3: signature policy
+    const sec = this._data.security;
+    if (sec) {
+      if (sec.signature && sec.signatures && sec.signatures.length > 0) {
+        errors.push(
+          "security.signature (v1.1 singular) and security.signatures[] " +
+            "(v2.0 multi) are mutually exclusive; set only one",
+        );
+      }
+      if (sec.signatures) {
+        for (let i = 1; i < sec.signatures.length; i++) {
+          if (!sec.signatures[i].prev_signature) {
+            errors.push(
+              `security.signatures[${i}] must set prev_signature (chain ` +
+                `verification requires every non-first entry to link to the ` +
+                `previous one)`,
+            );
+          }
+        }
+      }
     }
 
     return errors;
@@ -2002,14 +2121,37 @@ export class MDXManifest {
 
   /**
    * Add a signature entry (v2.0 §16.2).
-   * If a legacy singular `security.signature` is present, the new entry is
-   * added to `signatures[]` without removing the legacy field (viewers are
-   * expected to accept either).
+   *
+   * Chain policy: when adding entry N > 0, the caller MUST supply
+   * `entry.prev_signature` — it's the author's commitment that this
+   * entry follows the previous one. Without it, a middle entry could
+   * be inserted or reordered and a later chain-verifier couldn't
+   * detect it. This throws at insertion time rather than deferring to
+   * `validate()` because silently accepting a broken chain lets
+   * authors ship documents that will fail verification downstream.
+   *
+   * Refusing when a legacy `security.signature` is set prevents the
+   * ambiguous "both" state that `validate()` flags (invariant 2 above);
+   * callers must delete the legacy field explicitly to migrate.
    */
   addSignature(entry: SignatureEntry): void {
     if (!this._data.security) this._data.security = {};
+    if (this._data.security.signature) {
+      throw new Error(
+        "Cannot addSignature: legacy `security.signature` (v1.1 singular) is " +
+          "still present. Delete it first to migrate to `signatures[]`.",
+      );
+    }
     if (!this._data.security.signatures) this._data.security.signatures = [];
-    this._data.security.signatures.push(entry);
+    const existing = this._data.security.signatures;
+    if (existing.length > 0 && !entry.prev_signature) {
+      throw new Error(
+        `addSignature: entry at index ${existing.length} requires ` +
+          `prev_signature (hash of the previous entry's signature) to ` +
+          `preserve chain integrity.`,
+      );
+    }
+    existing.push(entry);
     this.updateModified();
   }
 
