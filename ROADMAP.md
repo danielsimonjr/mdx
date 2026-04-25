@@ -1400,14 +1400,19 @@ the drift this session found."
       `editor-desktop/playwright.config.ts`, electron-launch
       fixture, baseline tests for the four picker modals + diff
       modal + per-cell Run + open/save round-trip.
-- [ ] **Verify viewer build pipeline emits
-      `dist/mdz-viewer.js` end-to-end.** Phase 4.6.8 added
-      `tsconfig.build.json` and configured wrangler `[assets]` but
-      `npm run build -w @mdz-format/viewer` was never invoked +
-      the output wasn't validated. Add a CI step that runs the
-      build + asserts `dist/index.js` exists + a smoke test that
-      imports it and verifies `customElements.get('mdz-viewer')`
-      is defined.
+- [x] **Verify viewer build pipeline emits `dist/index.js`
+      end-to-end** — done 2026-04-25. New `validate-viewer-build`
+      CI job runs `npm run build -w @mdz-format/viewer` + asserts
+      `dist/index.js` and `dist/index.d.ts` are emitted; greps
+      the compiled `dist/mdz-viewer.js` for `customElements` to
+      verify the custom-element registration survives compilation.
+      `packages/mdz-viewer-hosted/src/worker.ts` updated: the
+      stub script-tag now imports `/index.js` (matches the
+      package's `main` field) instead of the speculative
+      `/viewer.js`. Locally verified: `tsc -p tsconfig.build.json`
+      emits 11 .js + 11 .d.ts files; `dist/index.js` exists;
+      `dist/mdz-viewer.js` references `customElements` twice
+      (define + get).
 - [ ] **Phase 3.2 follow-up: per-asset `content_hash` mismatch
       fixtures.** The integrity-fixtures runner deliberately
       deferred `asset-hash-mismatch` because `mdz verify` only

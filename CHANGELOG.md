@@ -8,6 +8,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 4.6.9: viewer build pipeline CI verification (2026-04-25)
+
+Phase 4.6.8 added `tsconfig.build.json` and pointed the hosted
+Worker's wrangler `[assets]` binding at `../mdz-viewer/dist`,
+but `npm run build -w @mdz-format/viewer` was never actually
+invoked + the output wasn't validated. Today's work:
+
+- New `validate-viewer-build` CI job runs the build, asserts
+  `dist/index.js` and `dist/index.d.ts` exist, and greps the
+  compiled `dist/mdz-viewer.js` for `customElements` to verify
+  the custom-element registration survives compilation. A
+  silently-broken build (where the entry point compiled but
+  the side-effect registration tree-shook away) would now
+  fail CI.
+- `packages/mdz-viewer-hosted/src/worker.ts` script-tag updated
+  to import `/index.js` (matches the package's `main` field)
+  instead of the speculative `/viewer.js`. The wrangler
+  `[assets]` binding was always going to serve whatever the
+  build emits at the binding directory's root; aligning the
+  worker's import to the actual filename closes the gap.
+
+Locally verified: `tsc -p tsconfig.build.json` emits 11 `.js` +
+11 `.d.ts` files; `dist/index.js` exists; `dist/mdz-viewer.js`
+references `customElements` twice (define + get). The
+build is now reproducible end-to-end and exercised on every
+push.
+
 ### Added — Phase 4.6.9: features-by-impl support matrix doc (2026-04-25)
 
 `docs/SUPPORT_MATRIX.md` is the new single-source-of-truth for

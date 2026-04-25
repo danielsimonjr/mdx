@@ -317,14 +317,19 @@ function baseShell(opts: ShellOptions): string {
     }
   </style>
   <!--
-    The viewer ships as /viewer.js — a Cloudflare Assets binding
+    The viewer ships as /index.js — a Cloudflare Assets binding
     (configured in wrangler.toml's [assets] block) that serves
-    the single-file ESM emitted by "npm run build" in
-    packages/mdz-viewer/ (output: packages/mdz-viewer/dist/mdz-viewer.js).
-    The worker itself is binding-agnostic; serving is wrangler's job.
+    the package's compiled entry point. "npm run build" in
+    packages/mdz-viewer/ emits dist/index.js (matches the
+    package.json `main`); wrangler serves it at the binding's
+    root.
+
+    The script-tag below imports the entry-point side-effect
+    (registering the <mdz-viewer> custom element); subsequent
+    use of <mdz-viewer> in markup just works.
   -->
   <script type="module">
-    import '/viewer.js';
+    import '/index.js';
   </script>
 </head>
 <body>

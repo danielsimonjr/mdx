@@ -82,6 +82,42 @@ jobs:
           cd implementations/typescript
           npm test
 
+  validate-viewer-build:
+    name: Validate Viewer Build (Phase 4.6.9)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install workspace dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build viewer package
+        # Phase 2.1 viewer needs to emit a clean dist/ for the
+        # Phase 2.2 hosted Worker's [assets] binding to serve.
+        # This step exercises the build pipeline end-to-end.
+        run: npm run build -w @mdz-format/viewer
+
+      - name: Assert dist/ contains the expected entry point
+        run: |
+          test -f packages/mdz-viewer/dist/index.js \
+            || (echo "::error::dist/index.js missing — viewer build emitted nothing" && exit 1)
+          test -f packages/mdz-viewer/dist/index.d.ts \
+            || (echo "::error::dist/index.d.ts missing — declaration emit failed" && exit 1)
+          # Sanity: the emitted JS should reference the custom-element
+          # registration. If the file is suspiciously small or doesn't
+          # mention `customElements`, the bundle is broken.
+          test -s packages/mdz-viewer/dist/index.js
+          if ! grep -q "customElements" packages/mdz-viewer/dist/mdz-viewer.js; then
+            echo "::error::compiled mdz-viewer.js does not reference customElements"
+            exit 1
+          fi
+          echo "✓ Viewer build emits dist/ with expected entry point + custom-element registration"
+
   validate-python:
     name: Validate Python
     runs-on: ubuntu-latest
