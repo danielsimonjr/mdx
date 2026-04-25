@@ -8,6 +8,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 3.2: Archive-level integrity fixtures (2026-04-25)
+
+`tests/conformance/integrity/` now hosts archive-level
+integrity-fail fixtures that the existing parser-level negative
+suite couldn't cover (parser tests run on raw `.md` strings; you
+can't tamper with a manifest_checksum that doesn't exist yet).
+
+Each fixture is a JSON descriptor (`descriptor.json`) declaring
+the manifest, file contents, and expected error rule + message
+substring. The runner
+(`run_integrity_conformance.js`) assembles each descriptor into
+a real `.mdz` ZIP in a temp file, hands it to either
+`mdz validate` (for structural-shape failures) or `mdz verify`
+(for integrity-hash failures) based on the declared rule, and
+asserts the verifier rejects it with the declared message.
+
+Three fixtures land in this commit:
+
+- **`content-hash-mismatch`** — manifest declares
+  `document.content_id` as all-zeros; the actual `document.md`
+  bytes hash to something else. Verifier MUST reject — accepting
+  defeats the integrity layer.
+- **`manifest-checksum-mismatch`** —
+  `security.integrity.manifest_checksum` is all-zeros. This is
+  the integrity anchor signature verification chains against; a
+  mismatch means tampering or a writer bug.
+- **`manifest-missing-mdx-version`** — required field absent.
+  Routed to `mdz validate` rather than `mdz verify` since the
+  failure is structural.
+
+Per-asset `content_hash` mismatch fixtures are deferred to a
+follow-up that first extends the `verify` command's checking
+beyond the manifest-level checksum.
+
+Wired into the `validate-cli` GitHub Actions job alongside the
+existing delta-snapshots conformance runner.
+
 ### Added — Phase 1.3: Py↔TS cross-impl parity harness (2026-04-25)
 
 Closes the long-standing Phase 1.3 ROADMAP item. Companion to

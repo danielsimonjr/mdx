@@ -1,0 +1,28 @@
+{
+  "kind": "negative",
+  "title": "manifest declares an integrity.manifest_checksum that doesn't match",
+  "rationale": "Per spec §16, security.integrity.manifest_checksum is the hash of the canonicalized manifest itself — the integrity anchor that signature verification chains against. A mismatch means either the manifest was tampered with after signing, OR the writer computed the hash wrong. Verifier MUST reject with a clear pointer to the mismatch.",
+  "manifest": {
+    "mdx_version": "2.0.0",
+    "document": {
+      "id": "00000000-0000-4000-8000-000000000004",
+      "title": "Manifest Checksum Mismatch",
+      "created": "2026-01-01T00:00:00Z",
+      "modified": "2026-01-01T00:00:00Z",
+      "language": "en-US"
+    },
+    "content": { "entry_point": "document.md" },
+    "security": {
+      "integrity": {
+        "manifest_checksum": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    }
+  },
+  "files": {
+    "document.md": "# Manifest checksum is all-zeros, won't match the canonicalized JSON.\n"
+  },
+  "expected_error": {
+    "rule": "manifest_checksum_mismatch",
+    "messageMatch": "manifest_checksum"
+  }
+}

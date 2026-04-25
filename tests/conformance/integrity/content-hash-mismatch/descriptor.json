@@ -1,0 +1,24 @@
+{
+  "kind": "negative",
+  "title": "manifest content_id doesn't match document.md",
+  "rationale": "An adversary or a buggy writer may declare a content_id whose hash doesn't match the actual entry_point bytes. Verifier MUST reject — accepting a mismatch defeats the entire integrity layer.",
+  "manifest": {
+    "mdx_version": "2.0.0",
+    "document": {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "title": "Mismatch Fixture",
+      "created": "2026-01-01T00:00:00Z",
+      "modified": "2026-01-01T00:00:00Z",
+      "language": "en-US",
+      "content_id": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "content": { "entry_point": "document.md" }
+  },
+  "files": {
+    "document.md": "# This document's hash will not match the all-zeros declared content_id.\n"
+  },
+  "expected_error": {
+    "rule": "content_hash_mismatch",
+    "messageMatch": "content_id"
+  }
+}

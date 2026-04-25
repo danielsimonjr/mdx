@@ -1,0 +1,22 @@
+{
+  "kind": "negative",
+  "title": "manifest is missing the required mdx_version field",
+  "rationale": "Per spec §3 mdx_version is required — readers use it to gate against unknown future revisions. A manifest without it can't be safely interpreted; verifier MUST reject.",
+  "manifest": {
+    "document": {
+      "id": "00000000-0000-4000-8000-000000000003",
+      "title": "No Version",
+      "created": "2026-01-01T00:00:00Z",
+      "modified": "2026-01-01T00:00:00Z",
+      "language": "en-US"
+    },
+    "content": { "entry_point": "document.md" }
+  },
+  "files": {
+    "document.md": "# missing mdx_version\n"
+  },
+  "expected_error": {
+    "rule": "missing_required_field",
+    "messageMatch": "mdx_version"
+  }
+}

@@ -267,6 +267,9 @@ jobs:
       - name: Run delta-snapshots-v1 conformance fixtures
         run: node tests/conformance/history/run_history_conformance.js
 
+      - name: Run archive-level integrity fixtures (Phase 3.2)
+        run: node tests/conformance/integrity/run_integrity_conformance.js
+
   test-phase-2-3:
     name: Phase 2/3 Tests (viewer sanitizer + accessibility)
     runs-on: ubuntu-latest

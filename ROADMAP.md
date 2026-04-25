@@ -944,7 +944,21 @@ enforcement. Fix this before any real adoption.
 ### 3.2 Subresource integrity enforcement
 
 - [x] Integrity field verification landed in the Node verifier + Rust binding (`verify_integrity`, `verify_content_id`). Conformance-suite-level viewer flagging is not yet implemented — the existing negative fixtures cover parser-level errors, not archive-level integrity mismatch. Archive-level integrity tests live in `cli/test/verify.test.js` and `bindings/rust/tests/archive_integration.rs` instead.
-- [ ] Add integrity-fail fixtures to `tests/conformance/negative/` — still parser-level only. Archive-level integrity tests are covered in the `verify.test.js` + Rust integration suites (different fixture-harness format).
+- [x] Add integrity-fail fixtures — done 2026-04-25.
+      `tests/conformance/integrity/` now hosts archive-level
+      fixtures with their own runner
+      (`run_integrity_conformance.js`). Each fixture is a JSON
+      descriptor that the runner assembles into a real `.mdz`
+      in-memory, then hands to `mdz validate` (structural) or
+      `mdz verify` (integrity hashes). Three fixtures land in
+      this commit:
+      `content-hash-mismatch` (document.content_id ≠ inflated bytes),
+      `manifest-checksum-mismatch` (security.integrity.manifest_checksum wrong),
+      `manifest-missing-mdx-version` (required-field absence).
+      Per-asset `content_hash` mismatch fixtures gated on
+      growing the `verify` command's per-asset check
+      (currently only checks `manifest_checksum`). Wired into
+      `validate-cli` CI job.
 
 ### 3.3 Accessibility conformance suite
 
