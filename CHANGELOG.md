@@ -196,6 +196,35 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Added — Phase 2.3a.5.0: Directive insertion engine (2026-04-24)
+
+Foundation layer for the picker pack (2.3a.5.1–4) and the Pro-tier
+non-core pickers (2.3b.7). New module
+`editor-desktop/src/renderer/directive-insert.ts` exports four pure
+builders — `buildCell`, `buildInclude`, `buildFig`, `buildCite` —
+each returning `{text, cursorOffset}` payloads ready to splice into
+CodeMirror's document. The cursor offset addresses are computed via
+a `CURSOR_SENTINEL`-and-strip pass, so the templates remain
+readable strings rather than offset arithmetic.
+
+`EditorPane.insertDirective(payload)` is the CodeMirror-side
+wrapper: it dispatches a single `view.dispatch` change that
+replaces the current selection (or splices at cursor when empty)
+with `payload.text` and parks the caret at
+`selection.from + payload.cursorOffset`. View focus is restored so
+the user can keep typing without a mouse round-trip.
+
+19 vitest cases cover every builder option permutation and
+sentinel-handling edge case. Test-driven: the suite caught a real
+bug — `buildCite({locator: {}})` was emitting `::cite[x]{}` (an
+empty attribute brace) because the locator-presence check accepted
+truthy empty objects. Fix: count populated locator parts before
+emitting the brace.
+
+Picker UIs in 2.3a.5.1–4 now have a tested foundation to build on;
+each picker only has to translate modal-form state into one of the
+four builder option objects.
+
 ### Added — Phase 2.3a.3: Asset sidebar (2026-04-24)
 
 The editor's right rail now hosts an asset tree with drag-drop

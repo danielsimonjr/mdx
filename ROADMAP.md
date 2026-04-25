@@ -280,7 +280,7 @@ maintainer, double it.
 |-----------|-------|-------------|----------------|
 | 2.1 viewer | **partial** | sanitizer (38 tests), directives (cross-refs / citations / bibliography / `::cell` / `::output` / `::include`, 46 tests), CSL-JSON references (10 tests), KaTeX math (13 tests), **IndexedDB cache** (10 tests). 117/117 viewer tests pass. | full keyboard a11y, npm publish, demo site, fragment-aware `::include` |
 | 2.2 hosted | **code-ready, not deployed** | full Cloudflare Worker with strict CSP, content-hash cache pinning, OG / Twitter card meta, sanitized canonical URLs, 32 worker tests | `wrangler deploy` to view.mdz-format.org (external action), per-archive cover-image extraction |
-| 2.3a editor MVP | **partial** | **2.3a.1** shell foundation + **2.3a.2** source editor + live preview + **2.3a.3** asset sidebar + **2.3a.4** .ipynb import wiring. 62 vitest cases (11 archive-io + 12 editor-pane + 7 ipynb-import + 32 asset-store). CodeMirror 6 + `@mdz-format/viewer` reuse, mode toggle, save flow, File → Import Jupyter notebook menu, drag-drop asset sidebar with SHA-256 + manifest projection. | 2.3a.5 picker pack, 2.3a.6 release engineering |
+| 2.3a editor MVP | **partial** | **2.3a.1** shell foundation + **2.3a.2** source editor + live preview + **2.3a.3** asset sidebar + **2.3a.4** .ipynb import wiring + **2.3a.5.0** directive insertion engine. 81 vitest cases (11 archive-io + 12 editor-pane + 7 ipynb-import + 32 asset-store + 19 directive-insert). CodeMirror 6 + `@mdz-format/viewer` reuse, mode toggle, save flow, File → Import Jupyter notebook menu, drag-drop asset sidebar with SHA-256 + manifest projection, pure builders for `::cell`/`::include`/`::fig`/`::cite` directives. | 2.3a.5.1–4 individual pickers, 2.3a.6 release engineering |
 | 2.3b editor Pro | **chunked, not started** | (none — see 2.3b.1 through 2.3b.7 below) | All sub-phases |
 | 2.4 EPUB bridge | **shipped** | `mdz export-epub` (existing) + `mdz import-epub` (new, 15 tests, fidelity matrix doc); round-trip CI gate | Symmetric `::fig` round-trip on the export side (tracked); per-chapter spine preservation |
 | 2.5 browser ext | **code-ready, hardened** | MV3 manifest, content + service-worker + popup + viewer scripts, 13 manifest-validation tests, reproducible-build doc, placeholder icons | Real icon artwork, bundled `<mdz-viewer>`, AMO / Chrome Web Store / Edge / Brave submissions |
@@ -487,9 +487,14 @@ Each picker is its own session-sized chunk. Sequencing within the
 chunk is bottom-up (insertion engine first, individual pickers
 second).
 
-- [ ] **2.3a.5.0 — Directive insertion engine.** A small CodeMirror
-      command API that places a directive at cursor with cursor
-      positioned at the first attribute. Used by every picker below.
+- [x] **2.3a.5.0 — Directive insertion engine.** Pure builders
+      (`buildCell`, `buildInclude`, `buildFig`, `buildCite`) in
+      `editor-desktop/src/renderer/directive-insert.ts` return
+      `{text, cursorOffset}` payloads. CodeMirror-side
+      `EditorPane.insertDirective(payload)` splices at cursor (or
+      replaces selection) and parks the caret at the requested
+      offset. 19 vitest cases cover all four builders + the
+      sentinel-split helper. Picker pack 2.3a.5.1+ builds on this.
 - [ ] **2.3a.5.1 — `::cell` picker.** Modal: language dropdown
       (Python / R / Julia / JS), kernel field, optional
       `execution_count`. Inserts a complete `::cell{...}` block plus
