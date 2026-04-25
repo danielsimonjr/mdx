@@ -1,0 +1,5 @@
+{
+  "kind": "negative",
+  "phase": "parse",
+  "messageMatch": "duplicate"
+}

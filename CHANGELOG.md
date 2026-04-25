@@ -196,6 +196,48 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Added — Phase 4.5.3: delta-snapshots-v1 conformance fixtures (2026-04-24)
+
+`tests/conformance/history/` now ships archive-level fixtures
+that exercise both implementations against the spec. Five
+fixtures cover the spec's "Constraints + errors" matrix:
+
+- `linear-chain` (positive) — base + 2 deltas; the happy path,
+  asserting all three versions reconstruct byte-equal to the
+  declared expected files.
+- `branching-chains` (positive) — two chains in one index, each
+  with its own base + delta; pins the multi-base support the spec
+  allows for capping chain depth.
+- `circular` (negative) — A→parent=B, B→parent=A; pins the spec's
+  "Readers MUST detect and reject" rule.
+- `missing-parent` (negative) — delta references a parent not in
+  the chain; pins the spec's "validation error" requirement.
+- `duplicate-version` (negative) — same `version` declared twice
+  in one chain; pins parse-time deduplication.
+
+`run_history_conformance.js` walks every fixture, classifies it
+positive/negative based on `expected.json`, and runs the
+appropriate assertions against the CLI's
+`cli/src/lib/snapshots.js`. The TypeScript impl ships its own
+24-case unit suite that pins the same algorithm; both
+implementations passing the same expectations means the spec's
+two reference impls agree.
+
+A real bug surfaced while regenerating the fixture patches:
+`generateUnifiedDiff` was emitting `+` lines BEFORE `-` lines
+within a substitution hunk (the LCS backtrack visited del first
+when tied, which after reversal put add first). Functionally
+correct (the applier processes in order, doesn't care), but
+violates unified-diff convention and reads weirdly. Fix: prefer
+the add branch on tied LCS values during backtrack so the
+reversed output puts `-` before `+` per convention.
+
+Wired into the `validate-cli` GitHub Actions job alongside the
+existing `verify` and `import-epub` test runs. CI now exercises
+the snapshot algorithm at three levels: TS unit suite (24
+cases), CLI lib unit suite (23 cases), and archive-level
+fixtures (5 fixtures across 3 phases).
+
 ### Added — Phase 4.5.2 (writer + CLI): mdz snapshot subcommands (2026-04-24)
 
 Three new CLI subcommands round out Phase 4.5:

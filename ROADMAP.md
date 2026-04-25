@@ -881,9 +881,12 @@ against its parent, not a full copy. Relevant once documents commonly have >20 v
       spec's "verify by round-tripping" rule). Auto-starts a new
       base chain when the patch exceeds 20% of the parent OR the
       depth would approach the 50-chain cap. 23 node:test cases.
-- [ ] **Conformance fixtures** in `tests/conformance/history/`
-      (chain-walk, invalid-chain, circular-chain). 24 unit cases
-      cover the algorithm; archive-level fixtures are a follow-up.
+- [x] **Conformance fixtures** in `tests/conformance/history/`
+      (5 fixtures: linear-chain + branching-chains positives,
+      circular + missing-parent + duplicate-version negatives).
+      `run_history_conformance.js` walks every fixture and asserts
+      the declared `kind: positive|negative` behaviour against the
+      CLI's snapshots lib. Wired into `validate-cli` CI job.
 - [ ] **arXiv-corpus measurement** of the 20% delta-vs-full
       threshold. Gated on the Phase 4.3 100-paper run.
 

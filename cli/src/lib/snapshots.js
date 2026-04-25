@@ -249,8 +249,14 @@ function lineDiffOps(aLines, bLines) {
   let j = n;
   while (i > 0 && j > 0) {
     if (aLines[i - 1] === bLines[j - 1]) { ops.push({ op: 'equal', line: aLines[i - 1] }); i--; j--; }
-    else if (lcs[i - 1][j] >= lcs[i][j - 1]) { ops.push({ op: 'del', line: aLines[i - 1] }); i--; }
-    else { ops.push({ op: 'add', line: bLines[j - 1] }); j--; }
+    // Tie-breaking note: backtracking walks from (m, n) → (0, 0); the
+    // op stream is reversed before return. To emit `-` before `+` in
+    // the final patch (the unified-diff convention), the BACKTRACK
+    // must visit `+` first when tied. So prefer the add branch on
+    // `lcs[i][j-1] >= lcs[i-1][j]` (strict-greater would also work
+    // for the non-tied case but lose convention on ties).
+    else if (lcs[i][j - 1] >= lcs[i - 1][j]) { ops.push({ op: 'add', line: bLines[j - 1] }); j--; }
+    else { ops.push({ op: 'del', line: aLines[i - 1] }); i--; }
   }
   while (i > 0) { ops.push({ op: 'del', line: aLines[i - 1] }); i--; }
   while (j > 0) { ops.push({ op: 'add', line: bLines[j - 1] }); j--; }

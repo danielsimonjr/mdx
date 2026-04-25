@@ -1,0 +1,8 @@
+{
+  "kind": "positive",
+  "reconstructions": {
+    "1.0.0": "expected/v1.0.0.md",
+    "1.1.0": "expected/v1.1.0.md",
+    "1.2.0": "expected/v1.2.0.md"
+  }
+}

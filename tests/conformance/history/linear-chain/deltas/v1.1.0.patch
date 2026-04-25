@@ -1,0 +1,11 @@
+--- v1.0.0.md
++++ v1.1.0.md
+@@ -2,7 +2,7 @@
+ 
+ ## Methods
+ 
+-We measured the effect using N=40 samples.
++We measured the effect using N=80 samples (expanded per reviewer 2).
+ 
+ ### Data collection
+ 

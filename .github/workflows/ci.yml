@@ -256,6 +256,14 @@ jobs:
           cd cli
           node --test test/import-epub.test.js
 
+      - name: Test snapshot command (Phase 4.5 delta-snapshots-v1)
+        run: |
+          cd cli
+          node --test test/snapshots.test.js
+
+      - name: Run delta-snapshots-v1 conformance fixtures
+        run: node tests/conformance/history/run_history_conformance.js
+
   test-phase-2-3:
     name: Phase 2/3 Tests (viewer sanitizer + accessibility)
     runs-on: ubuntu-latest

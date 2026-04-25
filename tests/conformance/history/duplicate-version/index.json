@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0.0",
+  "extension": "delta-snapshots-v1",
+  "chains": [
+    {
+      "base": "base/v1.0.0.md",
+      "base_version": "1.0.0",
+      "deltas": [
+        { "version": "1.1.0", "patch": "deltas/v1.1.0a.patch", "parent": "1.0.0" },
+        { "version": "1.1.0", "patch": "deltas/v1.1.0b.patch", "parent": "1.0.0" }
+      ]
+    }
+  ]
+}
