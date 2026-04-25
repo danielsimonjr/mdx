@@ -18,6 +18,7 @@
     "src/renderer/accessibility-checker.ts",
     "src/renderer/block-diff.ts",
     "src/renderer/annotations.ts",
+    "src/renderer/locales.ts",
     "test/**/*.ts"
   ],
   "exclude": [

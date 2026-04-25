@@ -196,6 +196,45 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Added — Phase 2.3b.5 (data layer): Multi-locale helpers (2026-04-24)
+
+`editor-desktop/src/renderer/locales.ts` ships the data layer
+behind multi-locale side-by-side editing. Two responsibilities:
+
+**Manifest enumeration.** `enumerateLocales(manifest)` reads
+`manifest.content.locales.available[]` in either form the spec
+allows — string-form (`["en-US", "es-ES"]`) or object-form
+(`[{ language, path }]`) — and produces `{ language, path,
+primary }` records. The primary locale's path falls through to
+`manifest.content.entry_point` (typically `document.md`); secondary
+locales default to `document.<lang>.md`. When no `primary` is
+tagged, the first entry wins for UI default but each locale keeps
+its conventional path. Falls back to a single-entry list when
+the locales block is absent.
+
+**Add-locale planning.** `planAddLocale(manifest, language)`
+returns the patched manifest (deep-cloned — no input mutation)
+plus the new `document.<language>.md` path the caller should
+write. Throws on duplicates. Creates the `locales` block if the
+manifest didn't have one.
+
+**Paragraph alignment.** `paragraphSlices(source)` slices markdown
+into blank-line-separated paragraph spans with 1-based start lines,
+byte lengths, and trimmed fingerprints (the future fuzzy matcher
+will key on these). `alignParagraphs(left, right)` returns
+index-paired alignments with null-padding for length mismatches.
+MVP heuristic is positional alignment; fuzzy matching (Levenshtein
+on fingerprints, for translations that insert / remove paragraphs)
+is a follow-up.
+
+19 vitest cases — five enumeration branches, four planAddLocale
+edge cases, four paragraphSlices, and three alignParagraphs
+scenarios.
+
+UI (two stacked CodeMirror panes, sync-scroll handler, "Add
+locale" command) deferred to Phase 2.3b.5.2 follow-up. Net
+editor-desktop tests: 232 → 251.
+
 ### Added — Phase 2.3b.4 (data layer): Peer-review annotations (2026-04-24)
 
 `editor-desktop/src/renderer/annotations.ts` ships the data side

@@ -281,7 +281,7 @@ maintainer, double it.
 | 2.1 viewer | **partial** | sanitizer (38 tests), directives (cross-refs / citations / bibliography / `::cell` / `::output` / `::include`, 46 tests), CSL-JSON references (10 tests), KaTeX math (13 tests), **IndexedDB cache** (10 tests). 117/117 viewer tests pass. | full keyboard a11y, npm publish, demo site, fragment-aware `::include` |
 | 2.2 hosted | **code-ready, not deployed** | full Cloudflare Worker with strict CSP, content-hash cache pinning, OG / Twitter card meta, sanitized canonical URLs, 32 worker tests | `wrangler deploy` to view.mdz-format.org (external action), per-archive cover-image extraction |
 | 2.3a editor MVP | **partial** | **2.3a.1** shell + **2.3a.2** editor+preview + **2.3a.3** asset sidebar + **2.3a.4** .ipynb import + **2.3a.5.0** insertion engine + **2.3a.5.1–4** picker pack. 113 vitest cases (11 archive-io + 12 editor-pane + 7 ipynb-import + 32 asset-store + 19 directive-insert + 32 directive-pickers). Toolbar buttons for `::cell`, `::include`, `::fig`/`::eq`/`::tab`, `::cite`; `<dialog>`-based modal scaffolding; CSL-JSON bibliography lookup; document-scan id-collision check; archive-entry membership check for include targets. | 2.3a.6 release engineering (signed installers — partly external) |
-| 2.3b editor Pro | **partial** | **2.3b.2** a11y checker (37 cases) + **2.3b.7.1–5** non-core picker pack (34 cases) + **2.3b.3** block-level diff algorithm (25 cases) + **2.3b.4** annotation data layer + threading + trust signals (23 cases). | 2.3b.1 Pyodide kernel, 2.3b.3.2 diff UI, 2.3b.4.2 annotation UI, 2.3b.5 multi-locale, 2.3b.6 image variants |
+| 2.3b editor Pro | **partial** | **2.3b.2** a11y checker (37 cases) + **2.3b.3** block-diff algorithm (25 cases) + **2.3b.4** annotation data layer (23 cases) + **2.3b.5** locale-enum + paragraph alignment (19 cases) + **2.3b.7.1–5** non-core picker pack (34 cases). 5 of 7 sub-phases land their data/algorithm layer; UI surfaces deferred to per-feature `*.2` follow-ups. | 2.3b.1 Pyodide kernel (1MB+ WASM), 2.3b.6 image variants (sharp/libvips binary), `*.2` UI surfaces |
 | 2.4 EPUB bridge | **shipped** | `mdz export-epub` (existing) + `mdz import-epub` (new, 15 tests, fidelity matrix doc); round-trip CI gate | Symmetric `::fig` round-trip on the export side (tracked); per-chapter spine preservation |
 | 2.5 browser ext | **code-ready, hardened** | MV3 manifest, content + service-worker + popup + viewer scripts, 13 manifest-validation tests, reproducible-build doc, placeholder icons | Real icon artwork, bundled `<mdz-viewer>`, AMO / Chrome Web Store / Edge / Brave submissions |
 
@@ -644,12 +644,30 @@ is independent — sequence by user demand, not by checklist order.
 
 #### 2.3b.5 Multi-locale side-by-side editing
 
+- [x] **Locale-enumeration data layer** in
+      `editor-desktop/src/renderer/locales.ts`. `enumerateLocales`
+      reads `manifest.content.locales` in either string-form or
+      object-form and resolves each entry's archive path; falls
+      back to a single `{ language, path: entry_point }` entry
+      when the locales block is absent. `planAddLocale(manifest,
+      lang)` returns the patched manifest + `document.<lang>.md`
+      path for a new locale (no input mutation; throws on
+      duplicates).
+- [x] **Paragraph-alignment helpers** for sync-scroll:
+      `paragraphSlices(source)` slices markdown into blank-line-
+      separated paragraphs with line offsets and trimmed
+      fingerprints; `alignParagraphs(left, right)` produces
+      index-paired alignment with null-padding for length
+      mismatches. MVP heuristic is positional alignment; fuzzy
+      matching for translations that insert / remove paragraphs is
+      a follow-up.
 - [ ] Two CodeMirror editors stacked horizontally, each bound to
-      one of `manifest.content.locales.available[]`.
-- [ ] Sync-scroll between panes (paragraph-aligned).
+      one of `manifest.content.locales.available[]`. Phase
+      2.3b.5.2 follow-up (UI).
 - [ ] "Add locale" command that creates a new
       `document.<lang>.md` entry pre-populated from the current
-      pane.
+      pane. Phase 2.3b.5.2 follow-up (data layer shipped via
+      `planAddLocale`).
 
   **Depends on:** 2.3a.2.
 
