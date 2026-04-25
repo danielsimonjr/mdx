@@ -8,6 +8,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 1.3: Py↔TS cross-impl parity harness (2026-04-25)
+
+Closes the long-standing Phase 1.3 ROADMAP item. Companion to
+the existing `rust_ts_manifest_parity.py`. New
+`tests/parity/py_ts_roundtrip.py` drives the Python reference
+generator (`implementations/python/mdx_format.py`'s
+`create_example_mdx()`), extracts the produced archive's
+manifest, normalises away spec-allowed nondeterministic fields
+(timestamps, document UUIDs, content_id, generator-tool name),
+and compares against the same archive's TS-readable manifest
+view.
+
+The harness deliberately compares the raw manifest JSON rather
+than booting the TypeScript `MDZDocument` class — that's what
+proves cross-impl agreement on the wire format, which is the
+parity invariant that matters. Booting the TS class would test
+the TS impl against itself.
+
+Wired into the `validate-cli` GitHub Actions job. The Rust↔TS
+parity harness shipped in Phase 4.6.2; with this one landing,
+all three impls now have automated cross-checks against each
+other on every CI run.
+
 ### Added — Phase 2.3b.1.3: Manifest kernels declaration on save (2026-04-25)
 
 When the editor has loaded the Pyodide kernel during a session

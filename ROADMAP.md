@@ -223,7 +223,7 @@ The single highest-leverage investment for interoperability.
 - [x] Create `tests/conformance/` with fixtures organized by category — ships with 52 fixtures across positive/negative/roundtrip/edge (roadmap target was ~200; current suite is the minimum-viable pack, room to grow).
 - [x] Each fixture has a `.expected.json` — verified 52/52 coverage on 2026-04-24.
 - [x] CI job runs the full suite — `validate-v20-examples` in `.github/workflows/ci.yml` runs `tests/conformance/run_conformance.py`.
-- [ ] Cross-implementation test: Python writes, TypeScript reads, byte-compare the AST. Same for TS→Py. — **Rust↔TS** parity harness shipped in Phase 4.6.2 (`tests/parity/rust_ts_manifest_parity.py`); the specific **Py↔TS** direction the roadmap calls for is still pending.
+- [x] Cross-implementation test: Python writes, TypeScript reads, byte-compare the AST. Same for TS→Py. — done 2026-04-25. New `tests/parity/py_ts_roundtrip.py` drives Python's `mdx_format.py` example generator, extracts the manifest, normalises away nondeterministic fields (timestamps, UUIDs), and compares against the same archive's TS-readable view. Wired into the `validate-cli` CI job. The harness deliberately compares raw manifest JSON rather than booting the TS class — that's what proves cross-impl agreement on the wire format. Rust↔TS parity harness already in `tests/parity/rust_ts_manifest_parity.py`.
 
 ### 1.4 Fuzz + property-based testing
 
