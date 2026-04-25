@@ -196,6 +196,62 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Added — Phase 4.5 (reader): delta-snapshots-v1 reference impl (2026-04-24)
+
+Closes the spec → impl gap that blocked Phase 2.3b.3's
+round-trip claim. New module
+`packages/mdz-viewer/src/snapshots.ts` ships the reader side of
+`spec/extensions/delta-snapshots-v1.md`:
+
+- `parseIndex(raw)` — JSON-parses + structurally validates
+  `history/snapshots/index.json`, rejecting wrong extension
+  declarations, missing `base` / `base_version` / `parent` fields,
+  duplicate delta versions, and empty chains arrays.
+- `resolveVersion(index, version, options?)` — locates the chain
+  containing `version` and walks backward from it to the base,
+  emitting the patch list in forward apply order. Detects circular
+  chains (via per-walk `seen` set), missing parents, and chain
+  depth above `maxChainDepth` (default 50 per spec).
+- `applyUnifiedDiff(source, patch, version?)` — applies a single
+  GNU unified-diff patch (the subset `diff -U 3` produces). Driven
+  by patch content rather than source-line consumption — trailing
+  `+` additions after the last `-`/` ` line in a hunk are correctly
+  emitted. Throws `SnapshotError` with the patch line number on
+  context mismatch; readers MUST NOT silently return a
+  partially-applied document per spec.
+- `reconstructVersion` (async) and `reconstructVersionSync` (map-
+  backed) — top-level reconstruction. Async variant takes an
+  `EntryReader` so the same code runs against JSZip-loaded
+  archives, in-memory test fixtures, or the editor's loaded entry
+  map.
+- `SnapshotError` — strict-error type carrying `version` and
+  optional `patchLine` so callers can render targeted diagnostics.
+
+24 vitest cases — every parse error branch, every chain-walk
+error path (missing chain, missing version-in-chain, circular,
+depth limit), every diff-applier op (insert / delete / replace /
+multi-hunk / no-trailing-newline preservation), and three
+end-to-end reconstructVersion scenarios.
+
+A real bug surfaced while writing the diff applier tests: my
+first-pass loop gated on `consumed < oldCount`, which exited
+before processing trailing `+` additions in a hunk. Switched to
+patch-content-driven termination (`@@` or end-of-patch), bringing
+the algorithm in line with how every other unified-diff applier
+behaves.
+
+The block-diff (Phase 2.3b.3) and the snapshot patches use the
+same unified-diff format, so a snapshot rebuilt from the chain
+feeds straight into `diffBlocks` for the version-comparison UI
+when it lands.
+
+What's still open in Phase 4.5: the writer-side `mdz snapshot
+create|view|export` CLI subcommand, archive-level conformance
+fixtures, and the arXiv-corpus measurement of the 20%
+delta-vs-full threshold (gated on the 100-paper run).
+
+Net `@mdz-format/viewer` tests: 117 → 141.
+
 ### Added — Phase 2.3b.6 (planner): Image-variant generation planner (2026-04-24)
 
 `editor-desktop/src/renderer/variant-planner.ts` ships the

@@ -27,3 +27,17 @@ export type {
 } from "./mdz-viewer.js";
 export { renderMarkdown } from "./render.js";
 export type { RenderOptions } from "./render.js";
+export {
+  parseIndex as parseSnapshotIndex,
+  resolveVersion as resolveSnapshotVersion,
+  applyUnifiedDiff,
+  reconstructVersion,
+  reconstructVersionSync,
+  SnapshotError,
+} from "./snapshots.js";
+export type {
+  SnapshotIndex,
+  SnapshotChain,
+  SnapshotDelta,
+  EntryReader,
+} from "./snapshots.js";

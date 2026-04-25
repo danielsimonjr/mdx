@@ -600,13 +600,20 @@ is independent — sequence by user demand, not by checklist order.
       `history/snapshots/` (UI integration). Algorithm is shipped
       and tested; the diff-pane component that consumes it is a
       Phase 2.3b.3.2 follow-up.
-- [ ] Round-trip with the Phase 4.5 `delta-snapshots-v1` extension
-      so diffs and patches use the same algorithm. Blocked on the
-      Phase 4.5 spec → impl gap (currently spec only); when 4.5
-      ships, the block keys produced here are the patch identifiers.
+- [x] **Round-trip with `delta-snapshots-v1` (read side):** Phase
+      4.5 reference impl shipped 2026-04-24 in
+      `packages/mdz-viewer/src/snapshots.ts` — `parseIndex`,
+      `resolveVersion`, `applyUnifiedDiff`,
+      `reconstructVersion[Sync]` plus `SnapshotError` for the
+      strict error path. The block-diff and the snapshot patches
+      use the same unified-diff format, so a snapshot rebuilt
+      from the chain feeds straight into `diffBlocks` for the
+      version-comparison UI when it lands.
+- [ ] Writer-side `mdz snapshot create|view|export` CLI subcommand
+      (Phase 4.5.2 follow-up).
 
-  **Depends on:** 2.3a.2 + Phase 4.5 implementation (currently
-  spec only). Algorithm shipped 2026-04-24; UI surface deferred.
+  **Depends on:** 2.3a.2. Algorithm + read side shipped 2026-04-24;
+  UI surface and writer CLI deferred.
 
 #### 2.3b.4 Peer-review annotation layer
 
@@ -849,6 +856,28 @@ is a real constraint.
 
 Git-style packfiles for `history/snapshots/` — each version stores a delta
 against its parent, not a full copy. Relevant once documents commonly have >20 versions.
+
+- [x] **Spec:** `spec/extensions/delta-snapshots-v1.md` (v1.0
+      draft; all three open questions resolved 2026-04-24).
+- [x] **Reader reference impl** in
+      `packages/mdz-viewer/src/snapshots.ts`. Strict per the
+      Conformance section: parses + structurally validates
+      `index.json`, walks chains backward to a `base/`, applies
+      unified diffs in forward order, surfaces `SnapshotError`
+      on every malformed-input path (circular chains, missing
+      parents, depth > `maxChainDepth`, context mismatch, hunk
+      overconsumption). 24 vitest cases. Exposed from the viewer
+      package as `parseSnapshotIndex`, `resolveSnapshotVersion`,
+      `applyUnifiedDiff`, `reconstructVersion[Sync]`,
+      `SnapshotError`.
+- [ ] **Writer CLI subcommand** — `mdz snapshot create|view|export`
+      using the same unified-diff format. Reader was the blocker
+      for downstream UI; writer can ship next.
+- [ ] **Conformance fixtures** in `tests/conformance/history/`
+      (chain-walk, invalid-chain, circular-chain). 24 unit cases
+      cover the algorithm; archive-level fixtures are a follow-up.
+- [ ] **arXiv-corpus measurement** of the 20% delta-vs-full
+      threshold. Gated on the Phase 4.3 100-paper run.
 
 ---
 
