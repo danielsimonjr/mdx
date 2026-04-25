@@ -26,6 +26,15 @@ head_sampling_rate = 1.0
 type = "ESModule"
 globs = ["**/*.ts"]
 
+# Serve the bundled <mdz-viewer> web component as `/viewer.js`.
+# `npm run build` in `../mdz-viewer/` emits `dist/mdz-viewer.js`; the
+# Assets binding picks it up + serves with the right MIME + caching.
+# A run of `wrangler deploy` from this dir requires the viewer's dist
+# directory to exist — `npm run build -w @mdz-format/viewer` first.
+[assets]
+directory = "../mdz-viewer/dist"
+binding = "VIEWER_ASSETS"
+
 # TODO: register view.mdz-format.org as a route once the domain is owned.
 # [[routes]]
 # pattern = "view.mdz-format.org/*"

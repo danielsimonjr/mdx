@@ -1179,12 +1179,18 @@ normal completion flow.
       cell consumes. Validates against the
       `scientific-paper-v1` profile. Plus a top-level README
       explaining how to bundle into a `.mdz` and validate.
-- [ ] **Viewer-hosted bundled-viewer wiring**
-      (`packages/mdz-viewer-hosted/src/worker.ts:323` "TODO:
-      replace with bundled viewer once `npm run build` in
-      `packages/mdz-viewer/` produces a single-file ESM"). The
-      worker currently inlines a stub; the real viewer bundle
-      should be embedded once the build pipeline emits one.
+- [x] **Viewer-hosted bundled-viewer wiring** — done 2026-04-25.
+      Three pieces:
+      `packages/mdz-viewer/tsconfig.build.json` defines the build
+      target (declarations + sourcemaps emitted to `dist/`); the
+      existing `npm run build` script picks it up. The worker.ts
+      stub comment is replaced with the canonical reference (no
+      more TODO). `wrangler.toml` gained an `[assets]` block
+      pointing at `../mdz-viewer/dist` with binding
+      `VIEWER_ASSETS`, so wrangler serves the bundle as
+      `/viewer.js`. Local dev: `npm run build -w
+      @mdz-format/viewer` then `wrangler dev` from
+      `packages/mdz-viewer-hosted`. 32/32 worker tests pass.
 - [x] **Directive label i18n** — done 2026-04-25.
       `packages/mdz-viewer/src/directives.ts` now ships
       `LABELS_BY_LANG` covering 8 languages (en/es/fr/de/it/pt/ja/zh,

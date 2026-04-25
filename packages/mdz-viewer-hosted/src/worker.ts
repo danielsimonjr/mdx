@@ -316,13 +316,14 @@ function baseShell(opts: ShellOptions): string {
       code { background: #222; }
     }
   </style>
-  <!-- The viewer is loaded from the package bundle at build time. In
-       production this will be replaced by a Cloudflare Assets binding
-       (wrangler r2 publish) so the module ships as /viewer.js. -->
+  <!--
+    The viewer ships as /viewer.js — a Cloudflare Assets binding
+    (configured in wrangler.toml's [assets] block) that serves
+    the single-file ESM emitted by "npm run build" in
+    packages/mdz-viewer/ (output: packages/mdz-viewer/dist/mdz-viewer.js).
+    The worker itself is binding-agnostic; serving is wrangler's job.
+  -->
   <script type="module">
-    // TODO: replace with bundled viewer once "npm run build" in
-    // packages/mdz-viewer emits dist/mdz-viewer.js. For dev, this pulls
-    // the viewer from the local package via the worker's binding.
     import '/viewer.js';
   </script>
 </head>
