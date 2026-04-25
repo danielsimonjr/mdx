@@ -30,7 +30,8 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const AdmZip = require('adm-zip');
+const AdmZip = require('adm-zip');     // read-only — input MDZ archive
+const yazl = require('yazl');          // write — output EPUB (explicit ordering + STORED control)
 const chalk = require('chalk');
 const ora = require('ora');
 const { marked } = require('marked');
@@ -69,7 +70,7 @@ async function exportEpub(inputPath, options) {
                 path.join(path.dirname(absIn), path.basename(absIn, path.extname(absIn)) + '.epub'),
         );
 
-        buildEpub({ manifest, markdown, sourceZip: mdzZip, outPath });
+        await buildEpub({ manifest, markdown, sourceZip: mdzZip, outPath });
 
         spinner.succeed(chalk.green(`Wrote ${path.basename(outPath)}`));
 
@@ -92,7 +93,7 @@ async function exportEpub(inputPath, options) {
     }
 }
 
-function buildEpub({ manifest, markdown, sourceZip, outPath }) {
+async function buildEpub({ manifest, markdown, sourceZip, outPath }) {
     const doc = manifest.document || {};
     const uuid = doc.id || crypto.randomUUID();
     const title = doc.title || 'Untitled';
@@ -108,26 +109,22 @@ function buildEpub({ manifest, markdown, sourceZip, outPath }) {
     const preProcessed = preprocessLabeledDirectives(markdown);
     const bodyHtml = marked.parse(preProcessed, { async: false });
 
-    const out = new AdmZip();
-
-    // EPUB spec (OCF §4.3) REQUIRES the `mimetype` entry to be:
-    //   (1) the first entry in the ZIP, AND
-    //   (2) STORED (compression method 0, NOT deflated), AND
-    //   (3) exactly `application/epub+zip` with no BOM / trailing newline.
+    // EPUB OCF §4.3 requires three things of the mimetype entry:
+    //   (1) FIRST in the ZIP central directory.
+    //   (2) STORED (compression method 0, NOT deflated).
+    //   (3) Exactly `application/epub+zip`, no BOM, no trailing newline.
     //
-    // adm-zip's addFile() defaults to DEFLATE and gives no per-entry
-    // override. epubcheck treats a deflated mimetype as a FATAL OPF-003,
-    // so "downstream validators accept a deflated mimetype with a
-    // warning" (the prior comment here) was wrong — every EPUB we emit
-    // would fail validation.
-    //
-    // Workaround: push the raw entry via adm-zip's internal entries API
-    // with compression method 0 and the method explicitly set on the
-    // ZipEntry header. We construct the entry with `storeFile()` semantics.
-    _addStoredEntry(out, 'mimetype', Buffer.from(EPUB_MIMETYPE, 'utf8'));
+    // yazl gives explicit per-entry control over both the order
+    // (entries are written in addBuffer-call order) and the compression
+    // method (`compress: false` → STORED). This replaces the previous
+    // adm-zip workaround which relied on undocumented internal-entry-
+    // table mutation to put mimetype first; that hack was a no-op on
+    // some adm-zip versions and produced an epubcheck WARNING when it
+    // didn't take. Phase 4.6.8 swap.
+    const out = new yazl.ZipFile();
+    out.addBuffer(Buffer.from(EPUB_MIMETYPE, 'utf8'), 'mimetype', { compress: false });
 
-    out.addFile(
-        'META-INF/container.xml',
+    out.addBuffer(
         Buffer.from(
             [
                 '<?xml version="1.0" encoding="UTF-8"?>',
@@ -139,6 +136,7 @@ function buildEpub({ manifest, markdown, sourceZip, outPath }) {
             ].join('\n'),
             'utf8',
         ),
+        'META-INF/container.xml',
     );
 
     // Copy images from the MDZ into OPS/Images/. Track which manifest-
@@ -162,7 +160,7 @@ function buildEpub({ manifest, markdown, sourceZip, outPath }) {
         }
         const baseName = path.basename(img.path);
         const epubPath = `OPS/Images/${baseName}`;
-        out.addFile(epubPath, entry.getData());
+        out.addBuffer(entry.getData(), epubPath);
         imageManifestItems.push({
             id: `img-${imageManifestItems.length + 1}`,
             href: `Images/${baseName}`,
@@ -177,11 +175,10 @@ function buildEpub({ manifest, markdown, sourceZip, outPath }) {
     // that are absent from the source ZIP).
     const imagesToRewrite = imgs.filter((img) => copiedImagePaths.has(img.path));
     const xhtml = wrapXhtml({ title, language, bodyHtml, imageRewrite: imagesToRewrite });
-    out.addFile('OPS/Text/content.xhtml', Buffer.from(xhtml, 'utf8'));
+    out.addBuffer(Buffer.from(xhtml, 'utf8'), 'OPS/Text/content.xhtml');
 
     // OPF package document.
-    out.addFile(
-        'OPS/content.opf',
+    out.addBuffer(
         Buffer.from(
             buildOpf({
                 uuid,
@@ -196,51 +193,20 @@ function buildEpub({ manifest, markdown, sourceZip, outPath }) {
             }),
             'utf8',
         ),
+        'OPS/content.opf',
     );
 
     // Navigation document (EPUB 3.3 replaces the NCX with XHTML nav).
-    out.addFile('OPS/Text/nav.xhtml', Buffer.from(buildNav({ title, language }), 'utf8'));
+    out.addBuffer(Buffer.from(buildNav({ title, language }), 'utf8'), 'OPS/Text/nav.xhtml');
 
-    // EPUB OCF §4.3 requires mimetype to be the FIRST entry in the ZIP.
-    // adm-zip orders entries internally; force mimetype to index 0.
-    _forceFirstEntry(out, 'mimetype');
-
-    out.writeZip(outPath);
-}
-
-/**
- * Attempt to reorder ZIP entries so `entryName` is at index 0 via adm-zip's
- * undocumented internal `entryTable`. Mutating the array returned by
- * `zip.getEntries()` does NOT affect write order (it's a snapshot), so
- * that path was removed as dead code.
- *
- * epubcheck emits a WARNING (not FATAL) when mimetype is not the first
- * entry, so a v1.0 EPUB that preserves STORED compression but has
- * mimetype in position 1 (after META-INF/) passes validation with a
- * warning. The FATAL violation (STORED-vs-DEFLATE for mimetype) IS
- * fixed by _addStoredEntry above.
- *
- * TODO: swap adm-zip for yazl, which supports explicit entry ordering.
- * Tracked as Phase 3 cleanup.
- */
-function _forceFirstEntry(zip, entryName) {
-    // If adm-zip exposes an `entryTable` property, rebuild it with our
-    // target first. Undocumented internal on some versions; a no-op on
-    // others (the EPUB remains valid with an ordering warning).
-    try {
-        const zipImpl = zip._zip || zip;
-        if (zipImpl && zipImpl.entryTable && zipImpl.entryTable[entryName]) {
-            const oldTable = zipImpl.entryTable;
-            const newTable = { [entryName]: oldTable[entryName] };
-            for (const k of Object.keys(oldTable)) {
-                if (k !== entryName) newTable[k] = oldTable[k];
-            }
-            zipImpl.entryTable = newTable;
-        }
-    } catch {
-        // Internal-layout change — not fatal; ordering warning will fire
-        // in epubcheck but the EPUB remains valid.
-    }
+    // Stream the assembled ZIP to disk. yazl flushes everything in the
+    // order added when end() is called.
+    out.end();
+    await new Promise((resolve, reject) => {
+        const ws = fs.createWriteStream(outPath);
+        out.outputStream.pipe(ws).on('close', resolve).on('error', reject);
+        out.outputStream.on('error', reject);
+    });
 }
 
 function wrapXhtml({ title, language, bodyHtml, imageRewrite }) {
@@ -426,31 +392,6 @@ function escapeXml(s) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&apos;');
-}
-
-/**
- * Add a ZIP entry with compression method 0 (STORED, uncompressed).
- *
- * EPUB OCF §4.3 requires `mimetype` to be the first entry AND stored
- * uncompressed. adm-zip defaults to DEFLATE; this helper adds the entry
- * normally then flips the entry's header method flag to 0 (STORED).
- * The flag is checked during `writeZip()` — setData() resets method on
- * some adm-zip versions, so we set it both before and after.
- *
- * This is only used for the EPUB mimetype entry; everything else
- * compresses normally.
- */
-function _addStoredEntry(zip, entryName, buffer) {
-    zip.addFile(entryName, buffer);
-    const entry = zip.getEntry(entryName);
-    if (!entry) {
-        throw new Error(`_addStoredEntry: adm-zip dropped the entry we just added: ${entryName}`);
-    }
-    // method 0 = STORED per PKZIP spec and EPUB OCF §4.3
-    entry.header.method = 0;
-    // Some adm-zip versions reset method on setData; force it back.
-    entry.setData(buffer);
-    entry.header.method = 0;
 }
 
 module.exports = exportEpub;

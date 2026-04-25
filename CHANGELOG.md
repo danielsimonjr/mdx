@@ -8,6 +8,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Phase 4.6.8: EPUB export adm-zip → yazl swap (2026-04-25)
+
+`cli/src/commands/export-epub.js` no longer uses adm-zip for the
+output EPUB. Replaced with `yazl.ZipFile`, which gives explicit
+per-entry ordering (entries write in `addBuffer` call order) and
+explicit `compress: false` for the mimetype entry. EPUB OCF §4.3
+requires mimetype to be:
+
+1. The first entry in the ZIP (yazl call order = write order)
+2. STORED (compression method 0; `compress: false`)
+3. Exactly `application/epub+zip`, no BOM, no trailing newline
+
+The previous adm-zip workaround had two private helpers:
+
+- `_addStoredEntry` flipped `entry.header.method = 0` after-the-
+  fact (twice, because some adm-zip versions reset it on
+  `setData`).
+- `_forceFirstEntry` mutated adm-zip's undocumented internal
+  `entryTable` to put mimetype at index 0. A no-op on some
+  adm-zip versions, which would produce an epubcheck WARNING
+  (not FATAL — but undesirable).
+
+Both removed. The yazl swap is the proper fix the comment at
+`export-epub.js:218` flagged as "Phase 3 cleanup" — now landed.
+
+`buildEpub` is now `async` (yazl streams to disk asynchronously);
+`exportEpub` awaits it. Reader path still uses adm-zip for the
+input MDZ (read-only, sync, fine).
+
+`yazl ^2.5.1` added to `cli/package.json` dependencies.
+
+15/15 import-epub round-trip tests still pass — the
+`round-trip: synthesized mdz → epub → mdz` test catches any
+correctness regression directly.
+
 ### Added — Phase 4.6.8: Rust binding blake3 (2026-04-25)
 
 Closes the `bindings/rust/src/lib.rs:804` "blake3 (spec'd but

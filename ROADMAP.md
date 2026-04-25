@@ -1203,11 +1203,19 @@ normal completion flow.
       cases pin the localization, the subtag fallback, and the
       English default. Adding a language is a one-line
       addition to `LABELS_BY_LANG`.
-- [ ] **EPUB export `adm-zip → yazl` swap**
-      (`cli/src/commands/export-epub.js:218`). adm-zip orders
-      entries non-deterministically; yazl supports explicit
-      ordering, which the EPUB 3.3 spec actually requires for
-      reproducible zip output (mimetype first, etc.).
+- [x] **EPUB export `adm-zip → yazl` swap** — done 2026-04-25.
+      `cli/src/commands/export-epub.js` now writes the output EPUB
+      via `yazl.ZipFile` with explicit per-entry ordering and
+      `compress: false` for the mimetype entry. Removed the prior
+      adm-zip workaround helpers (`_addStoredEntry` flipping
+      `entry.header.method = 0` post-add, `_forceFirstEntry`
+      mutating adm-zip's undocumented internal `entryTable`). Both
+      were defensive hacks against adm-zip's lack of explicit
+      ordering; yazl writes entries in `addBuffer` call order.
+      EPUB OCF §4.3 mimetype-first + STORED requirement is now
+      satisfied directly. The reader path still uses adm-zip for
+      the input MDZ (read-only, sync, fine). 15/15 import-epub
+      round-trip tests still pass.
 - [x] **EPUB import/export symmetric labeled-directive rule** —
       done 2026-04-25. Export side gained
       `preprocessLabeledDirectives` that runs before

@@ -30,7 +30,8 @@
     "marked-terminal": "^6.2.0",
     "open": "^8.4.2",
     "ora": "^5.4.1",
-    "turndown": "^7.2.0"
+    "turndown": "^7.2.0",
+    "yazl": "^2.5.1"
   },
   "pkg": {
     "assets": [
