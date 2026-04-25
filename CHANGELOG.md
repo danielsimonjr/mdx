@@ -8,6 +8,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Verified — Phase 1.2 + 3.1: audit cluster (2026-04-25)
+
+Two ROADMAP entries closed by audit (no code change needed):
+
+- **Phase 1.2 regex parser fallback** — verified the "keep
+  regex parser as fallback" intent is achieved at the parse-attr
+  level via the `strict: bool` flag in
+  `implementations/python/mdz_parser/parser.py:208`'s
+  `_parse_attrs_lark`. `strict=False` (v1.1 graceful-degradation
+  path) returns empty `ParsedAttrs` on malformed input;
+  `strict=True` (v2.0 directive path) raises `ParseError`. No
+  `--legacy` CLI flag exists or is needed because the choice is
+  per-call inside the parser. The original ROADMAP wording was
+  ahead of how the parser actually evolved.
+- **Phase 3.1 `::include` external-URL permissions** — verified
+  the viewer's `directives.ts` refuses external URL includes
+  without `content_hash` (renders `mdz-include-missing` with
+  "requires content_hash" message) and emits an
+  `mdz-include-pending` placeholder for URL+content_hash
+  includes. Both branches covered by `directives.test.ts:420`
+  and `:429`. Matches the spec's "external transclusion requires
+  integrity declaration" rule.
+
 ### Changed — Phase 4.6.8: EPUB export adm-zip → yazl swap (2026-04-25)
 
 `cli/src/commands/export-epub.js` no longer uses adm-zip for the
