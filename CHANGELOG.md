@@ -196,6 +196,56 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Added — Phase 2.1 viewer: `::include` archive-aware resolution (2026-04-24)
+
+`::include[target=path]` directives now resolve against the open
+archive's entries map, completing the directive set required for
+realistic scientific-paper rendering.
+
+- **Archive-internal targets** (no `://` in the path) inline the
+  entry's bytes as UTF-8 markdown. The inlined content participates
+  in the rest of the directive pipeline — `::fig` ids declared in an
+  included file are visible to `::ref` resolutions in the outer
+  document, citations from included sections appear in the outer
+  bibliography.
+- **Recursive resolution** with a `Set<string>` cycle detector: an
+  include chain `a.md → b.md → a.md` surfaces a visible
+  `mdz-include-missing` marker naming the cycle path
+  (`a.md → b.md → a.md`), never infinite recursion.
+- **Depth cap** of `MAX_INCLUDE_DEPTH = 10`. Beyond that, a
+  visible depth-exceeded marker.
+- **External (URL) includes** REQUIRE `content_hash` per spec §12 —
+  unhashed external includes refused outright. With a hash, the
+  viewer emits an `mdz-include-pending` placeholder (the synchronous
+  render path can't fetch over the network; a future async-include
+  hydration layer can attach to the placeholder).
+- **Missing targets** render as visible
+  `[?include: target.md — not found in archive]` markers per the
+  spec's "visible miss is better than silent" rule.
+- **`fragment` attribute** is parsed but NOT honored in v0.1; the
+  viewer adds an `mdz-include-fragment-unsupported` class so a
+  fragment-aware future viewer can detect the regression.
+
+Pipeline placement: include resolution is now Stage 0 of
+`processDirectives` (before cells / outputs / labels / cites /
+bibliography). Re-runs `collect()` on the post-include text so
+labels and citations from transcluded files participate in numbering.
+
+Wiring: `RenderOptions.archiveEntries` is the new threading point;
+`mdz-viewer.ts` passes the loaded archive's `entries` map through.
+Callers without a real archive (test harnesses, build-time
+prerenderers) can pass an empty `Map`; includes degrade to visible-
+miss markers.
+
+Tests: 11 new directive cases (46 total in the suite). Cover
+internal happy path + nested recursion + cycle detection +
+depth-cap + missing target + missing target attribute + external
+without hash + external with hash placeholder + fragment unsupported
+flag + cross-doc id resolution (included `::fig` participates in
+outer `::ref`) + end-to-end through marked + sanitizer. Total
+viewer tests now: **107** (38 sanitizer + 46 directives + 13 math +
+10 references). All pass; tsc --noEmit clean.
+
 ### Added — Phase 2.1 viewer: `::cell` + `::output` rendering (2026-04-24)
 
 `<mdz-viewer>` now renders code cells and their outputs as

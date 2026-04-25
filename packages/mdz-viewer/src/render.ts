@@ -92,6 +92,12 @@ export interface RenderOptions {
    * fall back to it with a console warning.
    */
   citationStyle?: string;
+  /**
+   * Archive entries (path → bytes) for resolving `::include[target=…]`.
+   * When omitted, includes render as visible-miss markers — the
+   * directive layer never silently drops a directive it can't resolve.
+   */
+  archiveEntries?: ReadonlyMap<string, Uint8Array>;
 }
 
 /**
@@ -183,6 +189,7 @@ export function renderMarkdown(
   const directived = processDirectives(md, {
     references: opts.references ?? {},
     citationStyle: opts.citationStyle,
+    archiveEntries: opts.archiveEntries,
   });
   const mathed = processMath(directived);
   // marked() is synchronous when `async: false` — but the types allow

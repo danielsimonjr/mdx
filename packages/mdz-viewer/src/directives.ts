@@ -40,6 +40,14 @@ export interface DirectiveOptions {
   references: Readonly<Record<string, CslEntry>>;
   /** Citation style for `::cite` rendering. Default: `chicago-author-date`. */
   citationStyle?: string;
+  /**
+   * Archive-internal entries map for resolving `::include[target=…]`.
+   * Keyed by archive-relative path (e.g. `methods.md`,
+   * `chapters/01.md`). Bytes decoded as UTF-8. Omitted / empty
+   * disables include resolution — `::include` directives render as
+   * a labeled "include not resolved" Div, NOT silently dropped.
+   */
+  archiveEntries?: ReadonlyMap<string, Uint8Array>;
 }
 
 interface FirstPassResult {
@@ -105,6 +113,19 @@ const FIG_LINE = /^::(fig|eq|tab)\{([^}]*)\}\s*$/;
 const REF_INLINE = /::ref\[([A-Za-z][A-Za-z0-9_\-]*)\]/g;
 const CITE_INLINE = /::cite\[([A-Za-z0-9_,\-\s]+)\](?:\{([^}]*)\})?/g;
 const BIBLIOGRAPHY_LINE = /^::bibliography(?:\{([^}]*)\})?\s*$/;
+/**
+ * `::include[<bracket-attrs>]{<brace-attrs>}` directive — both attribute
+ * containers are optional. The bracket form is the spec-canonical
+ * `::include[target=path]`; the brace form carries integrity and
+ * fragment hints that don't fit cleanly in the bracket attribute body
+ * (`{content_hash="sha256:…"}`). Either container can supply `target`,
+ * `fragment`, or `content_hash` — the renderer merges them with
+ * brace-attrs taking precedence (matching the pandoc Lua filter).
+ */
+const INCLUDE_LINE = /^::include\[(.*?)\](?:\{([^}]*)\})?\s*$/;
+/** Hard cap on `::include` recursion depth — same as the Phase 4.4
+ *  streaming proposal's "deep transclusion is a smell" guideline. */
+const MAX_INCLUDE_DEPTH = 10;
 
 /**
  * Run pass-1 collection over the source markdown.
@@ -171,11 +192,19 @@ function parseId(body: string): string | null {
  *      inline directives (`::ref` / `::cite`) walked line-by-line.
  */
 export function processDirectives(md: string, opts: DirectiveOptions): string {
-  const { labels, citationOrder } = collect(md);
+  // Stage 0 — `::include` resolution. Done first so the assembled
+  // document (after transclusion) is what subsequent stages see.
+  // Cycle detection via the `seen` path set; depth-bounded by
+  // MAX_INCLUDE_DEPTH so a malformed archive can't recurse forever.
+  const resolved = resolveIncludes(md, opts.archiveEntries ?? new Map(), 0, new Set());
+
+  // Re-run the id + citation collection on the post-include text so
+  // labels/citations from included files are numbered correctly.
+  const { labels, citationOrder } = collect(resolved);
   const style = opts.citationStyle ?? "chicago-author-date";
 
   // Stage 1 — multi-line block substitutions for cells + outputs.
-  let staged = md.replace(CELL_BLOCK, (_, attrs, lang, source) =>
+  let staged = resolved.replace(CELL_BLOCK, (_, attrs, lang, source) =>
     renderCellBlock(attrs, lang, source),
   );
   staged = staged.replace(OUTPUT_BLOCK_FENCED, (_, attrs, lang, body) =>
@@ -301,6 +330,115 @@ function renderBibliography(
     return `<section class="mdz-bibliography mdz-bibliography-empty" aria-label="Bibliography (no citations found in document)"></section>`;
   }
   return `<section class="mdz-bibliography" aria-label="Bibliography"><ol class="mdz-bib-list">${items.join("")}</ol></section>`;
+}
+
+// ---------------------------------------------------------------------------
+// ::include resolution
+// ---------------------------------------------------------------------------
+
+/**
+ * Recursively resolve `::include[target=…]` directives by walking the
+ * source line-by-line and substituting the included content inline.
+ *
+ * Spec-derived rules (`spec/MDX_FORMAT_SPECIFICATION_v2.0.md` §12):
+ *   - Archive-internal targets (no `://` in the path) inline the
+ *     entry's bytes as UTF-8 markdown.
+ *   - External (URL) targets — http(s) — REQUIRE `content_hash` to
+ *     pin the fetched bytes; viewers MUST refuse external includes
+ *     without a hash. The viewer also doesn't fetch over the network
+ *     here (sync render path); external includes ALWAYS surface as
+ *     a "needs-runtime-fetch" placeholder.
+ *   - Cycle detection: include path A → B → A is a hard error;
+ *     surface a visible cycle marker rather than infinite recursion.
+ *   - Depth cap: MAX_INCLUDE_DEPTH chains. Beyond that, surface a
+ *     visible depth-exceeded marker.
+ *   - Missing target: surface a `mdz-include-missing` marker (visible
+ *     miss, never silent drop).
+ *   - `fragment` attribute: spec-defined for selecting a section.
+ *     v0.1 viewer does NOT honor it — the whole target inlines and a
+ *     `mdz-include-fragment-unsupported` class is added so a fragment-
+ *     aware future viewer can detect the regression.
+ */
+function resolveIncludes(
+  md: string,
+  entries: ReadonlyMap<string, Uint8Array>,
+  depth: number,
+  seen: Set<string>,
+): string {
+  const out: string[] = [];
+  for (const line of md.split("\n")) {
+    const m = INCLUDE_LINE.exec(line);
+    if (!m) {
+      out.push(line);
+      continue;
+    }
+    const bracketBody = m[1] ?? "";
+    const braceBody = m[2] ?? "";
+    // Brace attrs win on conflict — content_hash + fragment usually
+    // sit there per the spec example.
+    const target =
+      pickAttr(braceBody, "target") ??
+      pickAttr(bracketBody, "target") ??
+      pickAttr(braceBody, "path") ??
+      pickAttr(bracketBody, "path");
+    if (!target) {
+      out.push(renderIncludeMiss("missing target", bracketBody));
+      continue;
+    }
+    const fragment = pickAttr(braceBody, "fragment") ?? pickAttr(bracketBody, "fragment");
+    const contentHash = pickAttr(braceBody, "content_hash") ?? pickAttr(bracketBody, "content_hash");
+
+    // External (URL) includes — viewer cannot do a synchronous fetch
+    // mid-render. Even if it could, content_hash pinning is required.
+    // Surface a placeholder that a future async-include layer can
+    // attach to.
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(target)) {
+      if (!contentHash) {
+        out.push(renderIncludeMiss(`external include "${target}" requires content_hash`, target));
+        continue;
+      }
+      out.push(renderExternalIncludePlaceholder(target, contentHash));
+      continue;
+    }
+
+    if (depth >= MAX_INCLUDE_DEPTH) {
+      out.push(renderIncludeMiss(`include depth ${depth} exceeded MAX_INCLUDE_DEPTH=${MAX_INCLUDE_DEPTH}`, target));
+      continue;
+    }
+    if (seen.has(target)) {
+      out.push(renderIncludeMiss(`include cycle detected: ${[...seen, target].join(" → ")}`, target));
+      continue;
+    }
+    const bytes = entries.get(target);
+    if (!bytes) {
+      out.push(renderIncludeMiss(`target "${target}" not found in archive`, target));
+      continue;
+    }
+    const decoded = new TextDecoder("utf-8").decode(bytes);
+    const nestedSeen = new Set(seen).add(target);
+    const inlined = resolveIncludes(decoded, entries, depth + 1, nestedSeen);
+    // Wrap in a Div so downstream CSS / a11y can detect transcluded
+    // content. The fragment-unsupported class signals the v0.1 caveat.
+    const fragClass = fragment ? " mdz-include-fragment-unsupported" : "";
+    // No `data-target` — sanitizer doesn't allow data-* — but aria-label
+    // names the target so screen readers + tooling can identify the
+    // transclusion.
+    out.push(`<div class="mdz-include${fragClass}" aria-label="included from ${escapeHtml(target)}">`);
+    out.push(inlined);
+    out.push(`</div>`);
+  }
+  return out.join("\n");
+}
+
+function renderIncludeMiss(reason: string, target: string): string {
+  return `<div class="mdz-include mdz-include-missing" aria-label="include miss: ${escapeHtml(reason)}">[?include: ${escapeHtml(target)} — ${escapeHtml(reason)}]</div>`;
+}
+
+function renderExternalIncludePlaceholder(target: string, contentHash: string): string {
+  // External includes need an async fetch the synchronous render path
+  // can't perform. Emit a placeholder that a future hydration step
+  // (or a build-time include resolver) can hook into.
+  return `<div class="mdz-include mdz-include-external mdz-include-pending" aria-label="external include pending fetch from ${escapeHtml(target)}">[external include: ${escapeHtml(target)} pinned to ${escapeHtml(contentHash)}]</div>`;
 }
 
 // ---------------------------------------------------------------------------

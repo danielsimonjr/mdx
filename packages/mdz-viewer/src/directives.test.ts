@@ -334,6 +334,151 @@ First we cite ::cite[jones2021]. Later ::cite[smith2020].
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
+// ::include — archive-aware resolution (Milestone F)
+// ---------------------------------------------------------------------------
+
+function makeEntries(map: Record<string, string>): Map<string, Uint8Array> {
+  const m = new Map<string, Uint8Array>();
+  const enc = new TextEncoder();
+  for (const [k, v] of Object.entries(map)) {
+    m.set(k, enc.encode(v));
+  }
+  return m;
+}
+
+describe("::include archive-aware resolution", () => {
+  it("inlines a target's content as markdown", () => {
+    const entries = makeEntries({ "methods.md": "Methods body text." });
+    const md = "Intro.\n\n::include[target=methods.md]\n\nOutro.";
+    const out = processDirectives(md, { references: NO_REFS, archiveEntries: entries });
+    expect(out).toContain("Methods body text.");
+    expect(out).toContain('class="mdz-include"');
+    expect(out).toContain('aria-label="included from methods.md"');
+  });
+
+  it("renders a visible miss marker when target is not in the archive", () => {
+    const out = processDirectives("::include[target=ghost.md]", {
+      references: NO_REFS,
+      archiveEntries: new Map(),
+    });
+    expect(out).toContain("mdz-include-missing");
+    expect(out).toContain("not found in archive");
+    expect(out).toContain("ghost.md");
+  });
+
+  it("renders a miss marker when target attribute is absent", () => {
+    const out = processDirectives("::include[]", {
+      references: NO_REFS,
+      archiveEntries: new Map(),
+    });
+    expect(out).toContain("mdz-include-missing");
+    expect(out).toContain("missing target");
+  });
+
+  it("recursively inlines includes (A includes B; B has body)", () => {
+    const entries = makeEntries({
+      "a.md": "Section A start.\n\n::include[target=b.md]\n\nSection A end.",
+      "b.md": "Body of B.",
+    });
+    const out = processDirectives("Outer.\n\n::include[target=a.md]", {
+      references: NO_REFS,
+      archiveEntries: entries,
+    });
+    expect(out).toContain("Section A start.");
+    expect(out).toContain("Body of B.");
+    expect(out).toContain("Section A end.");
+  });
+
+  it("detects cycles and emits a visible cycle marker", () => {
+    const entries = makeEntries({
+      "a.md": "::include[target=b.md]",
+      "b.md": "::include[target=a.md]",
+    });
+    const out = processDirectives("::include[target=a.md]", {
+      references: NO_REFS,
+      archiveEntries: entries,
+    });
+    expect(out).toContain("include cycle detected");
+    expect(out).toMatch(/a\.md.*b\.md.*a\.md/);
+  });
+
+  it("caps recursion depth (MAX_INCLUDE_DEPTH=10)", () => {
+    // Build a 15-deep chain.
+    const entries = new Map<string, Uint8Array>();
+    const enc = new TextEncoder();
+    for (let i = 0; i < 15; i++) {
+      const next = i + 1 === 15 ? "leaf" : `::include[target=ch${i + 1}.md]`;
+      entries.set(`ch${i}.md`, enc.encode(next));
+    }
+    const out = processDirectives("::include[target=ch0.md]", {
+      references: NO_REFS,
+      archiveEntries: entries,
+    });
+    expect(out).toContain("MAX_INCLUDE_DEPTH=10");
+  });
+
+  it("refuses external (URL) includes without a content_hash", () => {
+    const out = processDirectives(
+      "::include[target=https://example.com/methods.md]",
+      { references: NO_REFS, archiveEntries: new Map() },
+    );
+    expect(out).toContain("mdz-include-missing");
+    expect(out).toContain("requires content_hash");
+  });
+
+  it("emits a pending placeholder for external includes WITH content_hash", () => {
+    const out = processDirectives(
+      `::include[target=https://example.com/methods.md]{content_hash="sha256:abc"}`,
+      { references: NO_REFS, archiveEntries: new Map() },
+    );
+    expect(out).toContain("mdz-include-pending");
+    expect(out).toContain("sha256:abc");
+    expect(out).not.toContain("mdz-include-missing");
+  });
+
+  it("flags fragment-bearing includes as fragment-unsupported (v0.1 honest gap)", () => {
+    const entries = makeEntries({ "methods.md": "Body." });
+    const out = processDirectives(
+      `::include[target=methods.md fragment=intro]`,
+      { references: NO_REFS, archiveEntries: entries },
+    );
+    expect(out).toContain("mdz-include-fragment-unsupported");
+  });
+
+  it("post-include cells + cross-refs work — included content participates in numbering", () => {
+    const entries = makeEntries({
+      "methods.md": [
+        "::fig{id=hist}",
+        "",
+        "Histogram body.",
+      ].join("\n"),
+    });
+    const md = [
+      "::include[target=methods.md]",
+      "",
+      "See ::ref[hist].",
+    ].join("\n");
+    const out = processDirectives(md, { references: NO_REFS, archiveEntries: entries });
+    expect(out).toContain('href="#hist"');
+    expect(out).toContain(">Figure 1<");
+  });
+
+  it("end-to-end: included content survives marked + sanitizer", () => {
+    const entries = makeEntries({
+      "intro.md": "# Intro\n\nThe **introduction** body.",
+    });
+    const html = renderMarkdown("::include[target=intro.md]", {
+      resolveAsset: () => null,
+      references: {},
+      archiveEntries: entries,
+    });
+    expect(html).toContain("mdz-include");
+    expect(html).toContain("introduction");
+    expect(html).toContain("<strong");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // ::cell + ::output (Milestone E)
 // ---------------------------------------------------------------------------
 

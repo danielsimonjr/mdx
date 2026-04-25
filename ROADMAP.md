@@ -278,7 +278,7 @@ maintainer, double it.
 
 | Sub-phase | State | What landed | What's pending |
 |-----------|-------|-------------|----------------|
-| 2.1 viewer | **partial** | sanitizer (38 tests), directives (cross-refs / citations / bibliography / **`::cell` / `::output`**, 35 tests), CSL-JSON references (10 tests), KaTeX math (13 tests). 96/96 viewer tests pass. | IndexedDB cache, full keyboard a11y, npm publish, `::include` archive-aware resolution, demo site |
+| 2.1 viewer | **partial** | sanitizer (38 tests), directives (cross-refs / citations / bibliography / `::cell` / `::output` / **`::include`**, 46 tests), CSL-JSON references (10 tests), KaTeX math (13 tests). 107/107 viewer tests pass. | IndexedDB cache, full keyboard a11y, npm publish, demo site, fragment-aware `::include` |
 | 2.2 hosted | **code-ready, not deployed** | full Cloudflare Worker with strict CSP, content-hash cache pinning, OG / Twitter card meta, sanitized canonical URLs, 32 worker tests | `wrangler deploy` to view.mdz-format.org (external action), per-archive cover-image extraction |
 | 2.3a editor MVP | **chunked, not started** | (none — see 2.3a.1 through 2.3a.6 below for the new chunking) | All sub-phases |
 | 2.3b editor Pro | **chunked, not started** | (none — see 2.3b.1 through 2.3b.7 below) | All sub-phases |
@@ -310,9 +310,13 @@ Deliverables:
       **citations (`::cite`)** + **`::bibliography`** + **`::cell`**
       (with class-token language / kernel / execution_count metadata
       + ARIA description) + **`::output`** (text / stream / image
-      forms; image emits sanitizer-resolvable `<img>`). Remaining:
-      `::include` archive-aware resolution (next milestone — needs
-      archive-entries threading into the directives layer).
+      forms; image emits sanitizer-resolvable `<img>`) +
+      **`::include`** (archive-aware: archiveEntries threaded into
+      `processDirectives`; recursive resolution with cycle detection
+      + depth cap of 10; external URLs require `content_hash` per
+      spec §12; missing targets render as visible-miss markers;
+      fragment attribute flagged as unsupported in v0.1). 107 / 107
+      viewer tests pass.
 - [ ] Offline-first: uses IndexedDB for archive caching
 - [ ] Accessible by default: full keyboard navigation, screen-reader tested,
       **WCAG 2.1 AA baseline** (raises to 2.2 AA opt-in — 2.1 is what OA journals
