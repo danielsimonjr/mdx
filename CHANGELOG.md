@@ -8,6 +8,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — RLM cross-check: ROADMAP / CHANGELOG / CLAUDE.md sync (2026-04-25)
+
+Used the RLM skill to compare doc claims against the actual
+codebase, surface drift, and tighten the three top-level docs.
+
+- **Status snapshot** in `ROADMAP.md` refreshed for 2026-04-25.
+  Phase 2.3b row updated from "partial" → "all 7 sub-phases
+  shipped end-to-end" reflecting today's per-cell Run buttons,
+  read-write Compare-locales modal, diff-pane UI, annotation
+  sidebar, and Generate-variants IPC. Phase 2.4 row notes the
+  yazl-based deterministic export. Phase 2.5 row notes the
+  deterministic Node bundler. Phase 2.1 row reflects the
+  delta-snapshots-v1 reader + label i18n landing into the
+  viewer; viewer test count 117 → 145.
+- **Path drift fix** in ROADMAP: a citation for
+  `cli/test/import-ipynb.test.js` was a hallucinated path —
+  the actual ipynb-import test is
+  `editor-desktop/test/ipynb-import.test.ts`. Corrected.
+- **Duplicate-status fix** in ROADMAP: the writer-side `mdz
+  snapshot create|view|list` CLI was listed as `[ ]` under
+  Phase 2.3b.3 (a cross-reference that never got rolled up)
+  even though the canonical entry under Phase 4.5 was already
+  `[x]`. Marked the cross-reference `[x]` with a pointer to
+  Phase 4.5.
+- **`CLAUDE.md` repo overview** for `editor-desktop/` was a
+  one-line stub claiming "Phase 2.3a.1 Electron editor shell"
+  with only `archive-io.ts` listed. Replaced with an accurate
+  18-module breakdown and current 376-case test count.
+
+Cross-check methodology: loaded ROADMAP + CHANGELOG + every
+source file into Python via the RLM workflow, extracted all
+`[x]` cited paths (107 distinct), verified each against the
+filesystem (only one false reference — the ipynb path drift),
+extracted all `[ ]` keywords + grepped the codebase for
+matching implementations (no false-opens — the open items are
+genuinely open). Net delta: 159 → 160 `[x]`, 45 → 44 `[ ]`.
+
 ### Added — Phase 2.3b.5.3: read-write sibling-locale + Add-locale (2026-04-25)
 
 The compare-locales modal is now read-write, plus there's a

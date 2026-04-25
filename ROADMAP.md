@@ -274,16 +274,16 @@ maintainer, double it.
 5. 2.5 browser extension (depends on 2.1)
 6. 2.3b editor Pro features (depends on 2.3a and real author feedback)
 
-### Status snapshot (2026-04-24)
+### Status snapshot (2026-04-25)
 
 | Sub-phase | State | What landed | What's pending |
 |-----------|-------|-------------|----------------|
-| 2.1 viewer | **partial** | sanitizer (38 tests), directives (cross-refs / citations / bibliography / `::cell` / `::output` / `::include`, 46 tests), CSL-JSON references (10 tests), KaTeX math (13 tests), **IndexedDB cache** (10 tests). 117/117 viewer tests pass. | full keyboard a11y, npm publish, demo site, fragment-aware `::include` |
-| 2.2 hosted | **code-ready, not deployed** | full Cloudflare Worker with strict CSP, content-hash cache pinning, OG / Twitter card meta, sanitized canonical URLs, 32 worker tests | `wrangler deploy` to view.mdz-format.org (external action), per-archive cover-image extraction |
-| 2.3a editor MVP | **feature-complete (unsigned releases)** | 2.3a.1–5 shipped (113 vitest cases) + **2.3a.6** electron-builder config + 3-platform CI matrix + auto-update feed wired. Pipeline produces unsigned installers today and auto-signs when cert secrets arrive in CI — no code change needed. | Cert/notarization secrets (external accounts), real icon artwork, Phase 2.3a.7 Playwright integration tests |
-| 2.3b editor Pro | **partial** | **2.3b.1** Pyodide kernel layer (18 cases) + **2.3b.2** a11y checker (37 cases) + **2.3b.3** block-diff algorithm (25 cases) + **2.3b.4** annotation data layer (23 cases) + **2.3b.5** locale-enum + paragraph alignment (19 cases) + **2.3b.6** variant planner (13 cases) + **2.3b.7.1–5** non-core picker pack (34 cases). All 7 sub-phases now land their data/algorithm layer. UI surfaces + native-runtime execution (Pyodide CDN load, sharp encoder) deferred to per-feature `*.2` follow-ups gated on Phase 2.3a.6 Playwright. | 2.3b.1.2 Pyodide UI + CSP, 2.3b.6.2 sharp encoder, `*.2` UI surfaces |
-| 2.4 EPUB bridge | **shipped** | `mdz export-epub` (existing) + `mdz import-epub` (new, 15 tests, fidelity matrix doc); round-trip CI gate | Symmetric `::fig` round-trip on the export side (tracked); per-chapter spine preservation |
-| 2.5 browser ext | **code-ready, hardened** | MV3 manifest, content + service-worker + popup + viewer scripts, 13 manifest-validation tests, reproducible-build doc, placeholder icons | Real icon artwork, bundled `<mdz-viewer>`, AMO / Chrome Web Store / Edge / Brave submissions |
+| 2.1 viewer | **partial** | sanitizer + directives (cross-refs / citations / bibliography / `::cell` / `::output` / `::include`, 50 tests with i18n labels), CSL-JSON references, KaTeX math, IndexedDB cache, **delta-snapshots-v1 reader** (24 tests), `tsconfig.build.json` for single-file ESM emit. 145/145 viewer tests pass. | full keyboard a11y pass, npm publish, demo site, fragment-aware `::include` |
+| 2.2 hosted | **code-ready, not deployed** | full Cloudflare Worker (32 tests) + `wrangler.toml [assets]` block pointing at `../mdz-viewer/dist` + `VIEWER_ASSETS` binding so `/viewer.js` serves the real bundle | `wrangler deploy` to `view.mdz-format.org` (external action), per-archive cover-image extraction |
+| 2.3a editor MVP | **feature-complete (unsigned releases)** | 2.3a.1–6 all shipped: shell, source pane, asset sidebar, .ipynb import, picker pack, `electron-builder.yml` + 3-platform CI matrix + auto-update feed. Pipeline produces unsigned installers today and auto-signs when cert secrets arrive in CI. | Cert/notarization secrets (external accounts), real icon artwork, Phase 2.3a.7 Playwright integration tests |
+| 2.3b editor Pro | **all 7 sub-phases shipped end-to-end** | 2.3b.1 Pyodide (kernel layer + UI + CSP + `kernels.python.runtime` save + per-cell Run buttons) / 2.3b.2 a11y checker / 2.3b.3 block-diff algorithm + Compare-versions modal / 2.3b.4 annotation data layer + sidebar UI / 2.3b.5 locale data layer + read-write Compare-locales modal + Add-locale command / 2.3b.6 variant planner + sharp encoder + Generate-variants IPC + UI / 2.3b.7.1–5 non-core picker pack. **376/376 editor-desktop tests pass.** | Annotation creation flows (need IPC for UUID + sig integration), `--role=public\|editor` flag |
+| 2.4 EPUB bridge | **shipped** | `mdz export-epub` (yazl-based, deterministic, EPUB OCF §4.3-correct) + `mdz import-epub` (15 tests); fidelity matrix doc; round-trip CI gate; symmetric `::fig`/`::eq`/`::tab` directive round-trip | Per-chapter spine preservation |
+| 2.5 browser ext | **code-ready, hardened, deterministic build** | MV3 manifest, scripts, 16 tests (13 manifest + 3 build-determinism), reproducible Node bundler at `browser-extension/build.js`, CI 2x-build SHA-256 diff, placeholder icons | Real icon artwork, AMO / Chrome / Edge / Brave submissions, browser-driven smoke tests |
 
 ### 2.1 `<mdz-viewer>` web component — *the* highest-impact deliverable
 
@@ -477,9 +477,9 @@ end-to-end and export it to a journal as JATS-XML.
 
   **Depends on:** 2.3a.1.
   **Acceptance:** met to the extent CI can verify (7 vitest cases
-  on the bridge + the existing `cli/test/import-ipynb.test.js`
-  round-trip from Phase 4.3). End-to-end "right-click `.ipynb` →
-  `.mdz` opens in editor" path is Phase 2.3a.6 Playwright work.
+  on the bridge in `editor-desktop/test/ipynb-import.test.ts`).
+  End-to-end "right-click `.ipynb` → `.mdz` opens in editor" path
+  is Phase 2.3a.6 Playwright work.
 
 #### 2.3a.5 Visual-authoring picker pack — `::cell`, `::include`, `::fig`, `::cite`
 
@@ -708,8 +708,11 @@ is independent — sequence by user demand, not by checklist order.
       use the same unified-diff format, so a snapshot rebuilt
       from the chain feeds straight into `diffBlocks` for the
       version-comparison UI when it lands.
-- [ ] Writer-side `mdz snapshot create|view|export` CLI subcommand
-      (Phase 4.5.2 follow-up).
+- [x] Writer-side `mdz snapshot create|view|list` CLI subcommand
+      — done 2026-04-25 in Phase 4.5.2. See the Phase 4.5 entry
+      below for the canonical implementation note (this entry was
+      a Phase 2.3b.3 cross-reference that hadn't been rolled up).
+      `cli/src/commands/snapshot.js` + `cli/src/lib/snapshots.js`.
 
   **Depends on:** 2.3a.2. Algorithm + read side shipped 2026-04-24;
   UI surface and writer CLI deferred.

@@ -79,12 +79,29 @@ mdx/                                    # (directory name deferred-rename)
 │   │             manifest-types.ts)
 │   └── mdz-viewer-hosted/                          # Cloudflare Worker
 │       └── src/worker.ts
-├── editor-desktop/                                 # Phase 2.3a.1 Electron editor shell
-│   ├── src/main/archive-io.ts                      # pure open / save (FsLike-injected)
-│   ├── src/main/main.ts                            # Electron main-process glue
-│   ├── src/preload/preload.ts                      # contextBridge surface
-│   ├── src/renderer/{index.html,index.ts}          # minimal "open MDZ" UI
-│   ├── test/archive-io.test.ts                     # 11 vitest cases
+├── editor-desktop/                                 # Phase 2.3a + 2.3b Electron editor (feature-complete)
+│   ├── src/main/                                   # Electron main process
+│   │   ├── archive-io.ts                          # pure open / save (FsLike-injected)
+│   │   ├── ipynb-import.ts                        # .ipynb → .mdz bridge
+│   │   ├── main.ts                                # Electron glue + IPC handlers
+│   │   └── variant-encoder.ts                     # main-process sharp encoder (2.3b.6.2)
+│   ├── src/preload/{preload,types}.ts              # contextBridge surface + EditorApi types
+│   ├── src/renderer/                               # 18 modules, see source directory for full list
+│   │   ├── index.{html,ts}                        # main entry
+│   │   ├── editor-pane.ts                         # CodeMirror 6 + onPreviewRendered hook
+│   │   ├── asset-store.ts, assets sidebar, drag-drop
+│   │   ├── directive-{insert,pickers,modal}.ts    # picker pack (2.3a.5.1–4 + 2.3b.7.1–5)
+│   │   ├── accessibility-checker.ts               # live WCAG scan (2.3b.2)
+│   │   ├── block-diff.ts, diff-render.ts          # block-level diff + Compare-versions modal (2.3b.3)
+│   │   ├── annotations.ts, annotations-render.ts  # peer-review data + sidebar UI (2.3b.4)
+│   │   ├── locales.ts, sync-scroll.ts             # multi-locale data + Compare-locales modal (2.3b.5)
+│   │   ├── variant-{planner,flow}.ts              # AVIF/WebP variant pipeline (2.3b.6)
+│   │   ├── python-kernel.ts, cell-runner.ts       # Pyodide integration (2.3b.1)
+│   │   ├── cell-run-buttons.ts                    # per-cell ▶ Run injection (2.3b.1.3)
+│   │   └── kernel-manifest.ts                     # kernels.python.runtime save (2.3b.1.3)
+│   ├── electron-builder.yml                        # 2.3a.6 release pipeline (env-var cert placeholders)
+│   ├── build-resources/                            # entitlements + placeholder icons
+│   ├── test/                                       # 19 test files, 376 cases
 │   └── README.md
 ├── browser-extension/                              # Phase 2.5 WebExtensions
 │   ├── manifest.json
