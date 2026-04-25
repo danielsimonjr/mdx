@@ -583,16 +583,40 @@ is independent — sequence by user demand, not by checklist order.
       `timeoutResult()` per spec — Pyodide can't be preempted, so
       the timeout is advisory; the message says so explicitly.
       18 vitest cases.
-- [ ] CSP relaxation to allow `script-src https://cdn.jsdelivr.net`
-      and `'wasm-unsafe-eval'` for the Pyodide CDN load. Gated on
-      the actual UI integration (deferred); kept off until users
-      hit "Run" so the editor's default CSP stays strict.
-- [ ] "Run cell" button on `::cell{language=python}` blocks in the
-      preview pane + `::output` block insertion on success.
-      Phase 2.3b.1.2 follow-up (UI integration).
-- [ ] Manifest `kernels.python.runtime: "pyodide"` declaration so
-      readers know cells were executed under Pyodide's constraints.
-      Phase 2.3b.1.2 follow-up.
+- [x] **CSP relaxed** in `editor-desktop/src/renderer/index.html`
+      to permit the CDN load: `script-src 'self' 'wasm-unsafe-eval'
+      https://cdn.jsdelivr.net` + `connect-src 'self'
+      https://cdn.jsdelivr.net` + `worker-src 'self' blob:`.
+      Pyodide is opt-in (only loads when the user clicks "Run") so
+      the relaxation is bounded; the rest of the editor's CSP stays
+      strict. `wasm-unsafe-eval` is required because Pyodide's
+      `WebAssembly.compile` path counts as eval under CSP3.
+- [x] **"Run Python cells" toolbar button** wired in `index.ts`.
+      Lazy-loads the kernel on first click (`getPythonKernel`),
+      reuses the same handle across runs (module imports persist).
+      Walks the open document, extracts every `::cell{language=
+      python}` via `extractPythonCells`, runs them sequentially via
+      `runCells` (stops on first error per Jupyter REPL semantics),
+      splices `::output{type=…}` blocks into the source via
+      `insertOutputs`, and surfaces the outcome in the title bar
+      (`Ran N cells`, `Stopped at cell K: <reason>`, `Cell K timed
+      out`, etc.).
+- [x] **Pure orchestration layer** in
+      `editor-desktop/src/renderer/cell-runner.ts` —
+      `extractPythonCells`, `runCells`, `formatCellOutput`,
+      `insertOutputs`. Right-to-left splice keeps offsets valid
+      across multi-cell inserts. Output rendering picks rich MIME
+      types in priority order (`text/html` > SVG > PNG > JPEG >
+      `text/plain`) and inlines images as `data:` URIs so outputs
+      render without an asset write. 22 vitest cases cover every
+      mapping branch + the splice ordering invariant.
+- [ ] **Manifest `kernels.python.runtime: "pyodide"` declaration**
+      so readers know cells were executed under Pyodide's
+      constraints. Phase 2.3b.1.3 follow-up — small, but needs the
+      save flow to merge it into the manifest at write time.
+- [ ] **Per-cell Run buttons** in the preview pane (vs the current
+      "Run all" toolbar). Phase 2.3b.1.3 follow-up — needs DOM
+      injection into the rendered preview.
 
   **Honest caveat:** Pyodide is ~10 MB download, supports most
   pure-Python plus the curated C-extension wheels in the Pyodide

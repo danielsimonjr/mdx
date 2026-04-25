@@ -23,6 +23,7 @@
     "src/renderer/variant-planner.ts",
     "src/renderer/python-kernel.ts",
     "src/renderer/variant-flow.ts",
+    "src/renderer/cell-runner.ts",
     "test/**/*.ts"
   ],
   "exclude": [

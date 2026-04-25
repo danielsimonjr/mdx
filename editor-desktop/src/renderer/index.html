@@ -2,8 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
+  <!--
+    CSP: relaxed to allow the Pyodide WASM bundle to load from
+    cdn.jsdelivr.net (Phase 2.3b.1.2). The kernel is opt-in — users
+    only trigger the CDN load by clicking "Run Python cells" — but
+    the CSP has to permit it ahead of time. `wasm-unsafe-eval` is
+    required because Pyodide's WebAssembly.compile path counts as
+    eval under CSP3. See Phase 2.3b.1 ROADMAP entry for the security
+    rationale.
+  -->
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self';"/>
+        content="default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; connect-src 'self' https://cdn.jsdelivr.net; worker-src 'self' blob:;"/>
   <title>MDZ Editor</title>
   <style>
     body { font-family: system-ui, sans-serif; margin: 0; height: 100vh; display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: 1fr 220px; }
@@ -147,6 +156,7 @@
       <button id="picker-data" type="button" disabled title="Insert ::data">::data</button>
     </div>
     <button id="generate-variants-btn" type="button" disabled title="Generate AVIF/WebP variants for staged images">Generate variants</button>
+    <button id="run-cells-btn" type="button" disabled title="Execute every Python ::cell and insert ::output blocks">Run Python cells</button>
     <div class="mode-toggle" role="group" aria-label="View mode">
       <button id="mode-source" aria-pressed="false">Source</button>
       <button id="mode-split" aria-pressed="true">Split</button>

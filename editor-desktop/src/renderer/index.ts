@@ -25,6 +25,8 @@ import type { AssetPointerKind } from "./directive-insert.js";
 import { collectExistingIds, collectBibliographyKeys } from "./directive-pickers.js";
 import { checkMarkdown, summarize, type A11yViolation } from "./accessibility-checker.js";
 import { runVariantFlow, summarizeFlow, type VariantEncoderCallback } from "./variant-flow.js";
+import { extractPythonCells, runCells, insertOutputs } from "./cell-runner.js";
+import { loadPyodideKernel, type PythonKernel } from "./python-kernel.js";
 
 declare global {
   interface Window {
@@ -72,6 +74,7 @@ const pickerButtons = {
 const a11yStatusEl = document.getElementById("a11y-status")!;
 const a11yPanelEl = document.getElementById("a11y-panel")!;
 const generateVariantsBtn = document.getElementById("generate-variants-btn") as HTMLButtonElement;
+const runCellsBtn = document.getElementById("run-cells-btn") as HTMLButtonElement;
 
 const dropzone = document.getElementById("asset-dropzone") as HTMLDivElement;
 const assetListEl = document.getElementById("asset-list") as HTMLUListElement;
@@ -150,7 +153,58 @@ function setModeButtons(active: ViewMode): void {
 function setPickersEnabled(enabled: boolean): void {
   for (const btn of Object.values(pickerButtons)) btn.disabled = !enabled;
   generateVariantsBtn.disabled = !enabled;
+  runCellsBtn.disabled = !enabled;
 }
+
+/**
+ * Pyodide kernel handle. Lazy: we only download the ~10 MB WASM
+ * bundle when the user first clicks "Run Python cells". Subsequent
+ * clicks reuse the same handle (Pyodide globals persist between
+ * runs — module-level imports stay loaded).
+ */
+let pythonKernel: PythonKernel | null = null;
+async function getPythonKernel(): Promise<PythonKernel> {
+  if (pythonKernel) return pythonKernel;
+  pythonKernel = await loadPyodideKernel();
+  return pythonKernel;
+}
+
+runCellsBtn.addEventListener("click", () => {
+  void (async () => {
+    if (!pane) return;
+    const original = runCellsBtn.textContent;
+    runCellsBtn.disabled = true;
+    runCellsBtn.textContent = "Loading Python…";
+    try {
+      const source = pane.getContent();
+      const cells = extractPythonCells(source);
+      if (cells.length === 0) {
+        titleEl.textContent = "No Python cells in document.";
+        return;
+      }
+      const kernel = await getPythonKernel();
+      runCellsBtn.textContent = `Running ${cells.length} cell${cells.length === 1 ? "" : "s"}…`;
+      const runs = await runCells(cells, kernel);
+      const updated = insertOutputs(source, runs);
+      pane.setContent(updated);
+      const errored = runs.find((r) => r.result.status === "error");
+      const timed = runs.find((r) => r.result.status === "timeout");
+      if (errored) {
+        titleEl.textContent = `Stopped at cell ${errored.cell.index + 1}: ${errored.result.errorMessage?.split("\n")[0] ?? "error"}`;
+      } else if (timed) {
+        titleEl.textContent = `Cell ${timed.cell.index + 1} timed out — interpreter may still be running`;
+      } else {
+        titleEl.textContent = `Ran ${runs.length} cell${runs.length === 1 ? "" : "s"}.`;
+      }
+      if (session) setModified(true);
+    } catch (e) {
+      titleEl.textContent = `Run-cells error: ${(e as Error).message}`;
+    } finally {
+      runCellsBtn.textContent = original;
+      runCellsBtn.disabled = !session;
+    }
+  })();
+});
 
 const ipcEncoder: VariantEncoderCallback = (input) =>
   window.editorApi.encodeVariants({ sources: input.sources, plan: input.plan });

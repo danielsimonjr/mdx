@@ -8,6 +8,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 2.3b.1.2: Pyodide UI + CSP relaxation (2026-04-25)
+
+The editor can now actually execute Python cells. Three pieces:
+
+- **CSP relaxed** in
+  `editor-desktop/src/renderer/index.html` to permit the
+  `cdn.jsdelivr.net/pyodide` script + WASM load:
+  `script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net`,
+  `connect-src 'self' https://cdn.jsdelivr.net`, `worker-src 'self'
+  blob:`. Pyodide is opt-in — the bundle only loads when the user
+  clicks "Run Python cells" — so the relaxation is bounded; the
+  rest of the renderer stays under the strict default CSP.
+  `wasm-unsafe-eval` is required because Pyodide's
+  `WebAssembly.compile` path counts as eval under CSP3.
+- **Pure orchestration layer** in
+  `editor-desktop/src/renderer/cell-runner.ts`:
+  - `extractPythonCells(markdown)` — walks the document, picks up
+    every `::cell{language=python}` plus its fenced source block.
+    Tolerant of blank lines between directive and fence; skips
+    cells whose `language` attribute isn't `python`.
+  - `runCells(cells, kernel, defaults?)` — sequential execution
+    so later cells see earlier cells' side effects (Jupyter REPL
+    semantics). Stops on first `status: "error"`. Default 30 s
+    timeout per spec; overridable.
+  - `formatCellOutput(result)` — renders `KernelResult` →
+    `::output{type=…}` blocks per spec. Output mapping: stdout /
+    stderr / error / result (scalar last-expression) / display
+    (with rich-MIME priority `text/html > image/svg+xml >
+    image/png > image/jpeg > text/plain`). Inlines images as
+    `data:` URIs so outputs render without an asset write. Uses
+    4-backtick fences so triple-backticks inside output text
+    can't break the block.
+  - `insertOutputs(markdown, runs)` — right-to-left splice keeps
+    earlier offsets valid as later inserts shift the buffer.
+- **"Run Python cells" toolbar button** in `index.ts`. Lazy-loads
+  the kernel on first click via `getPythonKernel()`; subsequent
+  clicks reuse the same handle (module imports persist between
+  runs). Surfaces the outcome in the title bar:
+  `Ran N cells`, `Stopped at cell K: <reason>`,
+  `Cell K timed out — interpreter may still be running`, or
+  `No Python cells in document.`
+
+22 new vitest cases in `test/cell-runner.test.ts` cover the
+extractor (directive detection, language filter, fence pickup,
+ordering, blank-line tolerance, offset accuracy), the runner
+(sequential execution, stop-on-error, timeout defaulting), the
+output formatter (every MIME branch, scalar-only result blocks,
+rich-MIME priority), and the right-to-left splice invariant.
+
+The Pyodide CDN load itself is browser-only and exercised by
+Phase 2.3a.7 Playwright integration tests when those land. Tests
+here use `FakePythonKernel` for deterministic playback.
+
+Net editor-desktop tests: 305 → 327.
+
+Still open (Phase 2.3b.1.3 follow-up): manifest
+`kernels.python.runtime: "pyodide"` declaration on save;
+per-cell Run buttons in the preview pane (vs the current
+"Run all" toolbar).
+
 ### Added — Phase 2.3b.6.3: Generate-variants IPC + UI (2026-04-25)
 
 Closes Phase 2.3b.6 fully. Three pieces wire the planner (Phase
