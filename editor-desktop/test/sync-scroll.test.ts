@@ -13,6 +13,7 @@ import {
   mapLineRightToLeft,
   proportionalMap,
   mapWithFallback,
+  resolveLineHeightPx,
 } from "../src/renderer/sync-scroll.js";
 
 const EN = "First paragraph.\n\nSecond paragraph.\n\nThird paragraph.\n";
@@ -130,5 +131,85 @@ describe("buildSyncScrollState", () => {
     expect(state.alignment).toEqual([]);
     expect(state.leftSlices).toEqual([]);
     expect(state.rightSlices).toEqual([]);
+  });
+});
+
+describe("resolveLineHeightPx", () => {
+  // The node test environment doesn't expose `getComputedStyle`,
+  // so the function falls back to the documented default. Verify
+  // every branch via a stub element + a global stub for the
+  // computed-style API.
+
+  type StyleStub = { fontSize?: string; lineHeight?: string };
+  const makeEl = (style: StyleStub): HTMLElement => {
+    return { __style: style } as unknown as HTMLElement;
+  };
+
+  const withGetComputedStyle = (
+    impl: ((el: HTMLElement) => StyleStub) | null,
+    fn: () => void,
+  ): void => {
+    const original = (globalThis as { getComputedStyle?: unknown }).getComputedStyle;
+    if (impl == null) {
+      delete (globalThis as { getComputedStyle?: unknown }).getComputedStyle;
+    } else {
+      (globalThis as { getComputedStyle?: unknown }).getComputedStyle = (el: HTMLElement) =>
+        impl(el) as unknown as CSSStyleDeclaration;
+    }
+    try {
+      fn();
+    } finally {
+      if (original === undefined) {
+        delete (globalThis as { getComputedStyle?: unknown }).getComputedStyle;
+      } else {
+        (globalThis as { getComputedStyle?: unknown }).getComputedStyle = original;
+      }
+    }
+  };
+
+  it("returns the explicit pixel value when lineHeight ends in px", () => {
+    withGetComputedStyle(
+      (el) => (el as unknown as { __style: StyleStub }).__style,
+      () => {
+        const el = makeEl({ fontSize: "16px", lineHeight: "20px" });
+        expect(resolveLineHeightPx(el)).toBe(20);
+      },
+    );
+  });
+
+  it("multiplies unitless multiplier by the font-size in px", () => {
+    withGetComputedStyle(
+      (el) => (el as unknown as { __style: StyleStub }).__style,
+      () => {
+        const el = makeEl({ fontSize: "16px", lineHeight: "1.5" });
+        expect(resolveLineHeightPx(el)).toBe(24);
+      },
+    );
+  });
+
+  it("falls back to font-size × 1.2 for the `normal` keyword", () => {
+    withGetComputedStyle(
+      (el) => (el as unknown as { __style: StyleStub }).__style,
+      () => {
+        const el = makeEl({ fontSize: "10px", lineHeight: "normal" });
+        expect(resolveLineHeightPx(el)).toBeCloseTo(12, 5);
+      },
+    );
+  });
+
+  it("returns the supplied fallback when getComputedStyle is absent", () => {
+    withGetComputedStyle(null, () => {
+      expect(resolveLineHeightPx(makeEl({}), 99)).toBe(99);
+    });
+  });
+
+  it("returns the default 24-px fallback when nothing else parses", () => {
+    withGetComputedStyle(
+      () => ({}),
+      () => {
+        const el = makeEl({});
+        expect(resolveLineHeightPx(el)).toBe(24);
+      },
+    );
   });
 });

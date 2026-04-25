@@ -1352,10 +1352,17 @@ the drift this session found."
       had a real gap (skipped `'` and `"` escaping); the
       consolidation closes that. 6 new vitest cases (382/382
       pass).
-- [ ] **Sync-scroll: derive `lineHeight` from computed style.**
-      `index.ts:299` hardcodes `1.5 * 13.6`. Replace with
-      `parseFloat(getComputedStyle(pane).lineHeight)` (with a
-      fallback for `"normal"`).
+- [x] **Sync-scroll: derive `lineHeight` from computed style** —
+      done 2026-04-25. New `resolveLineHeightPx(el, fallback)` in
+      `sync-scroll.ts` reads `getComputedStyle(el).lineHeight` and
+      handles all three CSS forms: `<length>px` parsed directly,
+      unitless multiplier × `fontSize`, `"normal"` → font-size
+      × 1.2 default. Falls back to a configurable px when
+      `getComputedStyle` is absent (Node test env). Each pane
+      reads its own line-height — the right pane (`<textarea>`)
+      and left pane (monospace `<pre>`) often have different
+      sizes, so user font-size preferences are now respected. 5
+      new vitest cases cover every CSS branch.
 - [ ] **Decouple test runners from `cli/node_modules`.**
       `tests/conformance/integrity/run_integrity_conformance.js`
       and `browser-extension/build.js` both

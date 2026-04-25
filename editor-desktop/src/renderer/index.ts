@@ -44,7 +44,7 @@ import {
 } from "./annotations.js";
 import { renderAnnotationSidebar, summarizeAnnotations } from "./annotations-render.js";
 import { enumerateLocales, planAddLocale } from "./locales.js";
-import { buildSyncScrollState, mapWithFallback } from "./sync-scroll.js";
+import { buildSyncScrollState, mapWithFallback, resolveLineHeightPx } from "./sync-scroll.js";
 
 declare global {
   interface Window {
@@ -304,15 +304,22 @@ function openLocaleModal(): void {
     const state = buildSyncScrollState(leftText, rightText);
     leftPane.scrollTop = 0;
     rightPane.scrollTop = 0;
-    const lineHeight = 1.5 * 13.6;
+    // Each pane may have its own font-size + line-height (the right
+    // pane is a <textarea> with system-default sizing; the left
+    // pane uses the editor's monospace stack). Read each
+    // independently so user font-size preferences are respected.
+    const leftLh = resolveLineHeightPx(leftPane);
+    const rightLh = resolveLineHeightPx(rightPane);
     const scrollHandler = (source: "left" | "right"): (() => void) => () => {
       if (syncing) { syncing = false; return; }
       syncing = true;
       const fromPane = source === "left" ? leftPane : rightPane;
       const toPane = source === "left" ? rightPane : leftPane;
-      const sourceLine = Math.max(1, Math.round(fromPane.scrollTop / lineHeight) + 1);
+      const fromLh = source === "left" ? leftLh : rightLh;
+      const toLh = source === "left" ? rightLh : leftLh;
+      const sourceLine = Math.max(1, Math.round(fromPane.scrollTop / fromLh) + 1);
       const targetLine = mapWithFallback(state, sourceLine, source === "left" ? "ltr" : "rtl");
-      toPane.scrollTop = (targetLine - 1) * lineHeight;
+      toPane.scrollTop = (targetLine - 1) * toLh;
     };
     leftPane.addEventListener("scroll", scrollHandler("left"));
     rightPane.addEventListener("scroll", scrollHandler("right"));

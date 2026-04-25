@@ -125,3 +125,38 @@ export function mapWithFallback(
   if (direct != null) return direct;
   return proportionalMap(state, sourceLine, direction);
 }
+
+/**
+ * Resolve a scrollable element's effective line height in pixels.
+ * Reads `getComputedStyle(...).lineHeight`; handles the three forms
+ * the spec allows:
+ *   - `<length>px`         → parsed directly
+ *   - `<number>` (unitless) → multiply by font-size in pixels
+ *   - `"normal"`            → browser default ≈ 1.2 × font-size
+ *
+ * Replaces the prior hard-coded `1.5 * 13.6` magic number that
+ * broke whenever the user changed their default browser font
+ * size or the modal CSS evolved. Default fallback (1.5 × 16 px) is
+ * the minimum the test environment guarantees.
+ */
+export function resolveLineHeightPx(el: HTMLElement, fallbackPx = 24): number {
+  if (typeof getComputedStyle !== "function") return fallbackPx;
+  try {
+    const style = getComputedStyle(el);
+    const fontPx = parseFloat(style.fontSize);
+    const lh = style.lineHeight;
+    if (!lh || lh === "normal") {
+      return Number.isFinite(fontPx) ? fontPx * 1.2 : fallbackPx;
+    }
+    if (lh.endsWith("px")) {
+      const v = parseFloat(lh);
+      return Number.isFinite(v) ? v : fallbackPx;
+    }
+    // Unitless multiplier — see CSS spec.
+    const mult = parseFloat(lh);
+    if (Number.isFinite(mult) && Number.isFinite(fontPx)) return mult * fontPx;
+    return fallbackPx;
+  } catch {
+    return fallbackPx;
+  }
+}

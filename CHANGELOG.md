@@ -8,6 +8,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Phase 4.6.9: sync-scroll lineHeight from computed style (2026-04-25)
+
+The Compare-locales modal's sync-scroll handler previously
+hardcoded `lineHeight = 1.5 * 13.6` to convert pixel scrollTop
+into line numbers. That broke whenever the user changed their
+default browser font size, the modal CSS evolved, or the right
+pane's `<textarea>` rendered at a different size than the left
+pane's `<pre>`-style div.
+
+New exported helper in `sync-scroll.ts`:
+
+```ts
+resolveLineHeightPx(el: HTMLElement, fallback = 24): number
+```
+
+Reads `getComputedStyle(el).lineHeight` and handles all three
+CSS forms the spec allows:
+
+- `<length>px` — parsed directly.
+- Unitless multiplier — multiplied by `getComputedStyle(el).fontSize`
+  in pixels.
+- `"normal"` keyword — fallback ratio of 1.2 × font-size (the
+  browser default for most fonts).
+
+When `getComputedStyle` is absent (Node test env), returns the
+supplied fallback so callers get deterministic behaviour
+regardless of host environment.
+
+`index.ts` now reads each pane's line-height independently — the
+right pane is a `<textarea>` with system-default sizing while
+the left pane uses the editor's monospace stack, so they often
+differ. Sync-scroll math now respects the actual rendered line
+heights instead of pretending both panes match the same hardcoded
+value.
+
+5 new vitest cases pin every CSS branch (px / unitless /
+normal), the missing-getComputedStyle fallback, and the
+default-fallback path. Net editor-desktop tests: 382 → 387.
+
 ### Changed — Phase 4.6.9: centralise escapeHtml (2026-04-25)
 
 Consolidates three duplicate `escapeHtml` implementations in the
