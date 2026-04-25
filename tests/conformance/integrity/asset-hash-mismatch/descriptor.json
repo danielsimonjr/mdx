@@ -1,0 +1,34 @@
+{
+  "kind": "negative",
+  "title": "asset content_hash doesn't match the inflated bytes",
+  "rationale": "An asset entry's content_hash is the integrity anchor for its bytes — if a viewer can be tricked into accepting a mismatch, asset substitution attacks become possible. Phase 4.6.9 extended `mdz verify` to walk every assets[<category>][] entry and check each declared content_hash against the actual bytes; this fixture confirms the verifier rejects a mismatch.",
+  "manifest": {
+    "mdx_version": "2.0.0",
+    "document": {
+      "id": "00000000-0000-4000-8000-000000000005",
+      "title": "Asset Hash Mismatch",
+      "created": "2026-01-01T00:00:00Z",
+      "modified": "2026-01-01T00:00:00Z",
+      "language": "en-US"
+    },
+    "content": { "entry_point": "document.md" },
+    "assets": {
+      "data": [
+        {
+          "path": "assets/data/series.csv",
+          "mime_type": "text/csv",
+          "size_bytes": 12,
+          "content_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    }
+  },
+  "files": {
+    "document.md": "# Asset hash mismatch fixture.\n",
+    "assets/data/series.csv": "x,y\n1,2\n"
+  },
+  "expected_error": {
+    "rule": "asset_hash_mismatch",
+    "messageMatch": "asset"
+  }
+}

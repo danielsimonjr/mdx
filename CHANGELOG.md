@@ -8,6 +8,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 4.6.9: per-asset content_hash verification (2026-04-25)
+
+Closes the deferred half of Phase 3.2 integrity fixtures. `mdz
+verify` previously only checked the top-level
+`manifest_checksum` and `document.content_id`; per-asset
+`content_hash` fields were declared in the manifest but never
+enforced. That left a real attack surface — substitute an asset,
+leave the manifest untouched, and the verifier would still pass
+the document.
+
+New `checkAssetHashes(manifest, entries, report)` function in
+`cli/src/commands/verify.js`:
+
+- Walks every `manifest.assets[<category>][]` entry across all
+  categories (images / video / audio / models / data / fonts /
+  documents / other).
+- Hashes each declared asset's bytes via the existing
+  `verifyContentHash` helper (which handles algorithm dispatch
+  + format validation).
+- Mismatches go to `failures` — verify exits non-zero with a
+  specific "asset <path>: <hash kind> mismatch" message.
+- Missing-but-declared assets fail loudly: the manifest
+  promised a file the archive doesn't contain.
+- Assets without `content_hash` get a `warnings` line (the
+  spec marks the field SHOULD, not MUST — surface unsigned
+  assets so a maintainer notices).
+
+New fixture at
+`tests/conformance/integrity/asset-hash-mismatch/`: declares
+an all-zeros `sha256` hash for `assets/data/series.csv`, expects
+the verifier to reject with a message containing "asset". The
+run_integrity_conformance.js runner now exercises 4 fixtures
+(was 3); all 4 pass.
+
+`docs/SUPPORT_MATRIX.md` row added for
+`assets.<category>[].content_hash` with the updated CLI
+support level.
+
 ### Added — Phase 4.6.9: viewer build pipeline CI verification (2026-04-25)
 
 Phase 4.6.8 added `tsconfig.build.json` and pointed the hosted

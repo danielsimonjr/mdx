@@ -117,6 +117,7 @@ function runChecks(manifest, manifestBytes, entries, trustPolicy, options) {
     checkStructure(manifest, report);
     checkIntegrity(manifest, manifestBytes, report);
     checkContentId(manifest, entries, report);
+    checkAssetHashes(manifest, entries, report);
     checkSignatures(manifest, trustPolicy, options, report);
 
     return report;
@@ -186,6 +187,64 @@ function checkContentId(manifest, entries, report) {
     } else {
         report.failures.push(result.message);
     }
+}
+
+/**
+ * Walk every `manifest.assets[<category>][]` entry, hash each
+ * declared asset's bytes, and compare against the manifest's
+ * `content_hash` field. Phase 4.6.9: previously the verify
+ * command only checked the top-level `manifest_checksum` and
+ * `document.content_id`; per-asset hashes were declared in the
+ * manifest but never enforced, which left a real attack surface
+ * (substitute an asset, leave the manifest untouched, and the
+ * verifier would still pass the document).
+ *
+ * Each assets[<category>][] entry that declares both `path` and
+ * `content_hash` gets verified. Entries without `content_hash`
+ * are skipped (the field is SHOULD, not MUST) — surfaced as a
+ * warning so a maintainer notices unsigned assets. Missing files
+ * fail loudly because the manifest's promise didn't hold.
+ */
+function checkAssetHashes(manifest, entries, report) {
+    const assets = manifest.assets;
+    if (!assets || typeof assets !== 'object') return;
+    const entryByName = new Map();
+    for (const e of entries) entryByName.set(e.entryName, e);
+
+    let checked = 0;
+    let warnings = 0;
+    const failures = [];
+
+    for (const [category, items] of Object.entries(assets)) {
+        if (!Array.isArray(items)) continue;
+        for (const item of items) {
+            if (!item || typeof item !== 'object') continue;
+            const path = item.path;
+            const declared = item.content_hash;
+            if (!path) continue;
+            if (!declared) {
+                warnings++;
+                report.warnings.push(`asset ${category}/${path} missing content_hash (per spec §16, SHOULD declare)`);
+                continue;
+            }
+            const entry = entryByName.get(path);
+            if (!entry) {
+                failures.push(`asset ${path} declared in manifest but file is missing from archive`);
+                continue;
+            }
+            const result = verifyContentHash(declared, entry.getData());
+            if (result.ok) {
+                checked++;
+            } else {
+                failures.push(`asset ${path}: ${result.message}`);
+            }
+        }
+    }
+
+    if (checked > 0) {
+        report.passes.push(`asset content_hash verifies (${checked} asset${checked === 1 ? '' : 's'})`);
+    }
+    for (const f of failures) report.failures.push(f);
 }
 
 function checkSignatures(manifest, trustPolicy, options, report) {

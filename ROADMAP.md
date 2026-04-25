@@ -1413,14 +1413,19 @@ the drift this session found."
       emits 11 .js + 11 .d.ts files; `dist/index.js` exists;
       `dist/mdz-viewer.js` references `customElements` twice
       (define + get).
-- [ ] **Phase 3.2 follow-up: per-asset `content_hash` mismatch
-      fixtures.** The integrity-fixtures runner deliberately
-      deferred `asset-hash-mismatch` because `mdz verify` only
-      checks `security.integrity.manifest_checksum`. Two-part:
-      extend verify to walk `manifest.assets[].content_hash` and
-      check each against the actual archive bytes; add the
-      deferred fixture under
-      `tests/conformance/integrity/asset-hash-mismatch/`.
+- [x] **Phase 3.2 follow-up: per-asset `content_hash` mismatch**
+      — done 2026-04-25. Extended `mdz verify` with a new
+      `checkAssetHashes` pass that walks every
+      `manifest.assets[<category>][]` entry, hashes each declared
+      asset's bytes, and compares against the manifest's
+      `content_hash` field. Mismatches go to `failures` (verify
+      exits non-zero); missing-but-declared assets fail loudly
+      because the manifest's promise didn't hold; assets without
+      `content_hash` get a `warnings` line (the field is SHOULD,
+      not MUST). New fixture at
+      `tests/conformance/integrity/asset-hash-mismatch/` confirms
+      the rejection path; 4/4 integrity fixtures pass; 16/16 verify
+      tests pass. SUPPORT_MATRIX updated.
 
 **E. Features**
 

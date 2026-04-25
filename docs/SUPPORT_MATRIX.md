@@ -53,6 +53,7 @@ Implementations covered:
 | `kernels.<lang>` | optional | ✅ | ✅ | 🟡 read | ✅ | ✅ | ✅ Pyodide |
 | `security.signatures[]` | optional | ✅ | ✅ | ✅ verify | 🟡 surface only | ✅ | 🟡 read only |
 | `security.integrity.manifest_checksum` | SHOULD | ✅ | ✅ | ✅ verify | ✅ verify | ✅ verify | ✅ |
+| `assets.<category>[].content_hash` (per-asset) | SHOULD | ✅ writes | ✅ writes | ✅ verify | 🟡 surface | ✅ verify Phase 4.6.9 | ✅ writes |
 | `history.snapshots` (delta-snapshots-v1) | optional | 🟡 read | 🟡 read | 🟡 read | ✅ read | ✅ read+write | ✅ read |
 
 🟡 caveats:

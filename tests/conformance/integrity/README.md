@@ -49,7 +49,4 @@ two harnesses cover orthogonal layers.
 | `content-hash-mismatch` | manifest declares `document.content_id` whose hash doesn't match the inflated `document.md` |
 | `manifest-checksum-mismatch` | `security.integrity.manifest_checksum` is wrong — the verify command MUST reject as the integrity anchor is broken |
 | `manifest-missing-mdx-version` | required field `mdx_version` is absent — verifier MUST reject with a clear field-missing error |
-
-Per-asset `content_hash` mismatch fixtures are tracked separately;
-they need the verify command to grow per-asset hash checks first
-(currently it only checks `security.integrity.manifest_checksum`).
+| `asset-hash-mismatch` | `manifest.assets.data[0].content_hash` doesn't match the actual asset bytes — Phase 4.6.9 extended the verify command to walk per-asset hashes; this fixture confirms the rejection path |
