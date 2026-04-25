@@ -29,17 +29,7 @@ import type {
   AnnotationThreadNode,
   TrustWarning,
 } from "./annotations.js";
-
-const ESCAPE: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;",
-};
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ESCAPE[c]);
-}
+import { escapeHtml } from "./html-escape.js";
 
 function formatDate(iso: string | undefined): string {
   if (!iso) return "";

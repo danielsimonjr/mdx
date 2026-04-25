@@ -29,18 +29,7 @@
  * colors them green/red/yellow per common-diff convention.
  */
 import { diffLines, type Block, type BlockOp } from "./block-diff.js";
-
-const ESCAPE: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;",
-};
-
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ESCAPE[c]);
-}
+import { escapeHtml } from "./html-escape.js";
 
 function blockHeader(block: Block): string {
   // Headings render their key as a friendly label; directives strip

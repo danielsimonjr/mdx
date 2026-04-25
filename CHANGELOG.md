@@ -8,6 +8,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Phase 4.6.9: centralise escapeHtml (2026-04-25)
+
+Consolidates three duplicate `escapeHtml` implementations in the
+editor renderer into one canonical
+`editor-desktop/src/renderer/html-escape.ts`. `diff-render.ts`,
+`annotations-render.ts`, and `index.ts` import it.
+
+The consolidation closes a real gap: `index.ts`'s prior
+`escapeHtmlSimple` only escaped `&`, `<`, `>` — it skipped `'`
+and `"`. The locale text displayed in the Compare-locales modal
+went into `<pre>`-style output so attribute injection wasn't
+possible, but if a future refactor moved that text into an
+attribute the gap would have surfaced as a real XSS vector.
+Removing the variant + re-exporting the canonical name keeps
+both call sites unchanged while strengthening the escape.
+
+The canonical version handles `null`/`undefined` callers by
+coercing to empty string — convenient for optional fields
+without an `?? ""` at every call site.
+
+6 new vitest cases pin the five-char escape, ampersand-first
+ordering, null/undefined coercion, an XSS payload smoke test,
+and the apostrophe-escape gap. Net editor-desktop tests:
+376 → 382.
+
 ### Added — Phase 4.6.9: .editorconfig + .gitattributes (2026-04-25)
 
 Top-level `.editorconfig` and `.gitattributes` pin the repo to

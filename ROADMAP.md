@@ -1343,11 +1343,15 @@ the drift this session found."
 
 **C. Code consolidation**
 
-- [ ] **Centralise `escapeHtml`.** Three identical
-      `escapeHtml`/`escapeHtmlSimple` functions in
-      `editor-desktop/src/renderer/{diff-render,annotations-render,index}.ts`.
-      Extract to a shared `html-escape.ts` with one canonical impl
-      + tests.
+- [x] **Centralise `escapeHtml`** — done 2026-04-25. New
+      `editor-desktop/src/renderer/html-escape.ts` exports a
+      single canonical `escapeHtml(s)` that handles the five
+      HTML5-significant characters + null/undefined coercion.
+      `diff-render.ts`, `annotations-render.ts`, and `index.ts`
+      now import it. The retired `escapeHtmlSimple` in `index.ts`
+      had a real gap (skipped `'` and `"` escaping); the
+      consolidation closes that. 6 new vitest cases (382/382
+      pass).
 - [ ] **Sync-scroll: derive `lineHeight` from computed style.**
       `index.ts:299` hardcodes `1.5 * 13.6`. Replace with
       `parseFloat(getComputedStyle(pane).lineHeight)` (with a

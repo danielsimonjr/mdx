@@ -363,12 +363,10 @@ function openLocaleModal(): void {
   refresh();
 }
 
-function escapeHtmlSimple(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
+// `escapeHtmlSimple` retired in Phase 4.6.9 in favour of the
+// canonical `escapeHtml` from `./html-escape.ts`. Re-exported as
+// the same name to keep the two existing call sites unchanged.
+import { escapeHtml as escapeHtmlSimple } from "./html-escape.js";
 
 localeBtn.addEventListener("click", openLocaleModal);
 

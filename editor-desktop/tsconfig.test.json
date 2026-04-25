@@ -29,6 +29,7 @@
     "src/renderer/sync-scroll.ts",
     "src/renderer/kernel-manifest.ts",
     "src/renderer/cell-run-buttons.ts",
+    "src/renderer/html-escape.ts",
     "test/**/*.ts"
   ],
   "exclude": [
