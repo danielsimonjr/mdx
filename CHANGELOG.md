@@ -8,6 +8,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 3.3: `mdz validate --a11y-report` (WCAG sidecar JSON) (2026-04-25)
+
+Closes the deferred Compliance-report deliverable from Phase 2.3b.2.
+The CLI's validate command gains an `--a11y-report [path]` flag.
+When set, validate writes a WCAG sidecar JSON file alongside the
+normal terminal report:
+
+- Default sidecar path: `<archive>.a11y.json` (next to the input).
+- Custom path: `--a11y-report=/some/path.json`.
+- Schema: `{schema_version: "1.0", wcag_version: "2.2",
+  wcag_level: "AA", run_at, tool, scanned[], violations[],
+  summary: {total, by_rule, by_locale}}`.
+
+The rules live in a new module `cli/src/lib/a11y.js` — a JS port
+of the four WCAG checks already implemented in TypeScript at
+`editor-desktop/src/renderer/accessibility-checker.ts` and Python
+at `tests/accessibility/run_accessibility.py`. All three siblings
+stay in lockstep:
+
+- `image-alt` (WCAG 1.1.1)
+- `heading-order` (WCAG 2.4.10)
+- `link-name` (WCAG 2.4.4)
+- `document-language` (WCAG 3.1.1)
+
+Sidecar walks the archive's primary `content.entry_point` plus
+every locale variant declared in `manifest.content.locales[]`
+(e.g. `document.fr.md` for `locales: ["fr"]`). The
+`document-language` rule fires only on the primary scan to avoid
+duplicate per-locale findings.
+
+What's deliberately not covered: color contrast (1.4.3), keyboard
+nav (2.1.1), focus visible (2.4.7), ARIA correctness (4.1.2). Those
+need a real browser; tracked under Phase 3.3 fixture-pack expansion
+(#196), which adds an axe-core + Playwright runner.
+
+Tests: 9 cases in `cli/test/a11y.test.js`. Eight unit-test the rules
++ report assembly; one drives the full CLI end-to-end against an
+in-memory MDZ archive (manifest + primary + locale variants),
+assertion-grade verifies the sidecar shape and the violation set.
+New CI step `Test --a11y-report (Phase 3.3 WCAG sidecar JSON)` in
+`.github/workflows/ci.yml` runs the suite on every push.
+
 ### Added — Phase 2.3a.7.1: deterministic fixture archive + open/save round-trip (2026-04-25)
 
 Lands the fixture that the Phase 2.3a.7 scaffold's `.skip` stubs were

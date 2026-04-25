@@ -8,6 +8,7 @@ const chalk = require('chalk');
 const ora = require('ora');
 const AdmZip = require('adm-zip');
 const crypto = require('crypto');
+const { buildReport: buildA11yReport } = require('../lib/a11y.js');
 
 // Validation result types
 const Level = {
@@ -470,6 +471,29 @@ async function validateCommand(file, options) {
         if (profile && validator.manifest) {
             validator.validateProfile(options.profile);
         }
+
+        // --a11y-report: write the WCAG sidecar JSON. Runs against the
+        // archive's primary entry-point + every declared locale. The
+        // sidecar is independent of the validation pass/fail verdict
+        // (a fully-valid archive can still have a11y violations) so we
+        // emit it before computing results.
+        if (options?.a11yReport && validator.manifest) {
+            const sidecarPath = typeof options.a11yReport === 'string'
+                ? options.a11yReport
+                : path.join(path.dirname(filePath), `${path.basename(filePath)}.a11y.json`);
+            const scans = collectA11yScans(validator);
+            const report = buildA11yReport(scans, validator.manifest);
+            fs.writeFileSync(sidecarPath, JSON.stringify(report, null, 2) + '\n', 'utf-8');
+            // Note this on the validator's info channel so the
+            // existing report layout shows it without a separate
+            // chalk block.
+            validator.addIssue(
+                Level.INFO,
+                `a11y sidecar written to ${path.basename(sidecarPath)}`,
+                `${report.summary.total} violations across ${scans.length} scanned file(s)`,
+            );
+        }
+
         const results = validator.getResults();
 
         spinner.stop();
@@ -552,5 +576,44 @@ async function validateCommand(file, options) {
     }
 }
 
+/**
+ * Collect every markdown file the a11y report should scan: the primary
+ * entry_point + each locale variant declared in `manifest.content.locales`.
+ * Locale variants follow the spec convention `document.<lang>.md` when
+ * the entry-point is `document.md`; for non-default entry-points we
+ * splice the locale tag in before the extension (e.g. `paper.fr.md`).
+ *
+ * Returns an array of `{ path, locale, content }` records suitable for
+ * passing to `buildA11yReport`.
+ */
+function collectA11yScans(validator) {
+    const entryPoint = validator.manifest?.content?.entry_point || 'document.md';
+    const locales = Array.isArray(validator.manifest?.content?.locales)
+        ? validator.manifest.content.locales
+        : [];
+    const scans = [];
+
+    const primaryEntry = validator.entries.find((e) => e.entryName === entryPoint);
+    if (primaryEntry) {
+        scans.push({ path: entryPoint, locale: null, content: primaryEntry.getData().toString('utf-8') });
+    }
+
+    const dot = entryPoint.lastIndexOf('.');
+    const stem = dot >= 0 ? entryPoint.slice(0, dot) : entryPoint;
+    const ext = dot >= 0 ? entryPoint.slice(dot) : '';
+
+    for (const locale of locales) {
+        if (typeof locale !== 'string' || !locale) continue;
+        const localePath = `${stem}.${locale}${ext}`;
+        const localeEntry = validator.entries.find((e) => e.entryName === localePath);
+        if (localeEntry) {
+            scans.push({ path: localePath, locale, content: localeEntry.getData().toString('utf-8') });
+        }
+    }
+
+    return scans;
+}
+
 module.exports = validateCommand;
 module.exports.MDXValidator = MDXValidator;
+module.exports.collectA11yScans = collectA11yScans;

@@ -666,9 +666,19 @@ is independent — sequence by user demand, not by checklist order.
       and asserts the same `expected_violations` set the Python
       runner enforces. 23 fixtures × parity + 14 unit tests = 37
       vitest cases.
-- [ ] Compliance-report export (WCAG 2.1 / 2.2 AA sidecar JSON for
-      journal submission). Deferred to a follow-up — needs the
-      Phase 3.3 fixture pack expanded from 23 → 50 fixtures first.
+- [x] **Compliance-report export** — done 2026-04-25. CLI gains
+      `--a11y-report [path]` flag (`cli/src/index.js:128`); when
+      set, validate writes a WCAG sidecar JSON (`<archive>.a11y.json`
+      by default, or the path provided) with schema_version 1.0,
+      wcag_version 2.2, level AA. Rules ported into `cli/src/lib/a11y.js`
+      stay in lockstep with the TS sibling (`accessibility-checker.ts`)
+      and Python sibling (`tests/accessibility/run_accessibility.py`)
+      — image-alt / heading-order / link-name / document-language.
+      Sidecar walks primary + every locale variant declared in
+      `manifest.content.locales`. 9 vitest cases (`cli/test/a11y.test.js`);
+      new CI step `Test --a11y-report (Phase 3.3 WCAG sidecar JSON)`
+      runs them on every push. Fixture-pack expansion to 50 stays
+      a separate task (#196).
 
   **Depends on:** 2.3a.2 + the Phase 3.3 fixture pack (currently
   23/50 fixtures).

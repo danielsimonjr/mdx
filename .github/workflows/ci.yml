@@ -326,6 +326,11 @@ jobs:
           cd cli
           node --test test/snapshots.test.js
 
+      - name: Test --a11y-report (Phase 3.3 WCAG sidecar JSON)
+        run: |
+          cd cli
+          node --test test/a11y.test.js
+
       - name: Run delta-snapshots-v1 conformance fixtures
         run: node tests/conformance/history/run_history_conformance.js
 
