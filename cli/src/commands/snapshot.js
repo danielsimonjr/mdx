@@ -98,6 +98,77 @@ function viewSubcommand(file, version) {
   }
 }
 
+/**
+ * `mdz snapshot export` — extract a specific version's content out
+ * of the chain to a standalone file (Phase 4.6.9). Pairs with
+ * `view` (which prints to stdout); `export` writes to disk and
+ * optionally bundles the version-specific manifest.
+ *
+ * Usage:
+ *   mdz snapshot export <archive> <version> -o <outfile>
+ *   mdz snapshot export <archive> <version> -o <outfile> --with-manifest
+ *
+ * `--with-manifest` writes the manifest alongside the content
+ * file (`<outfile>` for content + `<outfile>.manifest.json` for
+ * the manifest, with `mdx_version` carried through and
+ * `document.modified` set to the snapshot's reconstruction time
+ * if the source manifest doesn't pin one for this version).
+ */
+function exportSubcommand(file, version, options) {
+  if (!options.output) {
+    console.error(chalk.red('--output / -o is required (the path to write the reconstructed content)'));
+    process.exit(1);
+  }
+  const { zip } = loadArchive(file);
+  const index = loadIndex(zip);
+  if (!index) {
+    console.error(chalk.red('Archive does not declare delta-snapshots-v1; no history/snapshots/index.json found.'));
+    process.exit(1);
+  }
+  let content;
+  try {
+    content = reconstruct(zip, index, version);
+  } catch (e) {
+    if (e instanceof SnapshotError) {
+      console.error(chalk.red(`snapshot error (version ${e.version || '?'}): ${e.message}`));
+      process.exit(1);
+    }
+    throw e;
+  }
+  const outPath = path.resolve(options.output);
+  fs.writeFileSync(outPath, content, 'utf-8');
+  console.log(chalk.green(`✓ wrote ${path.basename(outPath)} (${content.length} bytes)`));
+
+  if (options.withManifest) {
+    // Project the archive's manifest down to a version-specific
+    // shape: same mdx_version + document.id, but document.modified
+    // pinned to "now" (the moment the snapshot was extracted) and
+    // document.title suffixed with the version tag so a downstream
+    // reader can tell which slice this is.
+    const manifestEntry = zip.getEntry('manifest.json');
+    if (!manifestEntry) {
+      console.error(chalk.yellow('  (manifest.json missing from archive — skipping --with-manifest)'));
+      return;
+    }
+    const manifest = JSON.parse(manifestEntry.getData().toString('utf-8'));
+    const projected = {
+      ...manifest,
+      document: {
+        ...(manifest.document || {}),
+        title: `${(manifest.document && manifest.document.title) || 'Untitled'} (${version})`,
+        modified: new Date().toISOString().replace(/\.\d{3}/, ''),
+        derived_from: [
+          ...((manifest.document && manifest.document.derived_from) || []),
+          { source: path.basename(file), version },
+        ],
+      },
+    };
+    const manifestPath = `${outPath}.manifest.json`;
+    fs.writeFileSync(manifestPath, JSON.stringify(projected, null, 2), 'utf-8');
+    console.log(chalk.green(`✓ wrote ${path.basename(manifestPath)}`));
+  }
+}
+
 function listSubcommand(file) {
   const { zip } = loadArchive(file);
   const index = loadIndex(zip);
@@ -225,6 +296,7 @@ function pickLatestVersion(index) {
 
 module.exports = {
   viewSubcommand,
+  exportSubcommand,
   listSubcommand,
   createSubcommand,
 };

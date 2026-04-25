@@ -1419,13 +1419,16 @@ the drift this session found."
 
 **E. Features**
 
-- [ ] **`mdz snapshot export` subcommand.** Phase 4.5.2 shipped
-      `create|view|list`; `export` (extract a specific version's
-      content out of the chain to a standalone file) wasn't
-      implemented. Useful for hand-off scenarios. Wire it as
-      `mdz snapshot export <archive> <version> -o <outfile>`;
-      adds a `--with-manifest` flag for the version-specific
-      manifest.
+- [x] **`mdz snapshot export` subcommand** — done 2026-04-25.
+      `cli/src/commands/snapshot.js` gains `exportSubcommand` +
+      wiring in `cli/src/index.js`. Reuses the existing
+      `reconstruct` helper, writes the resulting markdown to
+      `--output` (`-o` short form), and with `--with-manifest`
+      writes `<outfile>.manifest.json` alongside — the projected
+      manifest carries the source archive + version through
+      `document.derived_from[]` and pins
+      `document.modified` to extraction time so a downstream
+      reader can trace provenance. Smoke-tested end-to-end.
 - [ ] **Spec features-by-impl support matrix.**
       `docs/SUPPORT_MATRIX.md` keyed by spec section (manifest
       fields, directives, integrity hashes, signature algorithms,

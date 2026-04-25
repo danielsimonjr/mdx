@@ -142,6 +142,13 @@ snapshot
   .action(snapshotCommands.listSubcommand);
 
 snapshot
+  .command('export <file> <version>')
+  .description('Extract a specific version\'s content to a standalone file')
+  .requiredOption('-o, --output <path>', 'Output path for the reconstructed content')
+  .option('--with-manifest', 'Also write a version-specific manifest.json alongside')
+  .action(snapshotCommands.exportSubcommand);
+
+snapshot
   .command('create <file> <version>')
   .description('Add a new snapshot of document.md to the archive at the given version label')
   .option('-p, --parent <version>', 'Parent version (defaults to the latest in the last chain)')

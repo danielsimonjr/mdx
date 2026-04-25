@@ -8,6 +8,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 4.6.9: mdz snapshot export subcommand (2026-04-25)
+
+Rounds out the `create|view|list` trio shipped in Phase 4.5.2
+with `mdz snapshot export <archive> <version>`. Useful for
+hand-off scenarios where the recipient needs a specific version
+as a standalone `.md` file rather than navigating the delta
+chain.
+
+```bash
+mdz snapshot export paper.mdz 1.2.0 -o paper-v1.2.0.md
+mdz snapshot export paper.mdz 1.2.0 -o paper-v1.2.0.md --with-manifest
+```
+
+Implementation reuses the existing `reconstruct` helper that
+`view` uses; the only differences are output target (file vs
+stdout) and the optional `--with-manifest` flag.
+
+`--with-manifest` writes a sibling `<outfile>.manifest.json`
+that:
+
+- Carries the archive's `mdx_version` + `document.id` through
+- Suffixes `document.title` with `(<version>)` so the slice is
+  identifiable
+- Pins `document.modified` to the extraction timestamp
+- Appends a `derived_from[]` entry with `{source, version}` for
+  provenance
+
+Smoke-tested end-to-end: seeded a fresh archive, ran
+`snapshot create 1.0.0`, then `snapshot export 1.0.0 -o
+exported.md --with-manifest`. Both files produced; the manifest
+correctly traced the version origin.
+
 ### Verified — Phase 4.6.9: cell-source escape + Pyodide CSP scope audit (2026-04-25)
 
 Two security-adjacent items closed by audit + targeted hardening.
