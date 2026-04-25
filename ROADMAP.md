@@ -710,9 +710,22 @@ is independent — sequence by user demand, not by checklist order.
       `severity: "error"` (forgery risk) and unsigned author /
       reviewer annotations as `warning`. Integrates with the
       Phase 3 signature chain when present.
-- [ ] Sidebar UI for the annotation tree (Phase 2.3b.4.2 follow-up).
-- [ ] Comment / reply / accept / reject creation flows
-      (Phase 2.3b.4.2 follow-up).
+- [x] **Sidebar UI for the annotation tree** in
+      `editor-desktop/src/renderer/annotations-render.ts`. Pure
+      `renderAnnotationSidebar(threads, warnings)` produces
+      strict-CSP HTML with role-coloured borders (author / reviewer /
+      editor / reader), motivation pills (decision pills get
+      strong colour for accept / reject / changes-requested),
+      trust badges (`trust-ok` / `trust-warning` / `trust-error`)
+      and threaded reply rendering with indented dashed gutter.
+      All untrusted body text passes through `escapeHtml`. The
+      asset sidebar's right rail now hosts an Assets / Annotations
+      tab pair; the Annotations panel surfaces every annotation
+      from `annotations/*.json` with a per-thread thread count in
+      the badge. 13 vitest cases.
+- [ ] Comment / reply / accept / reject creation flows.
+      Phase 2.3b.4.3 follow-up — needs IPC for UUID generation +
+      signature integration (those are the not-yet-shipped pieces).
 - [ ] `--role=public|editor` flag for confidential-comment
       visibility per spec (deferred — gating on a UI flag is not a
       security boundary; the public archive should simply not

@@ -59,6 +59,49 @@
       background: none; border: none; color: #dc2626; cursor: pointer; padding: 0 0.2rem;
       font-size: 0.85rem;
     }
+
+    /* Sidebar tabs (Phase 2.3b.4.2) */
+    .sidebar-tabs { display: flex; border-bottom: 1px solid #ddd; }
+    .sidebar-tabs button { flex: 1; background: transparent; color: inherit; border: none; padding: 0.5rem; font-size: 0.85rem; cursor: pointer; border-bottom: 2px solid transparent; border-radius: 0; }
+    .sidebar-tabs button[aria-selected="true"] { border-bottom-color: #1d4ed8; color: #1d4ed8; font-weight: 600; }
+    .sidebar-panel { display: none; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+    .sidebar-panel[data-active="true"] { display: flex; }
+
+    /* Annotation sidebar */
+    .annotation-list { padding: 0.5rem; overflow-y: auto; flex: 1; min-height: 0; font-size: 0.82rem; line-height: 1.4; }
+    .annotation { border-left: 3px solid #ccc; padding: 0.4rem 0.6rem; margin-bottom: 0.6rem; background: #fafafa; }
+    .annotation-author { border-color: #1d4ed8; }
+    .annotation-reviewer { border-color: #b45309; }
+    .annotation-editor { border-color: #15803d; }
+    .annotation-reader { border-color: #888; }
+    .annotation-header { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin-bottom: 0.25rem; font-size: 0.72rem; }
+    .annotation-header time { color: #888; }
+    .annotation-role { padding: 0.05rem 0.35rem; border-radius: 3px; background: #e5e7eb; text-transform: uppercase; font-size: 0.65rem; font-weight: 600; }
+    .role-author { background: #dbeafe; color: #1e3a8a; }
+    .role-reviewer { background: #fed7aa; color: #7c2d12; }
+    .role-editor { background: #bbf7d0; color: #14532d; }
+    .annotation-motivation { font-size: 0.72rem; color: #555; }
+    .annotation-motivation.decision-review-accept { color: #14532d; font-weight: 600; }
+    .annotation-motivation.decision-review-reject { color: #7f1d1d; font-weight: 600; }
+    .annotation-motivation.decision-review-request-changes { color: #7c2d12; font-weight: 600; }
+    .annotation-creator { color: #444; font-weight: 500; }
+    .annotation-trust { padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.65rem; font-weight: 600; margin-left: auto; }
+    .trust-ok { background: #dcfce7; color: #14532d; }
+    .trust-warning { background: #fef3c7; color: #78350f; }
+    .trust-error { background: #fee2e2; color: #7f1d1d; }
+    .annotation-quote { margin: 0.25rem 0; padding-left: 0.6rem; border-left: 2px solid #ccc; color: #555; font-style: italic; font-size: 0.78rem; }
+    .annotation-body { white-space: pre-wrap; word-break: break-word; }
+    .annotation-replies { margin-top: 0.4rem; padding-left: 0.5rem; border-left: 1px dashed #ddd; }
+    .annotation-replies .annotation { background: #f3f4f6; }
+    .annotation-empty { color: #888; font-style: italic; padding: 1rem; text-align: center; }
+    @media (prefers-color-scheme: dark) {
+      .sidebar-tabs { border-color: #333; }
+      .sidebar-tabs button[aria-selected="true"] { color: #60a5fa; border-bottom-color: #60a5fa; }
+      .annotation { background: #161616; }
+      .annotation-replies .annotation { background: #1c1c1c; }
+      .annotation-replies { border-color: #333; }
+      .annotation-quote { border-color: #333; color: #888; }
+    }
     @media (prefers-color-scheme: dark) {
       .asset-sidebar { border-color: #333; }
       .asset-sidebar-header { border-color: #333; }
@@ -200,16 +243,29 @@
       <p class="empty">Open an MDZ archive to start editing.</p>
     </div>
   </div>
-  <aside id="asset-sidebar" class="asset-sidebar" aria-label="Assets">
-    <div class="asset-sidebar-header">
-      <strong>Assets</strong>
-      <span id="asset-count" class="asset-count">0</span>
+  <aside id="asset-sidebar" class="asset-sidebar" aria-label="Sidebar">
+    <div class="sidebar-tabs" role="tablist">
+      <button id="tab-assets" type="button" role="tab" aria-selected="true" aria-controls="panel-assets">Assets</button>
+      <button id="tab-annotations" type="button" role="tab" aria-selected="false" aria-controls="panel-annotations">Annotations</button>
     </div>
-    <div id="asset-dropzone" class="asset-dropzone" aria-label="Drop files to add as archive assets">
-      <p>Drag files here to add as archive assets, or click to browse.</p>
-      <input type="file" id="asset-file-input" multiple hidden/>
+    <div id="panel-assets" class="sidebar-panel" data-active="true" role="tabpanel" aria-labelledby="tab-assets">
+      <div class="asset-sidebar-header">
+        <strong>Assets</strong>
+        <span id="asset-count" class="asset-count">0</span>
+      </div>
+      <div id="asset-dropzone" class="asset-dropzone" aria-label="Drop files to add as archive assets">
+        <p>Drag files here to add as archive assets, or click to browse.</p>
+        <input type="file" id="asset-file-input" multiple hidden/>
+      </div>
+      <ul id="asset-list" class="asset-list" role="list"></ul>
     </div>
-    <ul id="asset-list" class="asset-list" role="list"></ul>
+    <div id="panel-annotations" class="sidebar-panel" data-active="false" role="tabpanel" aria-labelledby="tab-annotations">
+      <div class="asset-sidebar-header">
+        <strong>Annotations</strong>
+        <span id="annotation-count" class="asset-count">0</span>
+      </div>
+      <div id="annotation-list" class="annotation-list"></div>
+    </div>
   </aside>
   <footer class="status-bar" role="contentinfo">
     <span id="a11y-status" class="a11y-status" aria-live="polite" tabindex="0">Accessibility: —</span>

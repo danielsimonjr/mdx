@@ -8,6 +8,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 2.3b.4.2: Annotation sidebar UI (2026-04-25)
+
+The editor's right rail now has an Assets / Annotations tab pair.
+The Annotations panel surfaces every entry from
+`annotations/*.json` with role-coloured borders, decision-motivation
+pills, threaded reply rendering, and trust badges per
+`findTrustWarnings`.
+
+Two pieces:
+
+- **Pure thread → HTML renderer**
+  (`editor-desktop/src/renderer/annotations-render.ts`):
+  - `renderAnnotationThread(node, warnings)` — recursive thread
+    renderer. One `<article class="annotation annotation-{role}">`
+    per node; replies nested in `<div class="annotation-replies">`
+    with an indented dashed gutter. Header has role pill,
+    motivation pill (decision motivations get strong colour),
+    creator name (falls back to DID, then `(anonymous)`), date
+    (date-only — time of day adds noise without value), and
+    trust pill.
+  - `renderAnnotationSidebar(threads, warnings)` — top-level
+    panel renderer with empty-state placeholder.
+  - `summarizeAnnotations(threads)` — `"N annotations across M
+    threads"` for the tab badge.
+  - All untrusted text passes through `escapeHtml`; tests verify
+    a `<script>` body renders as `&lt;script&gt;`.
+- **Sidebar tab + state in `index.ts`**:
+  - `loadAnnotationsState(entries)` walks the archive's
+    `annotations/*.json` paths via the Phase 2.3b.4 data layer's
+    `loadAnnotations`. Parse errors get logged but don't sink the
+    panel.
+  - Tab pair (Assets / Annotations) at the top of the right rail;
+    role-aware ARIA (`role="tab"`, `aria-selected`,
+    `aria-controls`).
+  - `refreshAnnotationsPanel()` runs `findTrustWarnings` against
+    an empty signed-creator set for now (Phase 3 signature
+    integration replaces with the real signed-DID set from
+    `security/signatures.json`); every annotation requiring a
+    signature surfaces as a warning until that lands.
+
+13 vitest cases in `test/annotations-render.test.ts` cover the
+single-annotation render, reply nesting, HTML escaping,
+decision-motivation classes, trust-pill mapping, anonymous /
+DID-only creator fallbacks, sidebar empty-state, multi-thread
+ordering, and the summary string.
+
+Net editor-desktop tests: 338 → 351.
+
+Still open (Phase 2.3b.4.3 follow-up): comment / reply / accept /
+reject creation flows. Those need IPC for UUID generation +
+signature integration (the latter is the not-yet-shipped piece).
+
 ### Added — Phase 2.3b.3.2: Diff-pane UI (2026-04-25)
 
 The "Compare versions" toolbar button now opens a modal that

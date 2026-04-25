@@ -34,6 +34,13 @@ import {
   reconstructVersionSync,
   type SnapshotIndex,
 } from "@mdz-format/viewer";
+import {
+  loadAnnotations,
+  buildThreads,
+  findTrustWarnings,
+  type Annotation,
+} from "./annotations.js";
+import { renderAnnotationSidebar, summarizeAnnotations } from "./annotations-render.js";
 
 declare global {
   interface Window {
@@ -91,6 +98,54 @@ const diffBtn = document.getElementById("diff-btn") as HTMLButtonElement;
  */
 let snapshotIndex: SnapshotIndex | null = null;
 const snapshotEntryText = new Map<string, string>();
+
+let annotations: Annotation[] = [];
+const annotationListEl = document.getElementById("annotation-list")!;
+const annotationCountEl = document.getElementById("annotation-count")!;
+const tabAssets = document.getElementById("tab-assets") as HTMLButtonElement;
+const tabAnnotations = document.getElementById("tab-annotations") as HTMLButtonElement;
+const panelAssets = document.getElementById("panel-assets")!;
+const panelAnnotations = document.getElementById("panel-annotations")!;
+
+function activateSidebarTab(which: "assets" | "annotations"): void {
+  tabAssets.setAttribute("aria-selected", String(which === "assets"));
+  tabAnnotations.setAttribute("aria-selected", String(which === "annotations"));
+  panelAssets.dataset.active = String(which === "assets");
+  panelAnnotations.dataset.active = String(which === "annotations");
+}
+tabAssets.addEventListener("click", () => activateSidebarTab("assets"));
+tabAnnotations.addEventListener("click", () => activateSidebarTab("annotations"));
+
+function refreshAnnotationsPanel(): void {
+  if (annotations.length === 0) {
+    annotationListEl.innerHTML = `<p class="annotation-empty">No annotations.</p>`;
+    annotationCountEl.textContent = "0";
+    return;
+  }
+  // We don't yet have signature data wired up — pass an empty set,
+  // which means every signed-required annotation surfaces as a warning.
+  // Phase 3 signature integration will replace this with the real
+  // signed-creator id set from `security/signatures.json`.
+  const warnings = findTrustWarnings(annotations, new Set());
+  const threads = buildThreads(annotations);
+  annotationListEl.innerHTML = renderAnnotationSidebar(threads, warnings);
+  annotationCountEl.textContent = String(threads.length);
+  // Update the title-bar mini-summary too, so users see whether
+  // annotations are present without opening the panel.
+  const summary = summarizeAnnotations(threads);
+  if (summary !== "0 annotations" && tabAnnotations.getAttribute("aria-selected") !== "true") {
+    tabAnnotations.title = summary;
+  }
+}
+
+function loadAnnotationsState(entries: ReadonlyMap<string, Uint8Array>): void {
+  const result = loadAnnotations(entries);
+  annotations = result.annotations;
+  if (result.errors.length > 0) {
+    console.warn("[annotations] parse errors:", result.errors);
+  }
+  refreshAnnotationsPanel();
+}
 
 const dropzone = document.getElementById("asset-dropzone") as HTMLDivElement;
 const assetListEl = document.getElementById("asset-list") as HTMLUListElement;
@@ -476,6 +531,7 @@ async function openFlow(): Promise<void> {
   const refsBytes = result.archive.entries.get("references.json");
   referencesJson = refsBytes ? new TextDecoder().decode(refsBytes) : null;
   loadSnapshotState(result.archive.entries);
+  loadAnnotationsState(result.archive.entries);
   await ensurePane(result.archive.content);
   setPickersEnabled(true);
   refreshA11y(result.archive.content);
@@ -556,6 +612,7 @@ async function importIpynbFlow(): Promise<void> {
   const refsBytes = opened.archive.entries.get("references.json");
   referencesJson = refsBytes ? new TextDecoder().decode(refsBytes) : null;
   loadSnapshotState(opened.archive.entries);
+  loadAnnotationsState(opened.archive.entries);
   await ensurePane(opened.archive.content);
   setPickersEnabled(true);
   refreshA11y(opened.archive.content);

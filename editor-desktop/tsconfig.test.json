@@ -25,6 +25,7 @@
     "src/renderer/variant-flow.ts",
     "src/renderer/cell-runner.ts",
     "src/renderer/diff-render.ts",
+    "src/renderer/annotations-render.ts",
     "test/**/*.ts"
   ],
   "exclude": [
