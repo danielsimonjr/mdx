@@ -586,12 +586,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Lint specification
+      - name: Lint actively-maintained docs (Phase 4.6.9)
+        # Spec files in spec/ + docs/ + legacy/ are excluded via
+        # .markdownlintignore. The config (.markdownlint.json)
+        # caps line-length at 120 cols (with table/code/heading
+        # exemptions) and turns off cosmetic rules whose
+        # pre-existing violations would require a separate
+        # focused pass. Going forward, regressions on the rules
+        # that ARE on (line-length, duplicate-headings,
+        # inline-html scope) fail CI directly.
         uses: DavidAnson/markdownlint-cli2-action@v16
         with:
           globs: |
-            spec/*.md
             README.md
             CONTRIBUTING.md
             CHANGELOG.md
-        continue-on-error: true

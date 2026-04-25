@@ -73,7 +73,12 @@ Ten capability additions, each backward-compatible with v1.1:
 9. **Multi-signature + DID identity** — `signatures[]` with roles and W3C DIDs (§16)
 10. **Responsive variants** — per-asset `variants[]` and document-level `content.variants[]` (§17)
 
-All v1.1 features (alignment, block attributes, container blocks, directive containers) continue to work unchanged. See [`spec/MDX_FORMAT_SPECIFICATION_v2.0.md`](spec/MDX_FORMAT_SPECIFICATION_v2.0.md) for full details and [`spec/MDX_FORMAT_SPECIFICATION_v1.1.md`](spec/MDX_FORMAT_SPECIFICATION_v1.1.md) for the v1.1 baseline.
+All v1.1 features (alignment, block attributes, container blocks, directive
+containers) continue to work unchanged. See
+[`spec/MDX_FORMAT_SPECIFICATION_v2.0.md`](spec/MDX_FORMAT_SPECIFICATION_v2.0.md)
+for full details and
+[`spec/MDX_FORMAT_SPECIFICATION_v1.1.md`](spec/MDX_FORMAT_SPECIFICATION_v1.1.md)
+for the v1.1 baseline.
 
 ## File Structure
 
@@ -201,7 +206,10 @@ The complete specification is available at:
 
 **File Extensions:** `.mdx` (primary), `.mdxc` (alternative, to avoid conflict with MDX/JSX)
 
-**JSON Schema:** [`spec/manifest-v2.schema.json`](spec/manifest-v2.schema.json) (v2.0), [`spec/manifest.schema.json`](spec/manifest.schema.json) (v1.1 baseline, still accepted)
+**JSON Schema:**
+[`spec/manifest-v2.schema.json`](spec/manifest-v2.schema.json) (v2.0),
+[`spec/manifest.schema.json`](spec/manifest.schema.json) (v1.1 baseline,
+still accepted)
 
 ## Comparison with Other Formats
 
@@ -320,7 +328,9 @@ See [legacy/editor/README.md](legacy/editor/README.md) for full documentation.
 
 ### Web Viewer
 
-A read-only viewer for MDX documents. Open `legacy/viewer/index.html` in a browser. The Phase 2.1 production viewer is at `packages/mdz-viewer/` (`<mdz-viewer>` web component).
+A read-only viewer for MDX documents. Open `legacy/viewer/index.html` in
+a browser. The Phase 2.1 production viewer is at `packages/mdz-viewer/`
+(the `<mdz-viewer>` web component).
 
 **Features:**
 - Drag-and-drop file loading

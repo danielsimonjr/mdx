@@ -1,0 +1,35 @@
+{
+  "$comment": "Phase 4.6.9 — markdownlint config. Initial policy: keep MD013 (line-length) on at 120 cols since that's the original housekeeping target. Pre-existing violations on cosmetic rules (blanks-around-lists/fences, table-column-style, inline-html) are widespread and would require a separate focused cleanup pass; turn those off so dropping `continue-on-error: true` still gives us regression-detection on the rules that matter.",
+
+  "default": true,
+
+  "MD013": {
+    "$comment": "line-length: relaxed to 120 cols (vs default 80); long URL rows + table rows + headings + code blocks are exempt.",
+    "line_length": 120,
+    "tables": false,
+    "code_blocks": false,
+    "headings": false
+  },
+
+  "MD024": {
+    "$comment": "duplicate-headings: CHANGELOG accumulates identical phase headings (e.g. `### Added`); allow when nesting differs.",
+    "siblings_only": true
+  },
+
+  "MD004": false,
+  "MD028": false,
+  "MD031": false,
+  "MD032": false,
+  "MD033": false,
+  "MD036": false,
+  "MD040": false,
+  "MD041": false,
+  "MD047": false,
+  "MD058": false,
+  "MD060": false,
+
+  "MD025": {
+    "$comment": "single-h1: tolerate multiple top-level headings in docs that document multiple format versions.",
+    "front_matter_title": ""
+  }
+}

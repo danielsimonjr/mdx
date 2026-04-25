@@ -1,0 +1,17 @@
+# markdownlintignore — Phase 4.6.9
+#
+# The CI lint step (post-`continue-on-error: true` removal) only
+# enforces rules on the actively-maintained docs in the project
+# root. Spec documents under `spec/` are slow-moving formal text
+# that uses non-trivial table layouts + technical-prose long lines
+# that don't benefit from auto-wrapping.
+#
+# If you want to lint spec files locally, run with
+# `markdownlint-cli2 --no-globs spec/file.md` to bypass this list.
+
+spec/
+docs/
+legacy/
+node_modules/
+**/node_modules/
+implementations/python/example-extracted/

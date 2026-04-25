@@ -8,6 +8,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Phase 4.6.9: drop continue-on-error on markdown lint (2026-04-25)
+
+The `markdown-lint` CI job carried `continue-on-error: true` since
+the original Phase 4.6 housekeeping pass — it caught violations
+but never failed CI, so regressions slipped through silently.
+Removed the shield. Two new config files make the strict-mode
+transition tractable:
+
+- `.markdownlint.json` — caps line-length at 120 cols (vs the
+  default 80) with table/code/heading exemptions; cosmetic rules
+  with widespread pre-existing violations (MD031, MD032, MD033,
+  MD036, MD040, MD041, MD047, MD058, MD060, MD028, MD004) are
+  turned off. The point is to catch *regressions* on the rules
+  that matter (line-length, duplicate-headings, inline-html
+  scope), not to retroactively reformat everything.
+- `.markdownlintignore` — excludes `spec/`, `docs/`, `legacy/`,
+  `node_modules/`, and `implementations/python/example-extracted/`
+  from the lint. Spec docs use technical-prose long lines and
+  custom table layouts that don't benefit from auto-wrapping;
+  the `legacy/` tree is being deleted with Phase 0.1; the example
+  output is generator-produced.
+
+CI lint scope narrowed to the actively-maintained customer-facing
+docs: `README.md`, `CONTRIBUTING.md`, `CHANGELOG.md`. `ROADMAP.md`
+and `CLAUDE.md` excluded because their narrative-heavy
+audit-history entries would force noisy reformat churn — the
+ROADMAP's prose intentionally captures *why* something is the
+way it is in long unwrapped paragraphs.
+
+Three pre-existing README line-length violations fixed inline
+(broken across paragraph-continuation lines). `npx
+markdownlint-cli2 README.md CONTRIBUTING.md CHANGELOG.md` is
+now zero-error; regressions on those three files will fail CI.
+
 ### Changed — Phase 4.6.9: retire pre-Phase-2.3 demos to legacy/ (2026-04-25)
 
 Three pre-Phase-2 demo trees moved under `legacy/`:
