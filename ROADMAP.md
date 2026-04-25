@@ -1289,6 +1289,125 @@ normal completion flow.
       `IntegrityError::Mismatch` path. README updated to drop the
       "deferred" caveat.
 
+### 4.6.9 Post-cross-check follow-ups (2026-04-25 RLM audit)
+
+Items surfaced during the RLM-driven ROADMAP↔code cross-check.
+Grouped by intent: CI gates that prevent future drift first, then
+hygiene + consolidation, then test infrastructure, then features,
+then security audit. Order picks reflect "what would have caught
+the drift this session found."
+
+**A. CI gates that prevent doc/code drift**
+
+- [ ] **ROADMAP `[x]` cited-path existence check.** A CI step that
+      walks every backtick-quoted file/test path inside `[x]`
+      entries and asserts each resolves on the filesystem. Would
+      have caught the `cli/test/import-ipynb.test.js` drift this
+      session's cross-check found. ~30 lines of Python; goes in a
+      new `validate-roadmap` job.
+- [ ] **Status-snapshot date freshness.** Assert the
+      `### Status snapshot (YYYY-MM-DD)` heading is within N days
+      of the `git log -1 --format=%ad` for ROADMAP.md. Catches
+      staleness without forcing a rewrite on every unrelated
+      commit.
+- [ ] **CHANGELOG line-length: drop `continue-on-error: true`.**
+      The markdown lint step still has the shield in place. Phase
+      4.6 wrapped the worst offenders; address the 2–3 remaining
+      over-80-col lines (URL rows + table rows) via targeted
+      `<!-- markdownlint-disable MD013 -->` blocks where
+      intentional, then make CI actually fail on regressions.
+
+**B. Repo hygiene**
+
+- [ ] **`.editorconfig` + `.gitattributes` for line endings.**
+      Every commit on this Windows host emits 5–10 `LF will be
+      replaced by CRLF` warnings. Top-level `.editorconfig`
+      declaring `end_of_line = lf` for source files; matching
+      `.gitattributes` with `* text=auto eol=lf`. Run
+      `git add --renormalize .` once the rules land.
+- [ ] **Retire pre-Phase-2.3 demo files.** `editor/index.html`
+      (WYSIWYG demo), `viewer/index.html` (read-only demo), and
+      `chrome-extension/` (legacy Chrome-only ext) are all
+      superseded by the Phase 2 production code. Move under
+      `legacy/` with a clear README or delete entirely.
+
+**C. Code consolidation**
+
+- [ ] **Centralise `escapeHtml`.** Three identical
+      `escapeHtml`/`escapeHtmlSimple` functions in
+      `editor-desktop/src/renderer/{diff-render,annotations-render,index}.ts`.
+      Extract to a shared `html-escape.ts` with one canonical impl
+      + tests.
+- [ ] **Sync-scroll: derive `lineHeight` from computed style.**
+      `index.ts:299` hardcodes `1.5 * 13.6`. Replace with
+      `parseFloat(getComputedStyle(pane).lineHeight)` (with a
+      fallback for `"normal"`).
+- [ ] **Decouple test runners from `cli/node_modules`.**
+      `tests/conformance/integrity/run_integrity_conformance.js`
+      and `browser-extension/build.js` both
+      `require('cli/node_modules/adm-zip')` because adm-zip lives
+      in cli's deps. Hoist adm-zip to a workspace root dep.
+
+**D. Test infrastructure + verification**
+
+- [ ] **Phase 2.3a.7 Playwright integration scaffold.** Many
+      shipped features are documented as "exercised by Phase
+      2.3a.7 Playwright when those land" — DOM modals (Compare-
+      versions, Compare-locales, directive pickers), per-cell
+      Run-button injection, sync-scroll, the open/save flow
+      end-to-end, and the Pyodide CDN load. Set up
+      `editor-desktop/playwright.config.ts`, electron-launch
+      fixture, baseline tests for the four picker modals + diff
+      modal + per-cell Run + open/save round-trip.
+- [ ] **Verify viewer build pipeline emits
+      `dist/mdz-viewer.js` end-to-end.** Phase 4.6.8 added
+      `tsconfig.build.json` and configured wrangler `[assets]` but
+      `npm run build -w @mdz-format/viewer` was never invoked +
+      the output wasn't validated. Add a CI step that runs the
+      build + asserts `dist/index.js` exists + a smoke test that
+      imports it and verifies `customElements.get('mdz-viewer')`
+      is defined.
+- [ ] **Phase 3.2 follow-up: per-asset `content_hash` mismatch
+      fixtures.** The integrity-fixtures runner deliberately
+      deferred `asset-hash-mismatch` because `mdz verify` only
+      checks `security.integrity.manifest_checksum`. Two-part:
+      extend verify to walk `manifest.assets[].content_hash` and
+      check each against the actual archive bytes; add the
+      deferred fixture under
+      `tests/conformance/integrity/asset-hash-mismatch/`.
+
+**E. Features**
+
+- [ ] **`mdz snapshot export` subcommand.** Phase 4.5.2 shipped
+      `create|view|list`; `export` (extract a specific version's
+      content out of the chain to a standalone file) wasn't
+      implemented. Useful for hand-off scenarios. Wire it as
+      `mdz snapshot export <archive> <version> -o <outfile>`;
+      adds a `--with-manifest` flag for the version-specific
+      manifest.
+- [ ] **Spec features-by-impl support matrix.**
+      `docs/SUPPORT_MATRIX.md` keyed by spec section (manifest
+      fields, directives, integrity hashes, signature algorithms,
+      EPUB round-trip, locale support, snapshots) × impl (Python
+      ref, TypeScript ref, Rust binding, viewer, CLI, editor).
+      Auto-generate from a YAML source so it stays in sync; add
+      a CI assertion that every spec MUST/SHOULD shows up in the
+      matrix.
+
+**F. Security audit**
+
+- [ ] **`data-mdz-cell-source` escape round-trip + Pyodide CSP
+      scope audit.** Two security-adjacent items:
+      (1) verify the HTML-escape applied to the
+      `data-mdz-cell-source` attribute round-trips correctly when
+      JS reads it back via `dataset.mdzCellSource`. Test with
+      cells containing `</textarea>`, `<script>`, and a literal
+      Unicode line-separator (U+2028) in the source.
+      (2) verify the CSP relaxation for `cdn.jsdelivr.net` is
+      scoped only to `script-src` + `connect-src`, not e.g.
+      `img-src`, and that `wasm-unsafe-eval` is the minimum
+      needed (no `unsafe-inline` / `unsafe-eval` leakage).
+
 ---
 
 ## Phase 5 — Governance (Q4 2027+)
