@@ -196,6 +196,60 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Added — Phase 2.3b.1 (kernel layer): Pyodide integration scaffolding (2026-04-24)
+
+`editor-desktop/src/renderer/python-kernel.ts` ships the
+testable kernel layer that the in-editor "Run cell" UI will sit
+on. Three pieces:
+
+- **`PythonKernel` interface** — what the UI talks to. Two
+  implementations:
+  - `loadPyodideKernel(options?)` — browser-only; lazy-loads
+    Pyodide from CDN via a script-tag injection (default
+    `cdn.jsdelivr.net/pyodide/v0.26.4/full/`, overridable for
+    air-gapped installs). Not exercised in unit tests — gated on
+    Phase 2.3a.6 Playwright.
+  - `FakePythonKernel` — deterministic in-memory kernel for
+    vitest. `setNextResult` / `setNextRaw` / `setNextError`
+    queue scripted return values; `history` exposes what the
+    editor sent for assertion-by-test.
+- **Output-capture parser** — `parseExecutionOutput(rawDict)`
+  normalizes the harness's `{stdout, stderr, result,
+  display_data, error, duration_ms}` into a uniform
+  `KernelResult`. Drops malformed display entries silently
+  (Pyodide's display pipeline is lossy on edge cases), assembles
+  human-readable error messages from `name + value + traceback`,
+  and clamps negative durations to 0.
+- **Cell-timeout wrapper** — `withTimeout(promise, ms)` races
+  against `setTimeout`; rejects with `TimeoutError` on expiry.
+  `timeoutResult(ms)` builds a uniform timeout-status
+  `KernelResult` with the message "Pyodide cannot be preempted;
+  the interpreter may still be running" — the timeout is
+  advisory and the wrapper documents this loudly so downstream
+  code doesn't assume hard cancellation.
+
+The Python harness (`PYODIDE_HARNESS`) lives as a string constant
+in the same module — small Python wrapper that captures
+stdout/stderr buffers, `display_data` from `IPython.display`, and
+the last-expression value via an `ast.parse` + split-into-exec-and-
+final-eval trick. Returns a JSON-serialisable dict that
+`parseExecutionOutput` consumes.
+
+18 vitest cases cover every parser branch (empty, full, error
+shape, malformed display dropped, metadata preserved, negative
+duration clamped), the timeout helper (resolve/reject/RangeError
+on bad input), the timeout-result shape, and FakePythonKernel
+playback. Net editor-desktop tests: 264 → 282.
+
+Still open (Phase 2.3b.1.2 follow-up):
+
+- CSP relaxation (`script-src https://cdn.jsdelivr.net` +
+  `'wasm-unsafe-eval'`); kept off the default CSP until users hit
+  "Run".
+- "Run cell" button on `::cell{language=python}` blocks +
+  `::output` insertion.
+- Manifest `kernels.python.runtime: "pyodide"` declaration.
+
 ### Added — Phase 4.5.3: delta-snapshots-v1 conformance fixtures (2026-04-24)
 
 `tests/conformance/history/` now ships archive-level fixtures
