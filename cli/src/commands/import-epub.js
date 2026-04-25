@@ -420,13 +420,39 @@ function makeTurndown() {
         filter: ['head', 'meta', 'link', 'style', 'script', 'epub:case', 'epub:switch'],
         replacement: () => '',
     });
-    // NOTE: a previous version emitted ::fig{id=...} from <figure id="...">,
-    // but the export side (export-epub.js) does not yet read ::fig back as
-    // <figure>, so the round-trip was lossy in a confusing way. Until the
-    // symmetric export rule lands (tracked as Phase 2.4 follow-up), let
-    // turndown handle <figure> with its default rule (image + caption
-    // paragraph). The id is lost; this is documented in the fidelity
-    // matrix.
+    // Symmetric round-trip with export-epub.js (Phase 4.6.8). The
+    // export side now emits `<figure class="mdz-fig" id="X">…</figure>`
+    // from `::fig{id=X}` openers, plus `<figure class="mdz-tab" id="X">`
+    // for ::tab and `<div role="math" class="mdz-eq" id="X">` for ::eq.
+    // We invert that here so a previously-imported MDZ → EPUB → MDZ
+    // pipeline preserves the labeled-directive identity.
+    td.addRule('mdz-labeled-figure', {
+        filter: function (node) {
+            if (node.nodeName !== 'FIGURE') return false;
+            const cls = (node.getAttribute('class') || '').split(/\s+/);
+            return cls.includes('mdz-fig') || cls.includes('mdz-tab');
+        },
+        replacement: function (content, node) {
+            const cls = (node.getAttribute('class') || '').split(/\s+/);
+            const kind = cls.includes('mdz-tab') ? 'tab' : 'fig';
+            const id = node.getAttribute('id');
+            const opener = id ? `::${kind}{id=${id}}` : `::${kind}{}`;
+            // content is the turndown-rendered figure body; preserve.
+            return `\n\n${opener}\n\n${content.trim()}\n\n:::\n\n`;
+        },
+    });
+    td.addRule('mdz-labeled-equation', {
+        filter: function (node) {
+            return node.nodeName === 'DIV'
+                && (node.getAttribute('role') || '') === 'math'
+                && (node.getAttribute('class') || '').split(/\s+/).includes('mdz-eq');
+        },
+        replacement: function (content, node) {
+            const id = node.getAttribute('id');
+            const opener = id ? `::eq{id=${id}}` : `::eq{}`;
+            return `\n\n${opener}\n\n${content.trim()}\n\n:::\n\n`;
+        },
+    });
     return td;
 }
 

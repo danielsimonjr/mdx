@@ -8,6 +8,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 4.6.8: EPUB import/export symmetric rule (2026-04-25)
+
+Round-trip MDZ → EPUB → MDZ now preserves labeled-directive
+identity. The prior comment in `import-epub.js:426` flagged the
+asymmetry as lossy: import was emitting `::fig{id=X}` from
+`<figure id="X">`, but export wasn't producing those `<figure>`
+elements in the first place — so a re-imported EPUB lost the
+directive identity the original MDZ carried.
+
+Two changes:
+
+- **Export side** (`cli/src/commands/export-epub.js`). New
+  `preprocessLabeledDirectives(markdown)` runs before
+  `marked.parse` and converts:
+  - `::fig{id=X}` → `<figure class="mdz-fig" id="X">`
+  - `::eq{id=X}` → `<div role="math" class="mdz-eq" id="X">`
+  - `::tab{id=X}` → `<figure class="mdz-tab" id="X">`
+  - `:::` closer → matching `</figure>` / `</div>`
+- **Import side** (`cli/src/commands/import-epub.js`). Two new
+  turndown rules (`mdz-labeled-figure`, `mdz-labeled-equation`)
+  filter on the class hooks the export now emits and reverse
+  the transform exactly. The id attribute survives the
+  round-trip.
+
+15/15 import-epub tests still pass — including the
+`round-trip: synthesized mdz → epub → mdz preserves declared
+values` test that catches asymmetry directly.
+
 ### Added — Phase 4.6.8: examples/scientific-paper/ (2026-04-25)
 
 Concrete demo MDZ source-tree at

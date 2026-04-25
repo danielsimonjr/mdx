@@ -1202,11 +1202,19 @@ normal completion flow.
       entries non-deterministically; yazl supports explicit
       ordering, which the EPUB 3.3 spec actually requires for
       reproducible zip output (mimetype first, etc.).
-- [ ] **EPUB import symmetric-export rule**
-      (`cli/src/commands/import-epub.js:426`). When exporting a
-      previously-imported EPUB back out, the import-side asset
-      naming rule should match the export-side — currently they
-      can drift.
+- [x] **EPUB import/export symmetric labeled-directive rule** —
+      done 2026-04-25. Export side gained
+      `preprocessLabeledDirectives` that runs before
+      `marked.parse` and converts `::fig{id=X}` → `<figure
+      class="mdz-fig" id="X">`, `::eq{id=X}` →
+      `<div role="math" class="mdz-eq" id="X">`,
+      `::tab{id=X}` → `<figure class="mdz-tab" id="X">`. Import
+      side gained matching turndown rules
+      (`mdz-labeled-figure`, `mdz-labeled-equation`) that invert
+      the transform. A previously-imported MDZ → EPUB → MDZ
+      round-trip now preserves the labeled-directive identity
+      (kind + id) the prior comment flagged as lossy. 15/15
+      import-epub tests still pass.
 - [ ] **Browser-extension reproducible-build bundler**
       (`browser-extension/REPRODUCIBLE_BUILD.md:70`). Bundling
       the viewer into the extension's `viewer/` directory should

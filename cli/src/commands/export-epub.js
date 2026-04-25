@@ -100,8 +100,13 @@ function buildEpub({ manifest, markdown, sourceZip, outPath }) {
     const authors = doc.authors || [];
     const modified = new Date().toISOString().replace(/\.\d{3}/, '');
 
-    // Render Markdown -> XHTML (no fragment HTML; a full document).
-    const bodyHtml = marked.parse(markdown, { async: false });
+    // Pre-process labeled directives (::fig / ::eq / ::tab) so they
+    // emit XHTML elements that import-epub.js can pick back up as the
+    // same directives (Phase 4.6.8 symmetric round-trip rule). Without
+    // this pre-pass, marked treats `::fig{id=X}` as raw text and the
+    // round-trip drops the directive identity.
+    const preProcessed = preprocessLabeledDirectives(markdown);
+    const bodyHtml = marked.parse(preProcessed, { async: false });
 
     const out = new AdmZip();
 
@@ -359,6 +364,58 @@ function buildNav({ title, language }) {
         '  </body>',
         '</html>',
     ].join('\n');
+}
+
+/**
+ * Pre-marked transform: labeled directive openers (::fig / ::eq / ::tab)
+ * become XHTML <figure> / <div role="math"> / <table-wrapper> openers
+ * carrying their id. Symmetric with import-epub's <figure id="..."> →
+ * `::fig{id=...}` rule (Phase 4.6.8 follow-up). Pure-string transform
+ * applied before marked.parse so the resulting elements survive into
+ * the OPF body unmangled.
+ *
+ * Format guarantees:
+ *   ::fig{id=overview}        → <figure id="overview">
+ *   ::eq{id=energy}           → <div role="math" id="energy">
+ *   ::tab{id=results}         → <figure class="mdz-tab" id="results">
+ *
+ * Closer markers (`:::`) become the matching close tag. Markdown
+ * inside the directive body is left alone for marked to render.
+ */
+function preprocessLabeledDirectives(markdown) {
+    // Stack of open directive kinds so we know which close tag to emit.
+    const stack = [];
+    const lines = markdown.split('\n');
+    const out = [];
+    for (const line of lines) {
+        const open = /^::(fig|eq|tab)\{([^}]*)\}\s*$/.exec(line);
+        if (open) {
+            const kind = open[1];
+            const idMatch = /\bid=([A-Za-z][A-Za-z0-9_\-]*)/.exec(open[2] || '');
+            const id = idMatch ? ` id="${idMatch[1]}"` : '';
+            if (kind === 'eq') {
+                out.push(`<div role="math" class="mdz-eq"${id}>`);
+            } else if (kind === 'tab') {
+                out.push(`<figure class="mdz-tab"${id}>`);
+            } else {
+                out.push(`<figure class="mdz-fig"${id}>`);
+            }
+            stack.push(kind);
+            continue;
+        }
+        if (line.trim() === ':::' && stack.length > 0) {
+            const kind = stack.pop();
+            out.push(kind === 'eq' ? '</div>' : '</figure>');
+            continue;
+        }
+        out.push(line);
+    }
+    // Close any unclosed openers — defensive against malformed input.
+    while (stack.length > 0) {
+        const kind = stack.pop();
+        out.push(kind === 'eq' ? '</div>' : '</figure>');
+    }
+    return out.join('\n');
 }
 
 function escapeXml(s) {
