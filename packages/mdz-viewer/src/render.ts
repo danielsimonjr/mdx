@@ -22,6 +22,7 @@
 import { marked } from "marked";
 
 import { processDirectives } from "./directives.js";
+import { processMath } from "./math.js";
 import type { CslEntry } from "./references.js";
 
 // ---------------------------------------------------------------------------
@@ -163,25 +164,30 @@ const TAG_ALLOWED_ATTRS: Record<string, readonly string[]> = {
  * Pipeline:
  *   1. `processDirectives` — pre-marked transform that resolves
  *      `::ref` / `::cite` / `::fig` / `::eq` / `::tab` / `::bibliography`
- *      to HTML islands. Two-pass: collects ids + citation keys first,
- *      then substitutes. See `directives.ts`.
- *   2. `marked.parse` — CommonMark + GFM. The HTML islands from step 1
- *      pass through marked unchanged.
- *   3. `sanitizeHtml` — allowlist walk. The directive renderer emits
- *      only sanitizer-allowed tags + attributes by construction, so
- *      this pass is a defense-in-depth check, not a transformation.
+ *      to HTML islands. See `directives.ts`.
+ *   2. `processMath` — pre-marked transform that renders `$inline$`
+ *      and `$$display$$` LaTeX via KaTeX (HTML output, no MathML).
+ *      Runs AFTER directives so directive-emitted ARIA labels and
+ *      hashes don't trip the math regex; runs BEFORE marked so the
+ *      KaTeX HTML survives unchanged.
+ *   3. `marked.parse` — CommonMark + GFM. HTML islands from steps 1
+ *      and 2 pass through unchanged.
+ *   4. `sanitizeHtml` — allowlist walk. KaTeX HTML output uses only
+ *      `<span>` elements with class names (no `<math>` element since
+ *      we use `output: "html"`); every tag is in `ALLOWED_TAGS`.
  */
 export function renderMarkdown(
   md: string,
   opts: RenderOptions,
 ): string {
-  const transformed = processDirectives(md, {
+  const directived = processDirectives(md, {
     references: opts.references ?? {},
     citationStyle: opts.citationStyle,
   });
+  const mathed = processMath(directived);
   // marked() is synchronous when `async: false` — but the types allow
   // Promise. Force sync via the synchronous API and coerce the return.
-  const rawHtml = marked.parse(transformed, { async: false, gfm: true }) as string;
+  const rawHtml = marked.parse(mathed, { async: false, gfm: true }) as string;
   return sanitizeHtml(rawHtml, opts);
 }
 

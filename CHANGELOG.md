@@ -196,6 +196,52 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Added — Phase 2.1 viewer: KaTeX math rendering (2026-04-24)
+
+LaTeX math now renders in `<mdz-viewer>` via a KaTeX pre-marked
+transform.
+
+- **Inline `$...$` and display `$$...$$`** detected with regex; the
+  display pattern matches first to prevent greedy-matching `$$` as
+  two adjacent inline spans. Standalone `$` characters (currency,
+  prose) are left untouched — the inline pattern requires content
+  between two `$` on the same line.
+- **KaTeX HTML output mode** (NOT MathML). The output is a tree of
+  `<span>` elements with KaTeX class names; every tag is already in
+  the sanitizer's `ALLOWED_TAGS`. MathML mode would require
+  unwinding the sanitizer's `DROP_CONTENTS_TAGS` posture for
+  `<math>`, a separate threat-model exercise.
+- **ARIA labels** preserve the original TeX source on each math
+  wrapper so screen readers (and any host page that hasn't loaded
+  KaTeX's CSS) get a meaningful announcement.
+- **Failure mode**: `throwOnError: false` plus a belt-and-suspenders
+  outer try/catch turns malformed TeX into a visible
+  `[?math: <source>]` marker rather than dropping the math
+  silently. KaTeX's own error span is kept so authors see the
+  parser's diagnostic too.
+- **Pipeline placement**: directives → math → marked → sanitize.
+  Math runs after directives so directive-emitted ARIA labels
+  don't trip the math regex; before marked so KaTeX's HTML
+  islands pass through to `marked.parse` unchanged.
+- **Bundle cost**: KaTeX is ~75 KB gzipped — added as a top-level
+  dep in `packages/mdz-viewer/package.json`. The fast-path
+  `if (!md.includes("$")) return md;` skips the regex scan for
+  documents with no math at all.
+- **CSS responsibility**: host pages MUST `<link>` KaTeX's
+  stylesheet (`katex.min.css`) for proper symbol-font rendering.
+  Equations remain readable as fallback text without the CSS.
+
+Tests (`packages/mdz-viewer/src/math.test.ts`): 13 vitest cases
+covering fast-path, inline + display rendering, ARIA labels,
+greedy-match prevention, empty-marker output, malformed-TeX
+fallback, lone-`$` non-matching, multi-span lines, sanitizer
+compatibility (only `<span>` and `<div>` survive), end-to-end via
+`renderMarkdown`, XSS resistance against `\href{javascript:…}`,
+co-existence with `::eq`/`::ref` directives.
+
+Total viewer tests now: **85** (38 sanitizer + 24 directives + 10
+references + 13 math). All pass; `tsc --noEmit` clean.
+
 ### Added — Phase 2.4 EPUB bridge: reverse direction (2026-04-24)
 
 `mdz import-epub` ships at `cli/src/commands/import-epub.js`,

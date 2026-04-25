@@ -292,9 +292,12 @@ core is ~30KB gzipped):
 Deliverables:
 
 - [ ] Framework-agnostic web component with shadow DOM isolation
-- [ ] Handles: CommonMark + GFM + math (KaTeX, lazy) + images + video + audio +
-      `::cell` + `::output` + `::include` + alignment/attributes + alt-text + ARIA
-      + cross-references (`::ref`) + citations (`::cite`)
+- [x] Handles: CommonMark + GFM (via `marked`) + **math (KaTeX
+      pre-marked transform, HTML output, ARIA-labeled wrappers)** +
+      images + video + audio (existing) + alignment/attributes
+      (existing) + alt-text + ARIA + **cross-references (`::ref`)** +
+      **citations (`::cite`)** + **`::bibliography`**. Remaining:
+      `::cell` / `::output` / `::include` rendering (next milestone).
 - [ ] Offline-first: uses IndexedDB for archive caching
 - [ ] Accessible by default: full keyboard navigation, screen-reader tested,
       **WCAG 2.1 AA baseline** (raises to 2.2 AA opt-in — 2.1 is what OA journals
