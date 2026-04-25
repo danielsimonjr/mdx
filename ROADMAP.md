@@ -1157,11 +1157,18 @@ normal completion flow.
       `packages/mdz-viewer/` produces a single-file ESM"). The
       worker currently inlines a stub; the real viewer bundle
       should be embedded once the build pipeline emits one.
-- [ ] **Directive label i18n**
-      (`packages/mdz-viewer/src/directives.ts:60` "see TODO at
-      end of file"). Per-kind label prefixes (`Figure`,
-      `Equation`, `Table`) currently English-only; localized
-      labels keyed off `manifest.document.language` are deferred.
+- [x] **Directive label i18n** — done 2026-04-25.
+      `packages/mdz-viewer/src/directives.ts` now ships
+      `LABELS_BY_LANG` covering 8 languages (en/es/fr/de/it/pt/ja/zh,
+      ~75% of academic publishing by paper count per Web of
+      Science 2023). `resolveLabels(language)` strips the BCP-47
+      subtag (`fr-CA` → `fr`) and falls back to English for
+      unknown / missing tags. `DirectiveOptions.language` threads
+      the manifest's `document.language` through both the pass-1
+      collector and the labeled-opener renderer. 4 new vitest
+      cases pin the localization, the subtag fallback, and the
+      English default. Adding a language is a one-line
+      addition to `LABELS_BY_LANG`.
 - [ ] **EPUB export `adm-zip → yazl` swap**
       (`cli/src/commands/export-epub.js:218`). adm-zip orders
       entries non-deterministically; yazl supports explicit

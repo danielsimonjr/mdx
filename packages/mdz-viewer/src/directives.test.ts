@@ -14,7 +14,7 @@
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
-import { processDirectives } from "./directives.js";
+import { processDirectives, resolveLabels } from "./directives.js";
 import { renderMarkdown } from "./render.js";
 import type { CslEntry } from "./references.js";
 
@@ -650,6 +650,35 @@ See ::ref[f1] for the result.
     // The sanitizer must NOT have stripped the cite/figure islands.
     expect(html).toContain("<cite");
     expect(html).toContain("<figure");
+  });
+
+  it("localizes labeled-directive prefixes per manifest.document.language", () => {
+    const md = "::fig{id=overview}\n\nA caption.\n";
+    const en = processDirectives(md, { references: NO_REFS, language: "en-US" });
+    expect(en).toContain("Figure 1");
+    const es = processDirectives(md, { references: NO_REFS, language: "es-ES" });
+    expect(es).toContain("Figura 1");
+    const ja = processDirectives(md, { references: NO_REFS, language: "ja-JP" });
+    expect(ja).toContain("図 1");
+    const zh = processDirectives(md, { references: NO_REFS, language: "zh-CN" });
+    expect(zh).toContain("图 1");
+  });
+
+  it("falls back to English for unknown / missing languages", () => {
+    const md = "::fig{id=x}\n\nCaption.\n";
+    expect(processDirectives(md, { references: NO_REFS })).toContain("Figure 1");
+    expect(processDirectives(md, { references: NO_REFS, language: "xx-YY" })).toContain("Figure 1");
+  });
+
+  it("uses the primary subtag — fr-CA and fr both resolve to French labels", () => {
+    expect(resolveLabels("fr-CA").fig).toBe("Figure");
+    expect(resolveLabels("fr").eq).toBe("Équation");
+    expect(resolveLabels("de").tab).toBe("Tabelle");
+  });
+
+  it("returns the English fallback for null / empty language", () => {
+    expect(resolveLabels(undefined)).toEqual({ fig: "Figure", eq: "Equation", tab: "Table" });
+    expect(resolveLabels("")).toEqual({ fig: "Figure", eq: "Equation", tab: "Table" });
   });
 
   it("does not leak script through the cite path even if a key looks malicious", () => {

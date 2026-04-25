@@ -8,6 +8,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 4.6.8: Directive label i18n (2026-04-25)
+
+`packages/mdz-viewer/src/directives.ts` now localizes the
+labeled-directive prefixes (`Figure 1` / `Figura 1` / `图 1`).
+The previous `LABEL_PREFIX` table was English-only with a
+"see TODO at end of file" note that the pre-RLM audit
+surfaced.
+
+- New `LABELS_BY_LANG` table covers 8 languages: en, es, fr,
+  de, it, pt, ja, zh — picked from Web of Science 2023's
+  ~75% paper-count coverage. Adding a language is a one-line
+  PR.
+- New exported `resolveLabels(language)` strips the BCP-47
+  subtag (`fr-CA` → `fr`, `en-US` → `en`); falls back to
+  English when the tag is null, empty, or unknown.
+- `DirectiveOptions.language` threads the manifest's
+  `document.language` through the pass-1 collector
+  (`collect(md, labelTable)`) and the labeled-opener
+  renderer (`renderLabeledOpener(..., labelTable)`).
+
+4 new vitest cases pin the localization (en/es/ja/zh), the
+unknown-language fallback, the primary-subtag handling, and
+the null/empty-language fallback. 50/50 viewer directive
+tests pass (was 46).
+
 ### Changed — Phase 4.6.4: Audit cluster (2026-04-25)
 
 Three of the four 4.6.4 audit-cluster items closed:

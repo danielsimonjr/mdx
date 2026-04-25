@@ -48,6 +48,14 @@ export interface DirectiveOptions {
    * a labeled "include not resolved" Div, NOT silently dropped.
    */
   archiveEntries?: ReadonlyMap<string, Uint8Array>;
+  /**
+   * BCP-47 language tag used to localize labeled-directive prefixes
+   * (`Figure 1` / `Figura 1` / `图 1` / …). Looked up against
+   * `LABELS_BY_LANG`; falls back to the language's primary subtag
+   * (`fr-CA` → `fr`), then to English. When unset / unknown, English
+   * is used.
+   */
+  language?: string;
 }
 
 interface FirstPassResult {
@@ -57,12 +65,40 @@ interface FirstPassResult {
   citationOrder: string[];
 }
 
-/** Per-kind label prefix. Defaults are English; see TODO at end of file. */
-const LABEL_PREFIX: Record<LabeledKind, string> = {
-  fig: "Figure",
-  eq: "Equation",
-  tab: "Table",
+/**
+ * Per-kind label prefix, keyed by BCP-47 primary language subtag.
+ * Selected against `DirectiveOptions.language`; the primary subtag
+ * (everything before `-` / `_`) is used for the lookup, so
+ * `en-US`, `en-GB`, `en` all resolve identically. Unknown languages
+ * fall back to English.
+ *
+ * Coverage is intentionally pragmatic — the eight languages here
+ * cover ~75% of academic publishing by paper count
+ * (Web of Science 2023). Adding a language is a one-line PR.
+ */
+const LABELS_BY_LANG: Record<string, Record<LabeledKind, string>> = {
+  en: { fig: "Figure", eq: "Equation", tab: "Table" },
+  es: { fig: "Figura", eq: "Ecuación", tab: "Tabla" },
+  fr: { fig: "Figure", eq: "Équation", tab: "Tableau" },
+  de: { fig: "Abbildung", eq: "Gleichung", tab: "Tabelle" },
+  it: { fig: "Figura", eq: "Equazione", tab: "Tabella" },
+  pt: { fig: "Figura", eq: "Equação", tab: "Tabela" },
+  ja: { fig: "図", eq: "式", tab: "表" },
+  zh: { fig: "图", eq: "公式", tab: "表" },
 };
+
+const FALLBACK_LABELS = LABELS_BY_LANG.en;
+
+/**
+ * Resolve the label table for a given BCP-47 tag. Strips the
+ * subtag suffix (`fr-CA` → `fr`); returns the English fallback
+ * when the language is unknown or absent.
+ */
+export function resolveLabels(language: string | undefined): Record<LabeledKind, string> {
+  if (!language) return FALLBACK_LABELS;
+  const primary = language.split(/[-_]/)[0].toLowerCase();
+  return LABELS_BY_LANG[primary] ?? FALLBACK_LABELS;
+}
 
 /**
  * Block-level matchers that span multiple lines. These run BEFORE
@@ -130,7 +166,7 @@ const MAX_INCLUDE_DEPTH = 10;
 /**
  * Run pass-1 collection over the source markdown.
  */
-function collect(md: string): FirstPassResult {
+function collect(md: string, labelTable: Record<LabeledKind, string> = FALLBACK_LABELS): FirstPassResult {
   const labels = new Map<string, string>();
   const counters: Record<LabeledKind, number> = { fig: 0, eq: 0, tab: 0 };
   for (const line of md.split("\n")) {
@@ -140,7 +176,7 @@ function collect(md: string): FirstPassResult {
     const id = parseId(m[2]);
     if (!id) continue;
     counters[kind] += 1;
-    labels.set(id, `${LABEL_PREFIX[kind]} ${counters[kind]}`);
+    labels.set(id, `${labelTable[kind]} ${counters[kind]}`);
   }
 
   const citationOrder: string[] = [];
@@ -198,9 +234,12 @@ export function processDirectives(md: string, opts: DirectiveOptions): string {
   // MAX_INCLUDE_DEPTH so a malformed archive can't recurse forever.
   const resolved = resolveIncludes(md, opts.archiveEntries ?? new Map(), 0, new Set());
 
+  // Resolve the localized label table for this document.
+  const labelTable = resolveLabels(opts.language);
+
   // Re-run the id + citation collection on the post-include text so
   // labels/citations from included files are numbered correctly.
-  const { labels, citationOrder } = collect(resolved);
+  const { labels, citationOrder } = collect(resolved, labelTable);
   const style = opts.citationStyle ?? "chicago-author-date";
 
   // Stage 1 — multi-line block substitutions for cells + outputs.
@@ -221,7 +260,7 @@ export function processDirectives(md: string, opts: DirectiveOptions): string {
   for (const line of staged.split("\n")) {
     const figMatch = FIG_LINE.exec(line);
     if (figMatch) {
-      out.push(renderLabeledOpener(figMatch[1] as LabeledKind, figMatch[2], labels));
+      out.push(renderLabeledOpener(figMatch[1] as LabeledKind, figMatch[2], labels, labelTable));
       continue;
     }
     if (BIBLIOGRAPHY_LINE.test(line)) {
@@ -252,10 +291,11 @@ function renderLabeledOpener(
   kind: LabeledKind,
   attrBody: string,
   labels: Map<string, string>,
+  labelTable: Record<LabeledKind, string> = FALLBACK_LABELS,
 ): string {
   const id = parseId(attrBody);
   if (!id) return `<!-- mdz-${kind}: missing id -->`;
-  const label = labels.get(id) ?? `${LABEL_PREFIX[kind]} ?`;
+  const label = labels.get(id) ?? `${labelTable[kind]} ?`;
   // Use semantic <figure> for fig; <div role="math"> for eq; <figure> with
   // a class for tab (real <table> would require the caller to embed one).
   if (kind === "eq") {
