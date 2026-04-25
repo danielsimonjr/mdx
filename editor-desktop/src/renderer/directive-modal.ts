@@ -21,13 +21,19 @@ import {
   validateInclude,
   validateFig,
   validateCite,
+  validateAssetPointer,
   type CellFormState,
   type IncludeFormState,
   type FigFormState,
   type CiteFormState,
+  type AssetPointerFormState,
   type ValidationResult,
 } from "./directive-pickers.js";
-import type { InsertionPayload, LabeledKind } from "./directive-insert.js";
+import type {
+  InsertionPayload,
+  LabeledKind,
+  AssetPointerKind,
+} from "./directive-insert.js";
 
 interface FieldDef {
   name: string;
@@ -286,4 +292,96 @@ function resolvePayload(
   return v.ok
     ? { ok: true, result: v.payload }
     : { ok: false, field: v.field, message: v.message };
+}
+
+// ---------------------------------------------------------------------------
+// Non-core asset-pointer pickers (Phase 2.3b.7)
+//
+// One generic dispatcher per kind; the differences between
+// `::video` and `::audio` (etc.) are just labels and which extra
+// brace attributes are exposed in the modal. Centralising the
+// schema keeps the toolbar wiring uniform.
+// ---------------------------------------------------------------------------
+
+interface KindSpec {
+  title: string;
+  placeholder: string;
+  /** Extra brace attributes for the kind (besides `src`). */
+  extraFields: ReadonlyArray<FieldDef>;
+}
+
+const KIND_SPECS: Record<AssetPointerKind, KindSpec> = {
+  video: {
+    title: "Insert video",
+    placeholder: "assets/video/intro.mp4",
+    extraFields: [
+      { name: "poster", label: "Poster image (optional)", type: "text", placeholder: "assets/images/poster.jpg" },
+      { name: "caption", label: "Caption (optional)", type: "text" },
+    ],
+  },
+  audio: {
+    title: "Insert audio",
+    placeholder: "assets/audio/clip.mp3",
+    extraFields: [{ name: "caption", label: "Caption (optional)", type: "text" }],
+  },
+  model: {
+    title: "Insert 3D model",
+    placeholder: "assets/models/scene.glb",
+    extraFields: [
+      { name: "caption", label: "Caption (optional)", type: "text" },
+      { name: "background", label: "Background color (optional)", type: "text", placeholder: "#202020" },
+    ],
+  },
+  embed: {
+    title: "Insert embedded document",
+    placeholder: "assets/documents/paper.pdf",
+    extraFields: [
+      { name: "caption", label: "Caption (optional)", type: "text" },
+      { name: "page", label: "Page (optional)", type: "number" },
+    ],
+  },
+  data: {
+    title: "Insert data visualization",
+    placeholder: "assets/data/series.csv",
+    extraFields: [
+      {
+        name: "type",
+        label: "Chart type",
+        type: "select",
+        value: "line",
+        options: [
+          { value: "line", label: "Line" },
+          { value: "bar", label: "Bar" },
+          { value: "scatter", label: "Scatter" },
+          { value: "table", label: "Table" },
+        ],
+      },
+      { name: "caption", label: "Caption (optional)", type: "text" },
+    ],
+  },
+};
+
+export function openAssetPointerPicker(
+  host: HTMLElement,
+  kind: AssetPointerKind,
+  archiveEntries: ReadonlyArray<string> | null,
+): Promise<InsertionPayload | null> {
+  const spec = KIND_SPECS[kind];
+  return openModal<InsertionPayload>(
+    host,
+    {
+      title: spec.title,
+      submitLabel: `Insert ::${kind}`,
+      fields: [
+        { name: "src", label: "Source path", type: "text", placeholder: spec.placeholder },
+        ...spec.extraFields,
+      ],
+    },
+    (v) => {
+      const attrs: Record<string, string> = {};
+      for (const field of spec.extraFields) attrs[field.name] = v[field.name] ?? "";
+      const state: AssetPointerFormState = { src: v.src, attrs };
+      return resolvePayload(validateAssetPointer(kind, state, archiveEntries));
+    },
+  );
 }

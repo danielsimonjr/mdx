@@ -11,6 +11,7 @@ import {
   validateInclude,
   validateFig,
   validateCite,
+  validateAssetPointer,
   collectExistingIds,
   collectBibliographyKeys,
 } from "../src/renderer/directive-pickers.js";
@@ -214,5 +215,89 @@ describe("validateCite", () => {
     const r = validateCite({ keys: ["x"], prefix: "see", suffix: "p. 42" }, null);
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.payload.text).toContain('{prefix="see" suffix="p. 42"}');
+  });
+});
+
+describe("validateAssetPointer", () => {
+  it("accepts a valid mp4 for ::video", () => {
+    const r = validateAssetPointer("video", { src: "assets/video/intro.mp4" }, null);
+    expect(r.ok).toBe(true);
+  });
+
+  it("rejects empty src", () => {
+    const r = validateAssetPointer("video", { src: "" }, null);
+    expect(r.ok).toBe(false);
+  });
+
+  it("rejects absolute paths", () => {
+    const r = validateAssetPointer("video", { src: "/etc/foo.mp4" }, null);
+    expect(r.ok).toBe(false);
+  });
+
+  it("rejects path traversal", () => {
+    const r = validateAssetPointer("audio", { src: "../leaked.mp3" }, null);
+    expect(r.ok).toBe(false);
+  });
+
+  it("rejects mismatched extension for kind", () => {
+    const r = validateAssetPointer("video", { src: "assets/images/x.png" }, null);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.message).toContain("supported ::video extension");
+  });
+
+  it("is case-insensitive on extensions", () => {
+    expect(validateAssetPointer("video", { src: "assets/x.MP4" }, null).ok).toBe(true);
+    expect(validateAssetPointer("audio", { src: "assets/x.WAV" }, null).ok).toBe(true);
+  });
+
+  it("rejects src not in archive when entries provided", () => {
+    const r = validateAssetPointer("video", { src: "assets/missing.mp4" }, ["assets/x.mp4"]);
+    expect(r.ok).toBe(false);
+  });
+
+  it("accepts src present in archive entries", () => {
+    const r = validateAssetPointer("video", { src: "assets/x.mp4" }, ["assets/x.mp4"]);
+    expect(r.ok).toBe(true);
+  });
+
+  it("threads attrs through to the builder", () => {
+    const r = validateAssetPointer("video", {
+      src: "assets/video/x.mp4",
+      attrs: { poster: "assets/images/p.jpg", caption: "Demo video" },
+    }, null);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.payload.text).toContain("poster=assets/images/p.jpg");
+      // "Demo video" contains whitespace, so the brace formatter wraps in quotes.
+      expect(r.payload.text).toContain('caption="Demo video"');
+    }
+  });
+
+  it("strips empty attr values", () => {
+    const r = validateAssetPointer("video", {
+      src: "assets/x.mp4",
+      attrs: { poster: "  ", caption: "" },
+    }, null);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.payload.text).not.toContain("{");
+  });
+
+  // Per-kind extension matrix
+  it.each([
+    ["video", "assets/v/x.mp4", true],
+    ["video", "assets/v/x.webm", true],
+    ["video", "assets/v/x.mp3", false],
+    ["audio", "assets/a/x.wav", true],
+    ["audio", "assets/a/x.mp4", false],
+    ["model", "assets/m/x.glb", true],
+    ["model", "assets/m/x.gltf", true],
+    ["model", "assets/m/x.png", false],
+    ["embed", "assets/d/x.pdf", true],
+    ["embed", "assets/d/x.docx", false],
+    ["data", "assets/d/x.csv", true],
+    ["data", "assets/d/x.json", true],
+    ["data", "assets/d/x.xml", false],
+  ] as const)("validateAssetPointer(%s, %s) → %s", (kind, src, expected) => {
+    expect(validateAssetPointer(kind, { src }, null).ok).toBe(expected);
   });
 });

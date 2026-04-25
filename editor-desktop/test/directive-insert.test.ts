@@ -18,6 +18,12 @@ import {
   buildInclude,
   buildFig,
   buildCite,
+  buildAssetPointer,
+  buildVideo,
+  buildAudio,
+  buildModel,
+  buildEmbed,
+  buildData,
   CURSOR_SENTINEL,
 } from "../src/renderer/directive-insert.js";
 
@@ -145,5 +151,62 @@ describe("buildCite", () => {
   it("omits the locator brace when both prefix and suffix are absent", () => {
     const out = buildCite({ keys: ["x"], locator: {} });
     expect(out.text).toBe("::cite[x]");
+  });
+});
+
+describe("buildAssetPointer (non-core)", () => {
+  it("parks cursor at the src slot when src is empty", () => {
+    const out = buildAssetPointer("video");
+    expect(out.text).toBe("::video[src=]\n");
+    expect(out.text.slice(out.cursorOffset).startsWith("]")).toBe(true);
+  });
+
+  it("emits a complete directive when src is provided and parks cursor after", () => {
+    const out = buildAssetPointer("video", { src: "assets/video/intro.mp4" });
+    expect(out.text.startsWith("::video[src=assets/video/intro.mp4]")).toBe(true);
+    expect(out.cursorOffset).toBeGreaterThan(out.text.indexOf("]"));
+  });
+
+  it("formats safe-token attribute values unquoted", () => {
+    const out = buildAssetPointer("video", {
+      src: "assets/video/intro.mp4",
+      attrs: { poster: "assets/images/poster.jpg" },
+    });
+    expect(out.text).toContain("{poster=assets/images/poster.jpg}");
+  });
+
+  it("quotes attribute values containing whitespace", () => {
+    const out = buildAssetPointer("data", {
+      src: "assets/data/series.csv",
+      attrs: { caption: "Quarterly revenue" },
+    });
+    expect(out.text).toContain('{caption="Quarterly revenue"}');
+  });
+
+  it("escapes embedded double quotes in attribute values", () => {
+    const out = buildAssetPointer("audio", {
+      src: "assets/audio/clip.mp3",
+      attrs: { title: 'a "quoted" title' },
+    });
+    expect(out.text).toContain('title="a \\"quoted\\" title"');
+  });
+
+  it("omits the brace when all attrs are empty", () => {
+    const out = buildAssetPointer("audio", {
+      src: "assets/audio/x.mp3",
+      attrs: { caption: "" },
+    });
+    expect(out.text).not.toContain("{");
+  });
+
+  // Per-kind convenience wrappers
+  it.each<[string, (opts?: { src?: string }) => { text: string }]>([
+    ["video", buildVideo],
+    ["audio", buildAudio],
+    ["model", buildModel],
+    ["embed", buildEmbed],
+    ["data", buildData],
+  ])("buildXxx wrapper for %s emits the right kind", (kind, fn) => {
+    expect(fn({ src: `assets/${kind}/x` }).text.startsWith(`::${kind}[`)).toBe(true);
   });
 });

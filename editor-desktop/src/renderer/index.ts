@@ -19,7 +19,9 @@ import {
   openIncludePicker,
   openFigPicker,
   openCitePicker,
+  openAssetPointerPicker,
 } from "./directive-modal.js";
+import type { AssetPointerKind } from "./directive-insert.js";
 import { collectExistingIds, collectBibliographyKeys } from "./directive-pickers.js";
 import { checkMarkdown, summarize, type A11yViolation } from "./accessibility-checker.js";
 
@@ -59,6 +61,11 @@ const pickerButtons = {
   include: document.getElementById("picker-include") as HTMLButtonElement,
   fig: document.getElementById("picker-fig") as HTMLButtonElement,
   cite: document.getElementById("picker-cite") as HTMLButtonElement,
+  video: document.getElementById("picker-video") as HTMLButtonElement,
+  audio: document.getElementById("picker-audio") as HTMLButtonElement,
+  model: document.getElementById("picker-model") as HTMLButtonElement,
+  embed: document.getElementById("picker-embed") as HTMLButtonElement,
+  data: document.getElementById("picker-data") as HTMLButtonElement,
 };
 
 const a11yStatusEl = document.getElementById("a11y-status")!;
@@ -222,6 +229,14 @@ pickerButtons.fig.addEventListener("click", () => {
 pickerButtons.cite.addEventListener("click", () => {
   void runPicker(() => openCitePicker(document.body, bibliographyKeysFromAssets()));
 });
+
+for (const kind of ["video", "audio", "model", "embed", "data"] as const satisfies ReadonlyArray<AssetPointerKind>) {
+  pickerButtons[kind].addEventListener("click", () => {
+    void runPicker(() =>
+      openAssetPointerPicker(document.body, kind, assetStore.list().map((e) => e.path)),
+    );
+  });
+}
 
 async function ensurePane(initialContent: string): Promise<EditorPane> {
   if (pane) {

@@ -15,8 +15,10 @@ import {
   buildInclude,
   buildFig,
   buildCite,
+  buildAssetPointer,
   type InsertionPayload,
   type LabeledKind,
+  type AssetPointerKind,
 } from "./directive-insert.js";
 
 // ---------------------------------------------------------------------------
@@ -239,5 +241,87 @@ export function validateCite(
   return {
     ok: true,
     payload: buildCite({ keys: unique, locator }),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Non-core asset-pointer pickers (Phase 2.3b.7) — ::video, ::audio,
+// ::model, ::embed, ::data
+// ---------------------------------------------------------------------------
+
+/**
+ * Per-kind extension allow-list. Picker rejects mismatched files
+ * loudly so a user doesn't accidentally point `::video` at a PNG.
+ * Lower-cased; comparison is case-insensitive.
+ */
+const KIND_EXTENSIONS: Record<AssetPointerKind, ReadonlyArray<string>> = {
+  video: [".mp4", ".webm", ".mov", ".m4v"],
+  audio: [".mp3", ".wav", ".ogg", ".oga", ".m4a", ".flac"],
+  model: [".gltf", ".glb"],
+  embed: [".pdf"],
+  data: [".csv", ".tsv", ".json", ".jsonl", ".geojson"],
+};
+
+function extensionOk(kind: AssetPointerKind, src: string): boolean {
+  const lower = src.toLowerCase();
+  return KIND_EXTENSIONS[kind].some((ext) => lower.endsWith(ext));
+}
+
+export interface AssetPointerFormState {
+  src: string;
+  /**
+   * Free-form attribute pairs for the brace. Each value is emitted
+   * either as `key=value` (when value is a safe token) or
+   * `key="value"` (otherwise). Empty values are omitted.
+   */
+  attrs?: Readonly<Record<string, string>>;
+}
+
+/**
+ * Validate a non-core directive form state. The
+ * archive-entries / extension checks are kind-aware so a misuse
+ * (`::video[src=foo.png]`) is caught before insertion.
+ */
+export function validateAssetPointer(
+  kind: AssetPointerKind,
+  state: AssetPointerFormState,
+  archiveEntries: ReadonlyArray<string> | null,
+): ValidationResult {
+  const src = state.src.trim();
+  if (!src) {
+    return { ok: false, field: "src", message: "Source path is required." };
+  }
+  if (src.startsWith("/") || src.includes("..")) {
+    return {
+      ok: false,
+      field: "src",
+      message: "Source must be archive-relative (no leading slash, no `..`).",
+    };
+  }
+  if (!extensionOk(kind, src)) {
+    return {
+      ok: false,
+      field: "src",
+      message: `'${src}' does not match a supported ::${kind} extension (${KIND_EXTENSIONS[kind].join(", ")}).`,
+    };
+  }
+  if (archiveEntries && !archiveEntries.includes(src)) {
+    return {
+      ok: false,
+      field: "src",
+      message: `'${src}' is not in the open archive.`,
+    };
+  }
+  // Drop empty attrs so the brace doesn't render `{}`.
+  const attrs: Record<string, string> = {};
+  if (state.attrs) {
+    for (const [k, v] of Object.entries(state.attrs)) {
+      const trimmed = v.trim();
+      if (trimmed) attrs[k] = trimmed;
+    }
+  }
+  return {
+    ok: true,
+    payload: buildAssetPointer(kind, { src, attrs: Object.keys(attrs).length > 0 ? attrs : undefined }),
   };
 }

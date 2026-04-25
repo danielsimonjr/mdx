@@ -196,6 +196,42 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Added — Phase 2.3b.7.1–5: Non-core directive picker pack (2026-04-24)
+
+Five new toolbar buttons round out the editor's directive support:
+`::video`, `::audio`, `::model`, `::embed`, `::data`. All five
+share one builder (`buildAssetPointer(kind, opts)`) and one
+validator (`validateAssetPointer(kind, state, archiveEntries)`)
+because the spec shape is identical: `::<kind>[src=<path>]{<attrs>}`.
+
+Per-kind extension allow-lists prevent obvious misuses up front:
+
+- `::video` accepts `.mp4`, `.webm`, `.mov`, `.m4v`
+- `::audio` accepts `.mp3`, `.wav`, `.ogg`, `.oga`, `.m4a`, `.flac`
+- `::model` accepts `.gltf`, `.glb`
+- `::embed` accepts `.pdf`
+- `::data` accepts `.csv`, `.tsv`, `.json`, `.jsonl`, `.geojson`
+
+Pointing `::video` at a `.png` is rejected with a clear error that
+lists the valid extensions.
+
+The brace-attribute formatter (`formatBrace` in directive-insert.ts)
+is shared across all kinds and quotes values containing whitespace
+or quotes (`caption="Quarterly revenue"`) while letting safe tokens
+pass through unquoted (`poster=assets/images/p.jpg`). Embedded
+double quotes in attribute values are backslash-escaped.
+
+Modal dispatch is centralised: `openAssetPointerPicker(host, kind,
+entries)` reads a per-kind `KindSpec` (title, placeholder, extra
+fields) so toolbar wiring stays uniform — adding a new asset-pointer
+kind is one new entry in `KIND_SPECS` and one new toolbar button.
+
+34 new vitest cases (11 builder + 23 validator including a 13-row
+extension-matrix `it.each`). Net editor-desktop tests: 150 → 184.
+
+Phase 2.3b.7 picker pack now complete; the editor surfaces every
+asset-pointer directive in the v2.0 spec via dedicated UI.
+
 ### Added — Phase 2.3b.2: In-editor accessibility checker (2026-04-24)
 
 The editor's status bar now shows a live WCAG 2.2 AA structural
