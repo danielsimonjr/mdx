@@ -1,0 +1,6 @@
+{
+  "expected_violations": [],
+  "wcag_level": "AA",
+  "wcag_criteria": ["1.4.3"],
+  "description": "Dark grey #222 on white satisfies AA contrast (~16:1)."
+}

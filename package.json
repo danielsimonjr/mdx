@@ -11,6 +11,7 @@
   ],
   "scripts": {
     "test": "npm run test --workspaces --if-present",
+    "test:a11y-real": "node tests/accessibility/run_axe.js",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {

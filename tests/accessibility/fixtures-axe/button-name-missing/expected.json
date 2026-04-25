@@ -1,0 +1,6 @@
+{
+  "expected_violations": ["button-name"],
+  "wcag_level": "A",
+  "wcag_criteria": ["4.1.2"],
+  "description": "Empty <button> with no accessible name (no text, no aria-label, no title) — keyboard / screen-reader users have no idea what it does."
+}

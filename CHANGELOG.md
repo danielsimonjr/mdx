@@ -8,6 +8,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 3.3b: axe-core + Playwright runner scaffold (2026-04-25)
+
+Closes the gap left by the Python structural runner — WCAG criteria
+that need a real browser. New runner at
+`tests/accessibility/run_axe.js`:
+
+- Boots Chromium via Playwright (`page.setContent()` only — no network).
+- Injects `axe-core/axe.min.js` from `node_modules/axe-core/`.
+- Runs `axe.run(document, {runOnly: {type: "tag", values:
+  ["wcag2a", "wcag2aa", "wcag22a", "wcag22aa", "best-practice"]}})`.
+- Compares fired rule IDs against each fixture's `expected.json`,
+  asserting exact match (drift either direction → FAIL).
+
+Initial fixture pack (`tests/accessibility/fixtures-axe/`, 7 cases):
+
+- `color-contrast-fail` (#aaa on white, ratio ≈ 2.85:1) — WCAG 1.4.3
+- `color-contrast-ok` (#222 on white, ~16:1) — clean baseline
+- `form-label-missing` (bare `<input type="text">` in form) —
+  WCAG 1.3.1, 4.1.2 (axe `label` rule)
+- `form-label-ok` (`<label for="q">` + matching id) — clean baseline
+- `button-name-missing` (empty `<button aria-haspopup="true">`) —
+  WCAG 4.1.2 (axe `button-name`)
+- `link-name-icon-only` (`<a><img></a>` with no alt) —
+  WCAG 1.1.1, 2.4.4, 4.1.2 (axe `image-alt` + `link-name`)
+- `landmark-main-missing` (no `<main>` element) — best-practice
+  (axe `landmark-one-main` + `region`)
+
+Findings during fixture authoring:
+
+- axe treats `placeholder` as a label source for the `label` rule.
+  Fixtures that demonstrate the violation must omit placeholder.
+- Without a `<main>` wrapper, every fixture also fires
+  `landmark-one-main` and `region` — drowning the actual signal.
+  Convention: wrap each fixture's body in `<main>` so only the
+  test target violates.
+- Fixtures use `page.setContent()` rather than network loads to
+  keep the runner deterministic and CI-portable.
+
+Wiring:
+
+- New root script `npm run test:a11y-real` invokes the runner.
+- Runner script gracefully fails (exit 2 + install instructions)
+  when Playwright or axe-core isn't installed — neither is added
+  to package.json (~150 MB combined; install on demand).
+- README updated with both the always-on Python baseline command
+  and the opt-in axe runner command.
+
+This is a **scaffold** — not in CI yet. CI promotion comes when
+the fixture pack reaches a count that justifies the Playwright
+install cost on every push (Phase 3.3b expansion targets +20 more
+fixtures: keyboard nav, focus visible, ARIA on interactive
+elements, table semantics, video captions, language-of-parts).
+
 ### Added — Phase 3.3: `mdz validate --a11y-report` (WCAG sidecar JSON) (2026-04-25)
 
 Closes the deferred Compliance-report deliverable from Phase 2.3b.2.

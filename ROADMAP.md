@@ -1177,7 +1177,7 @@ cycle skipped. Items are split by origin so credit + blame are clear.
 
 ### 4.6.5 Accessibility conformance expansion
 
-- [ ] **A11y fixtures 5 → 50** — expanded 5 → 23 on d6859f0 (image-alt / heading-order / link-name / document-language across positive + negative + combined + edge-case fixtures). **Remaining 27 fixtures** require a real-browser runner (axe-core + playwright) for checks the current Python regex runner cannot perform — color contrast (WCAG 1.4.3), keyboard navigation (2.1.1), focus visible (2.4.7), ARIA correctness (4.1.2), form labels, landmark roles, table headers. Tracked as Phase 3.3 completion.
+- [ ] **A11y fixtures 5 → 50** — expanded 5 → 23 on d6859f0 (structural rules) and 23 → 30 on 2026-04-25 with the Phase 3.3b axe-core scaffold: `tests/accessibility/run_axe.js` (Playwright + axe-core runner) plus 7 browser-criterion fixtures under `tests/accessibility/fixtures-axe/` covering color-contrast (1.4.3 fail + ok), form-label (1.3.1/4.1.2 fail + ok), button-name (4.1.2), link-name on icon-only links (1.1.1/2.4.4/4.1.2), landmark-one-main (1.3.1). **Remaining 20 fixtures** are tracked as Phase 3.3b expansion: keyboard navigation (2.1.1), focus visible (2.4.7), ARIA labelling on interactive elements, table semantics (`<th scope>` patterns), video captions (1.2.2), language-of-parts (3.1.2). The runner is opt-in (`npm run test:a11y-real`); CI promotion happens when the fixture-pack count justifies the Playwright/Chromium install cost.
 
 ### 4.6.6 CI hygiene
 

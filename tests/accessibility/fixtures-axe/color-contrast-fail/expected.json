@@ -1,0 +1,6 @@
+{
+  "expected_violations": ["color-contrast"],
+  "wcag_level": "AA",
+  "wcag_criteria": ["1.4.3"],
+  "description": "Body text in #aaa on white fails AA's 4.5:1 contrast minimum."
+}

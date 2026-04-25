@@ -1,0 +1,6 @@
+{
+  "expected_violations": [],
+  "wcag_level": "A",
+  "wcag_criteria": ["1.3.1", "4.1.2"],
+  "description": "Text input with associated <label for=...> passes axe."
+}

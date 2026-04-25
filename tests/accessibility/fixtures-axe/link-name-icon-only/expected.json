@@ -1,0 +1,6 @@
+{
+  "expected_violations": ["image-alt", "link-name"],
+  "wcag_level": "A",
+  "wcag_criteria": ["1.1.1", "2.4.4", "4.1.2"],
+  "description": "Icon-only link wraps an <img> with no alt — both image-alt and link-name fire because the link has no accessible name source."
+}

@@ -27,43 +27,59 @@ describes both the current state and the target fixture set.
 
 ## Running
 
+### Always-on baseline (Python, no browser)
+
 ```bash
-# Install once
-cd tests/accessibility
-npm install
-
-# Run against the viewer web component
-npm run test
-
-# Generate an HTML compliance report
-npm run test:report
+python tests/accessibility/run_accessibility.py
 ```
 
-The runner spawns Chromium via Playwright, loads each fixture through
-the viewer, and runs axe-core. Failures are printed with the WCAG
-success-criterion reference and a suggested fix.
+Runs the structural rules (image-alt / heading-order / link-name /
+document-language) against every fixture under `fixtures/`. CI
+exercises this on every push.
+
+### Browser-driven runner (Phase 3.3 axe-core scaffold)
+
+```bash
+# Install once — heavy (~150 MB for Playwright chromium-headless-shell)
+npm install --no-save axe-core@^4.10.0 playwright@^1.59.0
+npx playwright install chromium
+
+# Run against fixtures-axe/
+npm run test:a11y-real
+```
+
+`tests/accessibility/run_axe.js` boots Chromium via Playwright, loads
+each `fixtures-axe/*/input.html` via `page.setContent()` (no network),
+injects axe-core, and asserts `axe.run()` violations exactly match
+`expected.json`. Catches the WCAG criteria the Python runner cannot:
+contrast (1.4.3), keyboard / focus (2.1.1, 2.4.7), ARIA (4.1.2), form
+labels (1.3.1, 4.1.2), and landmarks (1.3.1).
+
+This runner is **opt-in, not in CI** today — the Playwright + Chromium
+install is too heavy to pay on every push. Promote to CI when the
+fixture-pack count justifies the runner cost (currently 7 axe fixtures;
+Phase 3.3b target is +20 more).
 
 ## Fixture format
 
-Each fixture is a directory containing:
+### `fixtures/` — markdown, structural rules
 
-- `input.md` — the markdown the viewer renders
-- `manifest.json` — optional; if absent, a default v2.0 manifest is
-  wrapped around the input at test time
-- `expected.json` — describes expected axe result shape:
-  ```json
-  {
-    "expected_violations": [],
-    "expected_passes": ["image-alt", "color-contrast"],
-    "wcag_level": "AA",
-    "description": "A bare paragraph and image; nothing exotic."
-  }
-  ```
+Each directory contains:
+
+- `input.md` — markdown the structural Python runner scans
+- `expected.json` — `{expected_violations, wcag_level, description}`
+
+### `fixtures-axe/` — HTML, axe-core rules
+
+Each directory contains:
+
+- `input.html` — minimal page. Load via `page.setContent()`; no network.
+- `expected.json` — `{expected_violations, wcag_level, wcag_criteria, description}`
 
 For "positive" fixtures (should pass), `expected_violations` is empty.
-For "negative" fixtures (documenting viewer bugs that shouldn't exist),
-the expected violation is listed so the test fails loudly if the bug
-is fixed without updating the fixture.
+For "negative" fixtures (documenting failure modes the viewer must
+not produce), the expected violation IDs are listed; drift either
+direction surfaces as a per-fixture FAIL.
 
 ## Coverage target
 
