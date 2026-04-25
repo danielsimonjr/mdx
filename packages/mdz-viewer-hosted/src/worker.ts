@@ -321,8 +321,8 @@ function baseShell(opts: ShellOptions): string {
     (configured in wrangler.toml's [assets] block) that serves
     the package's compiled entry point. "npm run build" in
     packages/mdz-viewer/ emits dist/index.js (matches the
-    package.json `main`); wrangler serves it at the binding's
-    root.
+    package.json "main" field); wrangler serves it at the
+    binding's root.
 
     The script-tag below imports the entry-point side-effect
     (registering the <mdz-viewer> custom element); subsequent
