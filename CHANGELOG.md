@@ -8,6 +8,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Verified — Phase 4.6.9: cell-source escape + Pyodide CSP scope audit (2026-04-25)
+
+Two security-adjacent items closed by audit + targeted hardening.
+
+**(1) `data-mdz-cell-source` escape round-trip.** Five new
+vitest cases in
+`packages/mdz-viewer/src/directives-security.test.ts` pin the
+attribute escape round-trip end-to-end:
+
+- five-char escape applied (`& < > " '`) inside the attribute
+  value
+- `</textarea><script>alert(1)</script>` payload survives
+  `escapeHtml` → attribute → `DOMParser` → `dataset.mdzCellSource`
+  byte-equal; no injected `<script>` tag
+- U+2028 / U+2029 line separators preserved
+- already-escaped `&amp;` sequences round-trip without
+  double-encoding
+- `</div><img onerror>` closer payload doesn't break the cell
+  wrapper; the malicious `<img onerror>` doesn't appear as a
+  real tag in the rendered HTML
+
+The pipeline is correct. The escape happens in `escapeHtml` from
+the centralised `html-escape.ts`, and dataset reads
+auto-decode entities — so the round-trip is text-equal even when
+the attribute carries entity-encoded markup.
+
+**(2) Pyodide CSP scope audit.** Verified the
+`cdn.jsdelivr.net` relaxation is correctly scoped:
+
+- `script-src` ✓ — Pyodide loader JS
+- `connect-src` ✓ — runtime fetch of WASM + package wheels
+- `worker-src` (`blob:`) ✓ — Pyodide's web-worker
+- `img-src` / `style-src` / `default-src` — NOT relaxed; the
+  CDN cannot inject anything else
+
+Tightened further while we were there: added `object-src 'none'`
+(no Flash / `<embed>`), `base-uri 'self'` (no `<base href>`
+hijack), `form-action 'self'` (no `<form>` exfiltration). The
+existing `'unsafe-inline'` on `style-src` is preserved — needed
+for the editor's inline-style scaffolding, not Pyodide-related,
+and would need separate refactoring to remove (out of scope for
+this audit).
+
+A tighter per-path CDN constraint
+(`cdn.jsdelivr.net/pyodide/v*/full/`) is what the loader
+actually fetches, but per-path CSP isn't supported in the
+meta-http-equiv form. The Phase 2.2 hosted Worker emits the
+tighter form via response header where it can.
+
+The CSP comment block in `index.html` now documents every
+entry's rationale + the audit findings.
+
 ### Changed — Phase 4.6.9: drop continue-on-error on markdown lint (2026-04-25)
 
 The `markdown-lint` CI job carried `continue-on-error: true` since

@@ -1437,17 +1437,26 @@ the drift this session found."
 
 **F. Security audit**
 
-- [ ] **`data-mdz-cell-source` escape round-trip + Pyodide CSP
-      scope audit.** Two security-adjacent items:
-      (1) verify the HTML-escape applied to the
-      `data-mdz-cell-source` attribute round-trips correctly when
-      JS reads it back via `dataset.mdzCellSource`. Test with
-      cells containing `</textarea>`, `<script>`, and a literal
-      Unicode line-separator (U+2028) in the source.
-      (2) verify the CSP relaxation for `cdn.jsdelivr.net` is
-      scoped only to `script-src` + `connect-src`, not e.g.
-      `img-src`, and that `wasm-unsafe-eval` is the minimum
-      needed (no `unsafe-inline` / `unsafe-eval` leakage).
+- [x] **`data-mdz-cell-source` escape round-trip + Pyodide CSP
+      scope audit** — done 2026-04-25.
+      (1) Five new vitest cases in
+      `packages/mdz-viewer/src/directives-security.test.ts` pin
+      the attribute escape round-trip: hostile sources containing
+      `</textarea>`, `</div><script>`, embedded apostrophes /
+      ampersands, and U+2028 / U+2029 line separators all survive
+      the `escapeHtml` → attribute-emission → DOMParser →
+      `dataset.mdzCellSource` pipeline byte-equal. None of the
+      malicious closer payloads inject markup.
+      (2) CSP audit confirmed `cdn.jsdelivr.net` is scoped only
+      to `script-src` + `connect-src` + `worker-src` (the
+      latter via `blob:`), NOT `img-src` / `style-src` /
+      `default-src`. Tightened further: added `object-src 'none'`
+      (no Flash / `<embed>`), `base-uri 'self'` (no `<base href>`
+      hijack), `form-action 'self'` (no `<form>` exfiltration).
+      Comment block in `index.html` documents each entry's
+      rationale. Hosted Worker (Phase 2.2) emits a tighter
+      per-path constraint via response header where the
+      meta-http-equiv form can't.
 
 ---
 

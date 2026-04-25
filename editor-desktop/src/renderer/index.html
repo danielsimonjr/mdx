@@ -4,15 +4,35 @@
   <meta charset="utf-8"/>
   <!--
     CSP: relaxed to allow the Pyodide WASM bundle to load from
-    cdn.jsdelivr.net (Phase 2.3b.1.2). The kernel is opt-in — users
-    only trigger the CDN load by clicking "Run Python cells" — but
-    the CSP has to permit it ahead of time. `wasm-unsafe-eval` is
-    required because Pyodide's WebAssembly.compile path counts as
-    eval under CSP3. See Phase 2.3b.1 ROADMAP entry for the security
-    rationale.
+    cdn.jsdelivr.net (Phase 2.3b.1.2; audited Phase 4.6.9).
+
+    Scope of the cdn.jsdelivr.net relaxation:
+    - script-src    → Pyodide loader JS
+    - connect-src   → fetch of WASM module + package wheels at runtime
+    - worker-src    → Pyodide's web-worker (blob:)
+    - img-src / style-src / default-src — NOT relaxed; the CDN
+      cannot inject images, styles, or anything else.
+
+    `wasm-unsafe-eval` is required because Pyodide's
+    `WebAssembly.compile` path counts as eval under CSP3.
+    `'unsafe-inline'` on style-src is needed for the editor's
+    inline-style scaffolding; not Pyodide-related.
+
+    Tightened by audit:
+    - `object-src 'none'`   → no Flash, no <embed>
+    - `base-uri 'self'`     → no <base href> hijack
+    - `form-action 'self'`  → no <form> exfiltration
+
+    The kernel itself is opt-in — users only trigger the CDN load
+    by clicking "Run Python cells" — but the CSP has to permit it
+    ahead of time. A tighter per-path constraint
+    (`cdn.jsdelivr.net/pyodide/v*/full/`) is what the loader
+    actually fetches, but per-path CSP isn't supported in the
+    meta-http-equiv form (only the HTTP header). The Phase 2.2
+    hosted Worker emits the tighter form via response header.
   -->
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; connect-src 'self' https://cdn.jsdelivr.net; worker-src 'self' blob:;"/>
+        content="default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; connect-src 'self' https://cdn.jsdelivr.net; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self';"/>
   <title>MDZ Editor</title>
   <style>
     body { font-family: system-ui, sans-serif; margin: 0; height: 100vh; display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: 1fr 220px; }
