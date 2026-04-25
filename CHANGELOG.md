@@ -33,6 +33,54 @@ Five small open items closed:
   remains externally blocked but is now scoped to a one-command
   follow-up (`cargo generate-lockfile && git add Cargo.lock`).
 
+### Added — Phase 2.3b.5.2: Compare-locales modal + sync-scroll (2026-04-25)
+
+The "Compare locales" toolbar button now opens a side-by-side
+modal showing the current draft on the left and any sibling
+locale on the right (picked via dropdown). Sync-scroll keeps the
+two panes aligned at the paragraph level using the alignment
+table from Phase 2.3b.5.
+
+Two pieces:
+
+- **Sync-scroll mapping** in
+  `editor-desktop/src/renderer/sync-scroll.ts`:
+  - `buildSyncScrollState(left, right)` — wraps
+    `paragraphSlices` + `alignParagraphs` from the locales data
+    layer.
+  - `paragraphAtLine(slices, line)` — finds which paragraph a
+    line falls inside; clamps to the last paragraph past EOF.
+  - `mapLineLeftToRight` / `mapLineRightToLeft` — direct
+    paragraph-index lookup, returns null when the alignment has
+    no match.
+  - `proportionalMap(state, line, direction)` — fallback that
+    maps by relative document offset (line-count ratio); always
+    returns a sensible target line.
+  - `mapWithFallback(state, line, direction)` — tries direct
+    mapping first, falls back to proportional.
+- **Compare-locales modal in `index.ts`**:
+  - `loadLocaleState(entries)` walks the open archive's locale
+    files (per `enumerateLocales(manifest)`) into a
+    `Map<language, text>`.
+  - `openLocaleModal()` builds a `<dialog>` with the two
+    read-only panes; `change`-on-dropdown rebuilds the alignment
+    state and resets scroll positions; bidirectional scroll
+    listeners use a `syncing` flag to suppress feedback loops.
+
+The modal is read-only for this chunk — the full read-write
+secondary CodeMirror pane (with stacked-pane layout in the
+main editor) is gated on CodeMirror state-effects work that
+deserves its own chunk (Phase 2.3b.5.3 follow-up). The
+read-only view validates the alignment + sync-scroll plumbing
+end-to-end and gives translators a useful comparison view today.
+
+16 new vitest cases in `test/sync-scroll.test.ts` cover every
+mapping branch (aligned, missing, empty, length-mismatch),
+proportional fallback math (clamps, ratio bounds), and the
+state-builder edge cases (empty inputs).
+
+Net editor-desktop tests: 351 → 367.
+
 ### Added — Phase 2.3b.4.2: Annotation sidebar UI (2026-04-25)
 
 The editor's right rail now has an Assets / Annotations tab pair.

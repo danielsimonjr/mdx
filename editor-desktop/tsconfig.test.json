@@ -26,6 +26,7 @@
     "src/renderer/cell-runner.ts",
     "src/renderer/diff-render.ts",
     "src/renderer/annotations-render.ts",
+    "src/renderer/sync-scroll.ts",
     "test/**/*.ts"
   ],
   "exclude": [

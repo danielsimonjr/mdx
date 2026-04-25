@@ -41,6 +41,8 @@ import {
   type Annotation,
 } from "./annotations.js";
 import { renderAnnotationSidebar, summarizeAnnotations } from "./annotations-render.js";
+import { enumerateLocales } from "./locales.js";
+import { buildSyncScrollState, mapWithFallback } from "./sync-scroll.js";
 
 declare global {
   interface Window {
@@ -90,6 +92,7 @@ const a11yPanelEl = document.getElementById("a11y-panel")!;
 const generateVariantsBtn = document.getElementById("generate-variants-btn") as HTMLButtonElement;
 const runCellsBtn = document.getElementById("run-cells-btn") as HTMLButtonElement;
 const diffBtn = document.getElementById("diff-btn") as HTMLButtonElement;
+const localeBtn = document.getElementById("locale-btn") as HTMLButtonElement;
 
 /**
  * Track the open archive's parsed snapshot index + raw entry text
@@ -226,7 +229,99 @@ function setPickersEnabled(enabled: boolean): void {
   generateVariantsBtn.disabled = !enabled;
   runCellsBtn.disabled = !enabled;
   diffBtn.disabled = !enabled;
+  localeBtn.disabled = !enabled;
 }
+
+/**
+ * Track raw locale-file text per archive open so the
+ * "Compare locales" modal can pull a sibling without going back
+ * through IPC.
+ */
+const localeFileText = new Map<string, string>();
+
+function loadLocaleState(entries: ReadonlyMap<string, Uint8Array>): void {
+  localeFileText.clear();
+  if (!session) return;
+  for (const entry of enumerateLocales(session.manifest)) {
+    const bytes = entries.get(entry.path);
+    if (bytes) localeFileText.set(entry.language, new TextDecoder().decode(bytes));
+  }
+}
+
+function openLocaleModal(): void {
+  if (!pane || !session) return;
+  const localeEntries = enumerateLocales(session.manifest);
+  if (localeEntries.length < 2) {
+    titleEl.textContent = "Document has no sibling locales — declare in manifest.content.locales.";
+    return;
+  }
+  const primary = localeEntries.find((e) => e.primary) ?? localeEntries[0];
+  const dialog = document.createElement("dialog");
+  dialog.className = "locale-modal";
+  dialog.innerHTML = `
+    <div class="locale-modal-header">
+      <h3 style="margin:0;font-size:1rem;">Compare locales (read-only)</h3>
+      <div class="diff-modal-controls">
+        <select aria-label="Sibling locale"></select>
+        <button type="button" class="cancel-btn">Close</button>
+      </div>
+    </div>
+    <div class="locale-modal-body">
+      <div class="locale-pane left-pane"></div>
+      <div class="locale-pane right-pane"></div>
+    </div>
+  `;
+  const select = dialog.querySelector("select") as HTMLSelectElement;
+  for (const e of localeEntries) {
+    if (e.language === primary.language) continue;
+    const opt = document.createElement("option");
+    opt.value = e.language;
+    opt.textContent = e.language;
+    select.appendChild(opt);
+  }
+  const leftPane = dialog.querySelector(".left-pane") as HTMLDivElement;
+  const rightPane = dialog.querySelector(".right-pane") as HTMLDivElement;
+  const cancelBtn = dialog.querySelector(".cancel-btn") as HTMLButtonElement;
+
+  let syncing = false;
+  const refresh = (): void => {
+    const leftText = pane!.getContent();
+    const rightText = localeFileText.get(select.value) ?? "(locale file not in archive)";
+    leftPane.innerHTML = `<h4>${primary.language} (current draft)</h4>` + escapeHtmlSimple(leftText);
+    rightPane.innerHTML = `<h4>${select.value} (saved)</h4>` + escapeHtmlSimple(rightText);
+    const state = buildSyncScrollState(leftText, rightText);
+    // Reset scroll positions.
+    leftPane.scrollTop = 0;
+    rightPane.scrollTop = 0;
+    // Approximate line height — used to convert pixel scroll → line.
+    const lineHeight = 1.5 * 13.6; // px (font-size 0.85rem ≈ 13.6px × line-height 1.5)
+    const scrollHandler = (source: "left" | "right"): (() => void) => () => {
+      if (syncing) { syncing = false; return; }
+      syncing = true;
+      const fromPane = source === "left" ? leftPane : rightPane;
+      const toPane = source === "left" ? rightPane : leftPane;
+      const sourceLine = Math.max(1, Math.round(fromPane.scrollTop / lineHeight) + 1);
+      const targetLine = mapWithFallback(state, sourceLine, source === "left" ? "ltr" : "rtl");
+      toPane.scrollTop = (targetLine - 1) * lineHeight;
+    };
+    leftPane.addEventListener("scroll", scrollHandler("left"));
+    rightPane.addEventListener("scroll", scrollHandler("right"));
+  };
+  select.addEventListener("change", refresh);
+  cancelBtn.addEventListener("click", () => { dialog.close(); dialog.remove(); });
+  document.body.appendChild(dialog);
+  dialog.showModal();
+  refresh();
+}
+
+function escapeHtmlSimple(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+localeBtn.addEventListener("click", openLocaleModal);
 
 /**
  * Load `history/snapshots/index.json` + every snapshot file from
@@ -532,6 +627,7 @@ async function openFlow(): Promise<void> {
   referencesJson = refsBytes ? new TextDecoder().decode(refsBytes) : null;
   loadSnapshotState(result.archive.entries);
   loadAnnotationsState(result.archive.entries);
+  loadLocaleState(result.archive.entries);
   await ensurePane(result.archive.content);
   setPickersEnabled(true);
   refreshA11y(result.archive.content);

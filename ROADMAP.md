@@ -754,13 +754,23 @@ is independent — sequence by user demand, not by checklist order.
       mismatches. MVP heuristic is positional alignment; fuzzy
       matching for translations that insert / remove paragraphs is
       a follow-up.
-- [ ] Two CodeMirror editors stacked horizontally, each bound to
-      one of `manifest.content.locales.available[]`. Phase
-      2.3b.5.2 follow-up (UI).
-- [ ] "Add locale" command that creates a new
-      `document.<lang>.md` entry pre-populated from the current
-      pane. Phase 2.3b.5.2 follow-up (data layer shipped via
-      `planAddLocale`).
+- [x] **Read-only side-by-side compare-locales modal** wired in
+      `index.ts` via `localeBtn`. Pulls every entry from
+      `enumerateLocales(manifest)`; opens a dialog with two
+      `<pre>`-style panes (current draft on left, sibling locale
+      on right; user picks the sibling via dropdown). Sync-scroll
+      runs through `mapWithFallback` from
+      `editor-desktop/src/renderer/sync-scroll.ts` — paragraph-
+      aligned mapping when the alignment table has a match,
+      proportional fallback otherwise. 16 vitest cases pin the
+      mapping helpers (`paragraphAtLine`, `mapLineLeftToRight`,
+      `mapLineRightToLeft`, `proportionalMap`, `mapWithFallback`,
+      `buildSyncScrollState`).
+- [ ] **Read-write secondary CodeMirror pane** + "Add locale"
+      command. Phase 2.3b.5.3 follow-up — the read-only modal
+      validates the alignment + sync-scroll plumbing first; the
+      full editing surface needs CodeMirror state-effects work
+      that's larger than this chunk.
 
   **Depends on:** 2.3a.2.
 

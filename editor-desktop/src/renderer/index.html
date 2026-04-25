@@ -181,6 +181,18 @@
     .diff-modal-controls { display: flex; gap: 0.5rem; align-items: center; }
     .diff-modal-controls select { padding: 0.25rem 0.5rem; }
 
+    /* Locale-compare modal (Phase 2.3b.5.2) */
+    .locale-modal { width: min(1200px, 95vw); max-height: 85vh; padding: 0; overflow: hidden; display: flex; flex-direction: column; border: 1px solid #ccc; border-radius: 6px; }
+    .locale-modal-header { display: flex; justify-content: space-between; padding: 0.5rem 0.75rem; border-bottom: 1px solid #ddd; gap: 0.5rem; align-items: center; }
+    .locale-modal-body { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; overflow: hidden; flex: 1; background: #ddd; }
+    .locale-pane { background: white; overflow-y: auto; padding: 0.75rem; font-family: ui-monospace, monospace; font-size: 0.85rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+    .locale-pane h4 { margin: 0 0 0.4rem; padding: 0.25rem 0; font-size: 0.78rem; color: #555; border-bottom: 1px solid #ddd; position: sticky; top: 0; background: white; }
+    @media (prefers-color-scheme: dark) {
+      .locale-modal-body { background: #222; }
+      .locale-pane { background: #111; color: #f5f5f5; }
+      .locale-pane h4 { background: #111; border-color: #333; color: #aaa; }
+    }
+
     /* Directive modal */
     .directive-modal { border: 1px solid #ccc; border-radius: 6px; padding: 1.25rem; min-width: 360px; max-width: 90vw; }
     .directive-modal::backdrop { background: rgba(0, 0, 0, 0.4); }
@@ -231,6 +243,7 @@
     <button id="generate-variants-btn" type="button" disabled title="Generate AVIF/WebP variants for staged images">Generate variants</button>
     <button id="run-cells-btn" type="button" disabled title="Execute every Python ::cell and insert ::output blocks">Run Python cells</button>
     <button id="diff-btn" type="button" disabled title="Compare current document against a saved snapshot">Compare versions</button>
+    <button id="locale-btn" type="button" disabled title="Compare current locale against a sibling locale (read-only)">Compare locales</button>
     <div class="mode-toggle" role="group" aria-label="View mode">
       <button id="mode-source" aria-pressed="false">Source</button>
       <button id="mode-split" aria-pressed="true">Split</button>
