@@ -111,9 +111,19 @@ ipcMain.handle("archive:open", async (_e, path: string) => {
   }
 });
 
-ipcMain.handle("archive:save", async (_e, path: string, payload: Parameters<typeof saveArchive>[1]) => {
+ipcMain.handle("archive:save", async (_e, path: string, payload: {
+  manifest: Record<string, unknown>;
+  content: string;
+  /** IPC serializes Map → array of [k, Uint8Array] pairs; restore here. */
+  assets?: Array<[string, Uint8Array]>;
+}) => {
   try {
-    await saveArchive(path, payload, nodeFs);
+    const assetMap = payload.assets ? new Map(payload.assets) : undefined;
+    await saveArchive(
+      path,
+      { manifest: payload.manifest, content: payload.content, assets: assetMap },
+      nodeFs,
+    );
     return { ok: true };
   } catch (e) {
     if (e instanceof ArchiveSaveError) {

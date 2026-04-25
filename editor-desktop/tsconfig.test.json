@@ -11,6 +11,7 @@
     "src/renderer/index.ts",
     "src/renderer/editor-pane.ts",
     "src/renderer/editor-pane-helpers.ts",
+    "src/renderer/asset-store.ts",
     "test/**/*.ts"
   ],
   "exclude": [

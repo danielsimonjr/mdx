@@ -196,6 +196,56 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Added — Phase 2.3a.3: Asset sidebar (2026-04-24)
+
+The editor's right rail now hosts an asset tree with drag-drop
+intake, per-asset SHA-256 hashing, and on-save population of
+`manifest.assets[<category>][]`.
+
+- **`AssetStore` class** at `editor-desktop/src/renderer/asset-store.ts`
+  — pure model with injectable `Hasher`. The renderer wires
+  `webCryptoHasher` (SHA-256 via `crypto.subtle.digest`); tests
+  inject a deterministic `bytes-length → hex` fake so the suite
+  stays synchronous.
+- **Path safety**: `add(filename, bytes)` strips path traversal
+  (`../etc/passwd.png` → `passwd.png`) and Windows backslashes
+  (`C:\foo\fig.png` → `fig.png`) before normalising to
+  `assets/<category>/<basename>`. The store NEVER emits a path
+  containing `..`.
+- **Rename refuses silent clobber**: `rename(path, newBasename)`
+  returns `null` if the target already exists rather than
+  overwriting. Same-name rename is a no-op.
+- **Manifest projection**: `manifestProjection()` groups entries
+  by category and emits spec §9-shaped objects (`path`,
+  `mime_type`, `size_bytes`, `content_hash`). Entries within each
+  category are alphabetically sorted for stable manifest diffs
+  across saves.
+- **Round-trip**: `loadFromArchive(entries)` ingests an opened
+  archive's `assets/...` paths, recomputes content hashes (the
+  shipped manifest may have stale or absent hashes), and seeds
+  the store so subsequent saves carry forward correctly.
+- **HTML / CSS**: new `<aside id="asset-sidebar">` with drop-zone,
+  per-asset list, delete button. Body grid changes to
+  `1fr 220px` so the sidebar parks alongside the source/preview
+  panes without competing for vertical space.
+- **IPC adjustments**: `archive:save` now accepts `assets` as an
+  array of `[path, Uint8Array]` tuples (Map → array conversion
+  needed because IPC structured-clone does flatten Maps unevenly).
+  Main-process handler restores to `Map` before calling
+  `saveArchive`.
+
+Tests at `test/asset-store.test.ts` (32 vitest cases): classify by
+extension (case-insensitive), formatSize boundaries, add /
+remove / rename happy paths + edge cases (path traversal, Windows
+slashes, last-write-wins, missing source, target collision,
+identical-name no-op), manifestProjection grouping + sort
+stability + empty-category omission, toEntriesMap shape,
+loadFromArchive imports `assets/...` paths only.
+
+Total editor-desktop tests: **62** (11 archive-io + 12 editor-pane
++ 7 ipynb-import + 32 asset-store). All pass; tsc --noEmit -p
+tsconfig.test.json clean.
+
 ### Added — Phase 2.3a.4: .ipynb import wiring (2026-04-24)
 
 The editor's File menu gains "Import Jupyter notebook…", routing

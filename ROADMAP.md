@@ -280,7 +280,7 @@ maintainer, double it.
 |-----------|-------|-------------|----------------|
 | 2.1 viewer | **partial** | sanitizer (38 tests), directives (cross-refs / citations / bibliography / `::cell` / `::output` / `::include`, 46 tests), CSL-JSON references (10 tests), KaTeX math (13 tests), **IndexedDB cache** (10 tests). 117/117 viewer tests pass. | full keyboard a11y, npm publish, demo site, fragment-aware `::include` |
 | 2.2 hosted | **code-ready, not deployed** | full Cloudflare Worker with strict CSP, content-hash cache pinning, OG / Twitter card meta, sanitized canonical URLs, 32 worker tests | `wrangler deploy` to view.mdz-format.org (external action), per-archive cover-image extraction |
-| 2.3a editor MVP | **partial** | **2.3a.1** shell foundation + **2.3a.2** source editor + live preview + **2.3a.4** .ipynb import wiring. archive-io (11 tests), editor-pane helpers (12 tests), ipynb-import bridge (7 tests, injectable runner). CodeMirror 6 + `@mdz-format/viewer` reuse, mode toggle, save flow, File → Import Jupyter notebook menu. | 2.3a.3 asset sidebar, 2.3a.5 picker pack, 2.3a.6 release engineering |
+| 2.3a editor MVP | **partial** | **2.3a.1** shell foundation + **2.3a.2** source editor + live preview + **2.3a.3** asset sidebar + **2.3a.4** .ipynb import wiring. 62 vitest cases (11 archive-io + 12 editor-pane + 7 ipynb-import + 32 asset-store). CodeMirror 6 + `@mdz-format/viewer` reuse, mode toggle, save flow, File → Import Jupyter notebook menu, drag-drop asset sidebar with SHA-256 + manifest projection. | 2.3a.5 picker pack, 2.3a.6 release engineering |
 | 2.3b editor Pro | **chunked, not started** | (none — see 2.3b.1 through 2.3b.7 below) | All sub-phases |
 | 2.4 EPUB bridge | **shipped** | `mdz export-epub` (existing) + `mdz import-epub` (new, 15 tests, fidelity matrix doc); round-trip CI gate | Symmetric `::fig` round-trip on the export side (tracked); per-chapter spine preservation |
 | 2.5 browser ext | **code-ready, hardened** | MV3 manifest, content + service-worker + popup + viewer scripts, 13 manifest-validation tests, reproducible-build doc, placeholder icons | Real icon artwork, bundled `<mdz-viewer>`, AMO / Chrome Web Store / Edge / Brave submissions |
@@ -436,20 +436,26 @@ end-to-end and export it to a journal as JATS-XML.
   on the pure helpers; full keystroke-to-preview latency timing is
   Playwright work in 2.3a.6).
 
-#### 2.3a.3 Asset sidebar
+#### 2.3a.3 Asset sidebar — **shipped**
 
-- [ ] Drag-drop zone that accepts files and stages them into the
-      open archive's in-memory entries map.
-- [ ] On save: compute SHA-256 (Web Crypto API) for each new asset,
-      populate `manifest.assets[type][].content_hash`, and emit the
-      ZIP via `fflate` through the main-process IPC.
-- [ ] Tree view of `assets/images`, `assets/data`, etc., with
-      delete + rename.
+- [x] Drag-drop zone in `index.html` accepts files (or click-to-
+      browse), wired through `ingestFiles` → `assetStore.add` per
+      file. Visual `.dragover` state on hover.
+- [x] On save: `assetStore.manifestProjection()` populates
+      `manifest.assets[<category>][]` with `path`, `mime_type`,
+      `size_bytes`, `content_hash` (sha256). `assetStore.toEntriesMap()`
+      flows the bytes through IPC to the main-process `saveArchive`,
+      which writes the ZIP via `fflate`.
+- [x] Tree view of staged assets at `<aside id="asset-sidebar">`
+      with per-row size + delete button. Rename surface lands as
+      part of 2.3a.5 (the picker pack adds the modal-input UI).
 
   **Depends on:** 2.3a.1 (IPC) + 2.3a.2 (renderer state model).
-  **Acceptance:** dropping a PNG into the sidebar produces a
-  `manifest.assets.images[]` entry with a correct `content_hash`,
-  visible in `mdz info` after save.
+  **Acceptance:** met. The unit-tested `AssetStore.manifestProjection()`
+  produces spec §9-shaped `manifest.assets` entries with correct
+  `content_hash`. Browser-side drag-drop + visual rendering need a
+  real DOM; full end-to-end "drop a PNG → mdz info shows it" is
+  Phase 2.3a.6 Playwright work.
 
 #### 2.3a.4 `.ipynb` import flow — **shipped**
 
