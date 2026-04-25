@@ -8,6 +8,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 4.6.9: .editorconfig + .gitattributes (2026-04-25)
+
+Top-level `.editorconfig` and `.gitattributes` pin the repo to
+LF line endings + UTF-8. Closes the per-commit `LF will be
+replaced by CRLF` warnings on Windows hosts that were burying
+real diffs.
+
+`.editorconfig`: `end_of_line = lf`, `charset = utf-8`,
+`insert_final_newline = true`; `indent_size = 2` default with
+`4` for Python + Rust and `tab` for Makefiles. Markdown keeps
+trailing whitespace (the two-space line-break syntax depends on
+it).
+
+`.gitattributes`: `* text=auto eol=lf` so cross-platform clones
+get the same bytes; explicit `binary` for image / archive /
+font / 3D-model types; per-language `diff=` drivers for nicer
+diffs; `package-lock.json` + `Cargo.lock` marked
+`linguist-generated=true` so review tools collapse them.
+
+A `git add --renormalize .` pass on existing tracked files
+would normalise any lingering CRLF; deferred to a separate
+commit since the resulting diff is large and better reviewed
+on its own.
+
 ### Added — Phase 4.6.9: Status-snapshot freshness CI gate (2026-04-25)
 
 `tests/roadmap/check_snapshot_freshness.py` complements the

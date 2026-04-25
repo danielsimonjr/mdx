@@ -1,0 +1,28 @@
+# EditorConfig — https://editorconfig.org
+#
+# Pinned to LF line endings everywhere because (a) every CI host
+# is Linux, (b) the CHANGELOG / ROADMAP cross-impl tooling reads
+# git-tracked files byte-for-byte, and (c) on Windows hosts the
+# pre-existing `LF will be replaced by CRLF` warnings on every
+# commit are noise that masks real diffs.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.{py,rs}]
+indent_size = 4
+
+[Makefile]
+indent_style = tab
+
+# Markdown trims-trailing-whitespace would chew up the explicit
+# two-space line-break syntax; turn it off for markdown.
+[*.md]
+trim_trailing_whitespace = false

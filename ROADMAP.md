@@ -1325,12 +1325,16 @@ the drift this session found."
 
 **B. Repo hygiene**
 
-- [ ] **`.editorconfig` + `.gitattributes` for line endings.**
-      Every commit on this Windows host emits 5–10 `LF will be
-      replaced by CRLF` warnings. Top-level `.editorconfig`
-      declaring `end_of_line = lf` for source files; matching
-      `.gitattributes` with `* text=auto eol=lf`. Run
-      `git add --renormalize .` once the rules land.
+- [x] **`.editorconfig` + `.gitattributes` for line endings** —
+      done 2026-04-25. Top-level `.editorconfig` declaring
+      `end_of_line = lf`, `charset = utf-8`,
+      `insert_final_newline = true`; per-language `indent_size`
+      overrides for Python/Rust (4) + Makefiles (tab); markdown
+      keeps trailing whitespace for the two-space line-break
+      syntax. `.gitattributes` declares `* text=auto eol=lf` plus
+      explicit per-extension rules for source / data files and
+      `binary` for image / archive / font types. Lockfiles marked
+      `linguist-generated=true` so review tools collapse them.
 - [ ] **Retire pre-Phase-2.3 demo files.** `editor/index.html`
       (WYSIWYG demo), `viewer/index.html` (read-only demo), and
       `chrome-extension/` (legacy Chrome-only ext) are all
