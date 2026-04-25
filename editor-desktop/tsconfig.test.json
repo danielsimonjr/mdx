@@ -17,6 +17,7 @@
     "src/renderer/directive-modal.ts",
     "src/renderer/accessibility-checker.ts",
     "src/renderer/block-diff.ts",
+    "src/renderer/annotations.ts",
     "test/**/*.ts"
   ],
   "exclude": [

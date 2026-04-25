@@ -196,6 +196,59 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Added — Phase 2.3b.4 (data layer): Peer-review annotations (2026-04-24)
+
+`editor-desktop/src/renderer/annotations.ts` ships the data side
+of the peer-review annotation layer
+(`spec/directives/peer-review-annotations.md`). Three layers:
+
+**Parsing.** `parseAnnotation(raw, path)` validates against the
+W3C Web Annotation Data Model + MDZ's spec extensions:
+
+- `role` field (`author` | `reviewer` | `editor` | `reader`)
+- 13 W3C `motivation` values + 4 MDZ extended values
+  (`review-accept`, `review-reject`, `review-request-changes`,
+  `review-confidential-comment`)
+- Required-field enforcement (`type === "Annotation"`,
+  `role`, `motivation`, `target`)
+- Tolerant of either object-form `target` (selector into the
+  manuscript) or string-form `target` (reply pointing at parent
+  annotation id)
+
+`loadAnnotations(entries)` walks an archive's entry map, parses
+every `annotations/*.json`, and collects malformed-file errors
+without throwing — a single bad annotation file doesn't sink the
+load.
+
+**Threading.** `buildThreads(annotations)` turns the flat list
+into a reply tree by following `motivation: "replying"` +
+`target: "annotations/parent.json"` pointers. Sorted by `created`
+ascending at every level; annotations missing `created` sort
+last; orphan replies (target id doesn't resolve) become roots so
+they stay visible.
+
+**Trust signals.** `findTrustWarnings(annotations,
+signedCreatorIds)` enforces the spec's signature requirements:
+
+- Unsigned editor decisions (`role: "editor"` +
+  `motivation: "review-*"`) → `severity: "error"` (forgery risk;
+  spec mandates the warning)
+- Unsigned author + reviewer annotations →
+  `severity: "warning"` (low trust)
+- All clean when `creator.id` is in `signedCreatorIds`
+
+Integrates with the Phase 3 signature chain when
+`security/signatures.json` is present; falls back to "warn
+everything" when signature data is absent.
+
+23 vitest cases — every parse error branch, archive-walk
+behavior, threading edge cases (orphans, undated, deep nesting),
+and the four trust-signal classes. Net editor-desktop tests:
+209 → 232.
+
+UI sidebar (collapsible thread render, comment / reply / decision
+flows) deferred to Phase 2.3b.4.2 follow-up.
+
 ### Added — Phase 2.3b.3 (algorithm): Block-level + line-level diff (2026-04-24)
 
 `editor-desktop/src/renderer/block-diff.ts` ships the diff

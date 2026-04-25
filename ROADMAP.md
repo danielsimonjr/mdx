@@ -281,7 +281,7 @@ maintainer, double it.
 | 2.1 viewer | **partial** | sanitizer (38 tests), directives (cross-refs / citations / bibliography / `::cell` / `::output` / `::include`, 46 tests), CSL-JSON references (10 tests), KaTeX math (13 tests), **IndexedDB cache** (10 tests). 117/117 viewer tests pass. | full keyboard a11y, npm publish, demo site, fragment-aware `::include` |
 | 2.2 hosted | **code-ready, not deployed** | full Cloudflare Worker with strict CSP, content-hash cache pinning, OG / Twitter card meta, sanitized canonical URLs, 32 worker tests | `wrangler deploy` to view.mdz-format.org (external action), per-archive cover-image extraction |
 | 2.3a editor MVP | **partial** | **2.3a.1** shell + **2.3a.2** editor+preview + **2.3a.3** asset sidebar + **2.3a.4** .ipynb import + **2.3a.5.0** insertion engine + **2.3a.5.1–4** picker pack. 113 vitest cases (11 archive-io + 12 editor-pane + 7 ipynb-import + 32 asset-store + 19 directive-insert + 32 directive-pickers). Toolbar buttons for `::cell`, `::include`, `::fig`/`::eq`/`::tab`, `::cite`; `<dialog>`-based modal scaffolding; CSL-JSON bibliography lookup; document-scan id-collision check; archive-entry membership check for include targets. | 2.3a.6 release engineering (signed installers — partly external) |
-| 2.3b editor Pro | **partial** | **2.3b.2** a11y checker (37 cases) + **2.3b.7.1–5** non-core picker pack (34 cases) + **2.3b.3** block-level + line-level diff algorithm (25 cases — UI integration deferred). | 2.3b.1 Pyodide kernel, 2.3b.3.2 diff UI, 2.3b.4 review annotations, 2.3b.5 multi-locale, 2.3b.6 image variants |
+| 2.3b editor Pro | **partial** | **2.3b.2** a11y checker (37 cases) + **2.3b.7.1–5** non-core picker pack (34 cases) + **2.3b.3** block-level diff algorithm (25 cases) + **2.3b.4** annotation data layer + threading + trust signals (23 cases). | 2.3b.1 Pyodide kernel, 2.3b.3.2 diff UI, 2.3b.4.2 annotation UI, 2.3b.5 multi-locale, 2.3b.6 image variants |
 | 2.4 EPUB bridge | **shipped** | `mdz export-epub` (existing) + `mdz import-epub` (new, 15 tests, fidelity matrix doc); round-trip CI gate | Symmetric `::fig` round-trip on the export side (tracked); per-chapter spine preservation |
 | 2.5 browser ext | **code-ready, hardened** | MV3 manifest, content + service-worker + popup + viewer scripts, 13 manifest-validation tests, reproducible-build doc, placeholder icons | Real icon artwork, bundled `<mdz-viewer>`, AMO / Chrome Web Store / Edge / Brave submissions |
 
@@ -610,14 +610,33 @@ is independent — sequence by user demand, not by checklist order.
 
 #### 2.3b.4 Peer-review annotation layer
 
-- [ ] Sidebar UI for the annotation tree (per
-      `spec/directives/peer-review-annotations.md` — already
-      shipped).
-- [ ] Comment / reply / accept / reject flows that create / update
-      `annotations/<uuid>.json` entries.
-- [ ] Reviewer identity surfaced via the signed-DID model
-      (`docs/security/SIGNATURE_TRUST.md`); `--role=public|editor`
-      flag for confidential-comment visibility per spec.
+- [x] **Data layer** in
+      `editor-desktop/src/renderer/annotations.ts`. Full
+      `parseAnnotation` per the W3C Web Annotation Data Model with
+      MDZ extensions: `role` field (author/reviewer/editor/reader),
+      4 extended `motivation` values (review-accept,
+      review-reject, review-request-changes,
+      review-confidential-comment), required-field validation per
+      spec. `loadAnnotations(entries)` walks the archive's
+      `annotations/*.json` paths with error tolerance (one
+      malformed file doesn't sink the rest).
+- [x] **Threading** via `buildThreads(annotations)` — turns the
+      flat list into a reply tree using string-target pointers
+      (`motivation: "replying"`, `target: "annotations/parent.json"`),
+      sorted by `created` ascending at every level. Orphan replies
+      (target id missing) become roots so they remain visible.
+- [x] **Trust signals** via `findTrustWarnings(annotations,
+      signedCreatorIds)` — surfaces unsigned editor decisions as
+      `severity: "error"` (forgery risk) and unsigned author /
+      reviewer annotations as `warning`. Integrates with the
+      Phase 3 signature chain when present.
+- [ ] Sidebar UI for the annotation tree (Phase 2.3b.4.2 follow-up).
+- [ ] Comment / reply / accept / reject creation flows
+      (Phase 2.3b.4.2 follow-up).
+- [ ] `--role=public|editor` flag for confidential-comment
+      visibility per spec (deferred — gating on a UI flag is not a
+      security boundary; the public archive should simply not
+      carry confidential comments per the spec's recommendation).
 
   **Depends on:** 2.3a.2 + signature integration.
   **NOT a real-time collaboration feature.** Asynchronous threaded
