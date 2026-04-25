@@ -28,6 +28,7 @@ import { runVariantFlow, summarizeFlow, type VariantEncoderCallback } from "./va
 import { extractPythonCells, runCells, insertOutputs } from "./cell-runner.js";
 import { loadPyodideKernel, type PythonKernel } from "./python-kernel.js";
 import { mergeKernelDeclaration } from "./kernel-manifest.js";
+import { attachCellRunButtons, spliceSingleCellOutput } from "./cell-run-buttons.js";
 import { tokenizeBlocks, diffBlocks } from "./block-diff.js";
 import { renderBlockOps, renderDiffStats } from "./diff-render.js";
 import {
@@ -593,6 +594,25 @@ async function ensurePane(initialContent: string): Promise<EditorPane> {
       },
       onSave: () => {
         void saveFlow();
+      },
+      onPreviewRendered: (host) => {
+        // Phase 2.3b.1.3: inject Run buttons next to each Python
+        // cell. Idempotent — re-renders on debounced source updates
+        // don't duplicate buttons.
+        attachCellRunButtons(host, {
+          getKernel: () => getPythonKernel(),
+          onCellRun: (synthetic, result) => {
+            if (!pane) return;
+            const updated = spliceSingleCellOutput(pane.getContent(), synthetic.source, result);
+            if (updated !== pane.getContent()) {
+              pane.setContent(updated);
+              if (session) setModified(true);
+            }
+          },
+          onStatus: (text) => {
+            titleEl.textContent = text;
+          },
+        });
       },
     },
   );

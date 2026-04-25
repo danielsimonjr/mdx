@@ -28,6 +28,7 @@
     "src/renderer/annotations-render.ts",
     "src/renderer/sync-scroll.ts",
     "src/renderer/kernel-manifest.ts",
+    "src/renderer/cell-run-buttons.ts",
     "test/**/*.ts"
   ],
   "exclude": [

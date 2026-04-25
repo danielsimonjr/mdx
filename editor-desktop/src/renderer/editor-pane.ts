@@ -47,6 +47,14 @@ export interface EditorPaneOptions {
    * bar; preview rendering uses its own debounced path).
    */
   onChange?: (source: string) => void;
+  /**
+   * Optional hook that fires AFTER each preview-pane render.
+   * Phase 2.3b.1.3 uses this to inject per-cell Run buttons into
+   * the rendered DOM. Receives the previewHost element so the
+   * caller can run `querySelectorAll` etc. without the editor
+   * pane needing to know what the hook does.
+   */
+  onPreviewRendered?: (previewHost: HTMLElement) => void;
 }
 
 export interface EditorPane {
@@ -107,6 +115,7 @@ export async function createEditorPane(
       hosts.previewHost.innerHTML = renderMarkdown(source, {
         resolveAsset: () => null,
       });
+      opts.onPreviewRendered?.(hosts.previewHost);
     } catch (e) {
       hosts.previewHost.textContent = `Preview error: ${(e as Error).message}`;
     }

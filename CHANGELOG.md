@@ -8,6 +8,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 2.3b.1.3: per-cell Run buttons (2026-04-25)
+
+The preview pane now shows a ▶ Run button on every Python
+`::cell` block, in addition to the existing "Run Python cells"
+toolbar that runs all of them. Authors who only want to re-run
+the cell they just edited skip the wait on earlier cells.
+
+Three pieces:
+
+- **Renderer change** in `packages/mdz-viewer/src/directives.ts`:
+  `renderCellBlock` now embeds the cell's source and language as
+  `data-mdz-cell-source` / `data-mdz-cell-language` attributes on
+  the rendered `.mdz-cell` div. The HTML escape is the same
+  pre-existing one used for the inline `<code>` body, so the
+  serialization is safe.
+- **Editor wiring** in
+  `editor-desktop/src/renderer/cell-run-buttons.ts`. Pure (with
+  one DOM call):
+  - `attachCellRunButtons(previewHost, opts)` walks for
+    `[data-mdz-cell-language="python"]` elements, injects a
+    single absolutely-positioned Run button into each, tagged
+    with `data-mdz-run-attached` so re-renders don't duplicate.
+  - `spliceSingleCellOutput(markdown, cellSource, result)` — a
+    pure-string helper that finds the cell body in the source
+    and splices an `::output` block after the matching closing
+    fence. 3 vitest cases pin insertion ordering, no-match
+    no-op, and every output-type branch.
+- **EditorPane.onPreviewRendered hook** in `editor-pane.ts`.
+  Fires after each preview render with the host element so
+  `index.ts` can wire `attachCellRunButtons` against the same
+  lazy-loaded Pyodide kernel the toolbar uses.
+
+3 new vitest cases. Net editor-desktop tests: 373 → 376.
+
 ### Verified — Phase 1.2 + 3.1: audit cluster (2026-04-25)
 
 Two ROADMAP entries closed by audit (no code change needed):

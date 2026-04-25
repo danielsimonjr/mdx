@@ -622,9 +622,27 @@ is independent — sequence by user demand, not by checklist order.
       the manifest copy at save time. 6 new vitest cases pin the
       add / preserve / overwrite / immutability / malformed-input
       branches.
-- [ ] **Per-cell Run buttons** in the preview pane (vs the current
-      "Run all" toolbar). Phase 2.3b.1.3 follow-up — needs DOM
-      injection into the rendered preview.
+- [x] **Per-cell Run buttons** in the preview pane — done
+      2026-04-25. Three pieces:
+      1. `directives.ts`'s `renderCellBlock` now embeds the cell's
+         source and language as `data-mdz-cell-source` /
+         `data-mdz-cell-language` attributes on the rendered
+         `.mdz-cell` div.
+      2. New `editor-desktop/src/renderer/cell-run-buttons.ts`
+         walks the preview DOM for
+         `[data-mdz-cell-language="python"]` elements and injects
+         a single Run button (▶) into each, idempotent via the
+         `data-mdz-run-attached` flag. Includes
+         `spliceSingleCellOutput(markdown, cellSource, result)` —
+         a pure helper that finds the cell body in the source and
+         splices an `::output` block after the matching closing
+         fence.
+      3. `EditorPaneOptions.onPreviewRendered` hook fires after
+         each preview render; `index.ts` wires it to
+         `attachCellRunButtons` with the same lazy-loaded Pyodide
+         kernel the toolbar uses. 3 new vitest cases pin the
+         splice behaviour (insertion ordering, no-match no-op,
+         every output type emitted).
 
   **Honest caveat:** Pyodide is ~10 MB download, supports most
   pure-Python plus the curated C-extension wheels in the Pyodide

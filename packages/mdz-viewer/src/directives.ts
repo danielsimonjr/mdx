@@ -548,7 +548,15 @@ function renderCellBlock(attrBody: string, lang: string, source: string): string
 
   const idAttr = id ? ` id="${escapeHtml(id)}"` : "";
   const langClass = language ? ` class="language-${escapeHtml(language)}"` : "";
-  return `<div${idAttr} class="${classes}" aria-label="${escapeHtml(ariaLabel)}"><pre class="mdz-cell-source"><code${langClass}>${escapeHtml(source)}</code></pre></div>`;
+  // Embed the cell's source as a data attribute so the editor's
+  // per-cell Run button (Phase 2.3b.1.3) can pull it out without
+  // re-parsing the rendered HTML. `data-mdz-cell-language` mirrors
+  // the language attribute for the same reason.
+  const dataAttrs = [
+    language ? ` data-mdz-cell-language="${escapeHtml(language)}"` : "",
+    ` data-mdz-cell-source="${escapeHtml(source)}"`,
+  ].join("");
+  return `<div${idAttr} class="${classes}" aria-label="${escapeHtml(ariaLabel)}"${dataAttrs}><pre class="mdz-cell-source"><code${langClass}>${escapeHtml(source)}</code></pre></div>`;
 }
 
 /**
