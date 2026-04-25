@@ -431,6 +431,29 @@ jobs:
       - name: Run helper unit tests
         run: node --test integrations/vscode/test/*.test.js
 
+  validate-browser-extension:
+    name: Validate Browser Extension (Phase 2.5)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Validate manifest.json + script files
+        run: node --test browser-extension/test/manifest.test.js
+
+      - name: Verify reproducible-build doc reflects current state
+        # Smoke check: REPRODUCIBLE_BUILD.md must mention manifest.json
+        # and the zip command. If a maintainer adds a build step, they
+        # MUST update the doc — this catches the case where it goes
+        # stale silently.
+        run: |
+          grep -q 'manifest.json' browser-extension/REPRODUCIBLE_BUILD.md
+          grep -q 'zip' browser-extension/REPRODUCIBLE_BUILD.md
+
   validate-corpus-fetcher:
     name: Validate Corpus Fetcher (Phase 4.3)
     runs-on: ubuntu-latest

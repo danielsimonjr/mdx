@@ -392,11 +392,25 @@ for documents that don't need cells.
 
 Replace the Chrome-only extension with a universal one.
 
-- [ ] WebExtensions API (works in Chrome/Edge/Firefox/Brave/Arc)
-- [ ] Intercepts `application/vnd.mdz-container+zip` responses and renders inline
-      using the `<mdz-viewer>` web component
-- [ ] Published to all 4 addon stores
-- [ ] Firefox store requires reproducible build — set up the CI for this
+- [x] WebExtensions API — `browser-extension/manifest.json` declares
+      MV3 with `browser_specific_settings.gecko` for Firefox compat.
+      Code ships at `browser-extension/{background,content,popup,viewer}/`.
+      Service-worker background, content-script link detector, popup, viewer.
+- [x] Intercepts via `declarativeNetRequest` + content-script link
+      detection (covers both correct-MIME and `octet-stream` cases).
+      The `<mdz-viewer>` web component integration is the next milestone
+      (currently the extension's viewer page uses inline rendering).
+- [ ] Published to all 4 addon stores — pending real icon artwork
+      (currently 1×1 transparent PNG placeholders per
+      `browser-extension/icons/README.md`) + bundled `<mdz-viewer>`.
+- [x] Firefox reproducible-build instructions at
+      `browser-extension/REPRODUCIBLE_BUILD.md`. CI runs `node --test
+      browser-extension/test/manifest.test.js` (13 cases: MV3
+      structure, permissions hygiene, CSP correctness, every
+      referenced file exists, all .js passes `node --check`,
+      popup.html refs resolve) + verifies the doc stays in sync.
+      Full reproducible-build CI (zip + sha256 verification) lands
+      when the bundler is wired in.
 
 ---
 

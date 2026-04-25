@@ -196,6 +196,35 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Added — Phase 2.5 browser-extension hardening (2026-04-24)
+
+The browser extension's manifest + scripts now have CI validation
+covering everything that can be verified without a real browser
+runtime.
+
+- `browser-extension/test/manifest.test.js` — 13 node:test cases:
+  MV3 structure (manifest_version, version SemVer shape,
+  service_worker as ES module, gecko id format), permissions
+  hygiene (no scripting/cookies/webNavigation/tabs/history/
+  bookmarks creep without an explicit threat-model update;
+  host_permissions stays at `<all_urls>`), CSP (no `unsafe-eval`,
+  no `wasm-unsafe-eval`, script-src `'self'` only, object-src
+  `'none'`), every referenced file exists on disk, every JS file
+  passes `node --check`, popup.html references resolve.
+- `browser-extension/icons/` — 1×1 transparent PNG placeholders
+  for the manifest-required 16/48/128 sizes, with a README that
+  spells out "replace before AMO submission".
+- `browser-extension/REPRODUCIBLE_BUILD.md` — Mozilla AMO–facing
+  reproducible-build instructions for both the current pre-bundle
+  state (plain zip) and the future bundled state (Node version
+  pin + lockfile + nvmrc + sha256 verification).
+- `.github/workflows/ci.yml` — new `validate-browser-extension`
+  job. CI count grew 14 → 15.
+
+The full Firefox AMO submission flow needs (a) real icons and
+(b) a bundled `<mdz-viewer>` integration; both are tracked in
+ROADMAP §2.5.
+
 ### Added — Phase 2.1 viewer: KaTeX math rendering (2026-04-24)
 
 LaTeX math now renders in `<mdz-viewer>` via a KaTeX pre-marked

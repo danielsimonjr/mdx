@@ -199,7 +199,7 @@ tsc implementations/typescript/mdx_format.ts --target es2020 --module esnext
 - Open `.mdx` files with any ZIP utility to inspect contents
 
 ### CI Validation
-The GitHub Actions workflow (`.github/workflows/ci.yml`) runs 14 jobs:
+The GitHub Actions workflow (`.github/workflows/ci.yml`) runs 15 jobs:
 - Validate TypeScript (type-check via `tsc --noEmit`)
 - TypeScript Unit Tests (vitest; includes fast-check property tests)
 - Validate Python (py_compile + example generation)
@@ -213,6 +213,7 @@ The GitHub Actions workflow (`.github/workflows/ci.yml`) runs 14 jobs:
 - Validate Rust Binding (Phase 4.1 — cargo build+test, default + no-default)
 - Validate Pandoc Lua Filter (Phase 4.2 — smoke + fixture pack if present)
 - Validate VS Code Extension (Phase 4.2 — JSON + syntax check)
+- Validate Browser Extension (Phase 2.5 — manifest.json structural + JS syntax + reproducible-build doc)
 - Validate Corpus Fetcher (Phase 4.3 — py_compile + import smoke)
 - Lint Markdown (DavidAnson/markdownlint-cli2-action)
 
