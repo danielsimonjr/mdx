@@ -10,7 +10,7 @@
  * exposed by the preload bridge.
  */
 
-import type { EditorApi } from "../preload/preload.js";
+import type { EditorApi } from "../preload/types.js";
 
 declare global {
   interface Window {

@@ -13,42 +13,22 @@
 
 import { contextBridge, ipcRenderer } from "electron";
 
-interface OpenedArchiveSerialized {
-  path: string;
-  manifest: Record<string, unknown>;
-  // ipcMain serializes Map → array of [k, v] pairs; we restore client-side.
-  entries: Array<[string, Uint8Array]>;
-  content: string;
-}
+import type { EditorApi } from "./types.js";
 
-const api = {
-  openFromPath: async (path: string) => {
-    const result = (await ipcRenderer.invoke("archive:open", path)) as
-      | { ok: true; archive: { path: string; manifest: Record<string, unknown>; entries: Map<string, Uint8Array>; content: string } }
-      | { ok: false; error: string };
-    return result;
-  },
-  saveToPath: async (path: string, payload: unknown) => {
-    return (await ipcRenderer.invoke("archive:save", path, payload)) as
-      | { ok: true }
-      | { ok: false; error: string };
-  },
-  pickOpen: async () => (await ipcRenderer.invoke("dialog:openFile")) as string | null,
-  pickSave: async (defaultName?: string) =>
-    (await ipcRenderer.invoke("dialog:saveFile", defaultName)) as string | null,
-  /**
-   * Subscribe to menu events from main (File → Open / Save / Save As).
-   * Returns an unsubscribe function.
-   */
-  onMenu: (event: "open" | "save" | "save-as", handler: () => void): (() => void) => {
+const api: EditorApi = {
+  openFromPath: async (path) =>
+    ipcRenderer.invoke("archive:open", path) as ReturnType<EditorApi["openFromPath"]>,
+  saveToPath: async (path, payload) =>
+    ipcRenderer.invoke("archive:save", path, payload) as ReturnType<EditorApi["saveToPath"]>,
+  pickOpen: async () => ipcRenderer.invoke("dialog:openFile") as Promise<string | null>,
+  pickSave: async (defaultName) =>
+    ipcRenderer.invoke("dialog:saveFile", defaultName) as Promise<string | null>,
+  onMenu: (event, handler) => {
     const channel = `menu:${event}`;
     const listener = () => handler();
     ipcRenderer.on(channel, listener);
     return () => ipcRenderer.removeListener(channel, listener);
   },
 };
-
-export type EditorApi = typeof api;
-export type { OpenedArchiveSerialized };
 
 contextBridge.exposeInMainWorld("editorApi", api);
