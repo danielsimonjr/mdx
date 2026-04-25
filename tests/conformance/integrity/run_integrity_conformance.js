@@ -24,9 +24,9 @@ const os = require('node:os');
 const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 
-// AdmZip lives in cli/node_modules; reuse it rather than adding a
-// repo-root dependency.
-const AdmZip = require(path.resolve(__dirname, '..', '..', '..', 'cli', 'node_modules', 'adm-zip'));
+// adm-zip lives at the workspace root (Phase 4.6.9 hoist); the
+// previous reach into cli/node_modules has been retired.
+const AdmZip = require('adm-zip');
 
 const ROOT = __dirname;
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');

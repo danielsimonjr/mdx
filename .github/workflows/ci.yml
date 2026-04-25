@@ -293,6 +293,12 @@ jobs:
       - name: Run delta-snapshots-v1 conformance fixtures
         run: node tests/conformance/history/run_history_conformance.js
 
+      - name: Install root dependencies (adm-zip for cross-package runners)
+        # Phase 4.6.9: adm-zip is hoisted to the workspace root so
+        # tests/conformance/integrity/run_integrity_conformance.js
+        # can resolve it without reaching into cli/node_modules.
+        run: npm install --no-audit --no-fund
+
       - name: Run archive-level integrity fixtures (Phase 3.2)
         run: node tests/conformance/integrity/run_integrity_conformance.js
 
@@ -522,10 +528,8 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install adm-zip dependency for build
-        run: |
-          cd cli
-          npm install --no-audit --no-fund
+      - name: Install root dependencies (adm-zip lives at workspace root)
+        run: npm install --no-audit --no-fund
 
       - name: Validate manifest + run build determinism tests
         run: node --test browser-extension/test/manifest.test.js browser-extension/test/build.test.js

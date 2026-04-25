@@ -13,6 +13,10 @@
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
+  "devDependencies": {
+    "adm-zip": "^0.5.10"
+  },
+  "comment-devdeps": "adm-zip is hoisted to the root so cross-package test runners (browser-extension/build.js, tests/conformance/integrity/run_integrity_conformance.js) can require it without reaching into a sibling package's node_modules. The cli package keeps its own copy because it ships as a published binary.",
   "engines": {
     "node": ">=20"
   },

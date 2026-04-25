@@ -1363,11 +1363,17 @@ the drift this session found."
       and left pane (monospace `<pre>`) often have different
       sizes, so user font-size preferences are now respected. 5
       new vitest cases cover every CSS branch.
-- [ ] **Decouple test runners from `cli/node_modules`.**
+- [x] **Decouple test runners from `cli/node_modules`** — done
+      2026-04-25. `adm-zip` hoisted to the workspace root's
+      `devDependencies` (with a `comment-devdeps` explainer).
+      The three callers — `browser-extension/build.js`,
+      `browser-extension/test/build.test.js`,
       `tests/conformance/integrity/run_integrity_conformance.js`
-      and `browser-extension/build.js` both
-      `require('cli/node_modules/adm-zip')` because adm-zip lives
-      in cli's deps. Hoist adm-zip to a workspace root dep.
+      — now `require('adm-zip')` directly. CI's
+      `validate-browser-extension` and `validate-cli` jobs add a
+      root-install step before the runners. Build determinism
+      preserved (SHA-256 unchanged); 3/3 integrity fixtures still
+      pass.
 
 **D. Test infrastructure + verification**
 

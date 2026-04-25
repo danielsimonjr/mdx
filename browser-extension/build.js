@@ -32,7 +32,10 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const AdmZip = require(path.resolve(__dirname, '..', 'cli', 'node_modules', 'adm-zip'));
+// adm-zip lives at the workspace root (Phase 4.6.9 hoist) so this
+// resolves whether the script is run from the repo root or another
+// package's working directory.
+const AdmZip = require('adm-zip');
 
 const ROOT = __dirname;
 const PACKAGED_DIRS = ['background', 'content', 'popup', 'viewer', 'icons'];

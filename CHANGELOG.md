@@ -8,6 +8,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Phase 4.6.9: hoist adm-zip to workspace root (2026-04-25)
+
+Three cross-package test runners
+(`browser-extension/build.js`,
+`browser-extension/test/build.test.js`,
+`tests/conformance/integrity/run_integrity_conformance.js`)
+were `require('adm-zip')` by reaching directly into
+`cli/node_modules/adm-zip` via `path.resolve(...)`. That
+coupling broke whenever cli's lockfile or hoisting layout
+changed.
+
+Fix: `adm-zip` declared in the workspace root's
+`devDependencies`. The three callers now plain
+`require('adm-zip')` and Node's standard `node_modules` lookup
+walks up to the root and resolves it. The cli package keeps its
+own copy because the cli ships as a published binary that
+shouldn't depend on dev tooling.
+
+CI updated: `validate-browser-extension` job's
+"Install adm-zip dependency for build" step (which used to
+`cd cli && npm install`) is now a plain root install. The
+`validate-cli` job adds the same root install before running
+the integrity-fixtures runner. Build determinism preserved
+(SHA-256 of the extension zip unchanged at `175d5fa8…`); 3/3
+integrity fixtures still pass.
+
 ### Changed — Phase 4.6.9: sync-scroll lineHeight from computed style (2026-04-25)
 
 The Compare-locales modal's sync-scroll handler previously

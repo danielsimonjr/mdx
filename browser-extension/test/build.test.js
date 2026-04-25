@@ -41,7 +41,7 @@ test('build excludes test/ directory and host-specific metadata files', () => {
     const out = tempZipPath();
     try {
         buildExtensionZip(out);
-        const AdmZip = require(path.resolve(__dirname, '..', '..', 'cli', 'node_modules', 'adm-zip'));
+        const AdmZip = require('adm-zip');
         const zip = new AdmZip(out);
         const names = zip.getEntries().map((e) => e.entryName);
         assert.ok(!names.some((n) => n.startsWith('test/')), 'test/ entries leaked into the zip');
@@ -56,7 +56,7 @@ test('build includes manifest.json + every directory listed', () => {
     const out = tempZipPath();
     try {
         buildExtensionZip(out);
-        const AdmZip = require(path.resolve(__dirname, '..', '..', 'cli', 'node_modules', 'adm-zip'));
+        const AdmZip = require('adm-zip');
         const zip = new AdmZip(out);
         const names = zip.getEntries().map((e) => e.entryName);
         assert.ok(names.includes('manifest.json'), 'manifest.json missing');
