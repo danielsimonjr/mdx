@@ -274,6 +274,17 @@ maintainer, double it.
 5. 2.5 browser extension (depends on 2.1)
 6. 2.3b editor Pro features (depends on 2.3a and real author feedback)
 
+### Status snapshot (2026-04-24)
+
+| Sub-phase | State | What landed | What's pending |
+|-----------|-------|-------------|----------------|
+| 2.1 viewer | **partial** | sanitizer (38 tests), directives (cross-refs / citations / bibliography, 24 tests), CSL-JSON references (10 tests), KaTeX math (13 tests). 85/85 viewer tests pass. | IndexedDB cache, full keyboard a11y, npm publish, `::cell` / `::output` / `::include` rendering, demo site |
+| 2.2 hosted | **code-ready, not deployed** | full Cloudflare Worker with strict CSP, content-hash cache pinning, OG / Twitter card meta, sanitized canonical URLs, 32 worker tests | `wrangler deploy` to view.mdz-format.org (external action), per-archive cover-image extraction |
+| 2.3a editor MVP | **chunked, not started** | (none — see 2.3a.1 through 2.3a.6 below for the new chunking) | All sub-phases |
+| 2.3b editor Pro | **chunked, not started** | (none — see 2.3b.1 through 2.3b.7 below) | All sub-phases |
+| 2.4 EPUB bridge | **shipped** | `mdz export-epub` (existing) + `mdz import-epub` (new, 15 tests, fidelity matrix doc); round-trip CI gate | Symmetric `::fig` round-trip on the export side (tracked); per-chapter spine preservation |
+| 2.5 browser ext | **code-ready, hardened** | MV3 manifest, content + service-worker + popup + viewer scripts, 13 manifest-validation tests, reproducible-build doc, placeholder icons | Real icon artwork, bundled `<mdz-viewer>`, AMO / Chrome Web Store / Edge / Brave submissions |
+
 ### 2.1 `<mdz-viewer>` web component — *the* highest-impact deliverable
 
 Without a great viewer, no one authors MDZ.
@@ -335,49 +346,225 @@ Deliverables:
 Goal: anyone can put `.mdz` in GitHub and share a rendering link. Removes the
 "no users because no viewer" chicken-and-egg.
 
-### 2.3a Desktop editor MVP (4–6 months)
+### 2.3a Desktop editor MVP (4–6 months aggregate, broken into ~10 session-sized chunks)
 
 The first editor ships only what's *required* to produce a publishable paper.
 "Adobe Acrobat-class" is the long-term target (see 2.3b), not what v1.0 is.
 
-- [ ] **Tech stack:** Electron + Vite + CodeMirror 6 + web-component viewer (reuse 2.1).
-      Auto-update via `electron-updater` (not Squirrel.Windows directly — Squirrel.Windows
-      is effectively unmaintained; `electron-updater` targets NSIS and Squirrel.Mac
-      through one API).
-- [ ] **Split-pane editor:** source Markdown + live rendering + asset sidebar
-- [ ] **Visual authoring for core directives:** GUI pickers for `::cell`,
-      `::include`, `::fig`, `::cite` (the scientific-paper four)
-- [ ] **Import from .ipynb:** drag-drop an ipynb, get an MDZ shell with cells
-      pre-populated. This is the on-ramp.
-- [ ] **Asset management:** drag-drop, content-hash computation on save
-- [ ] **Code-signed installers for Mac, Windows, Linux** (reuse signing infra
-      from the MermaidJS desktop project)
+**Chunking model.** The original "4–6 months" estimate is the *aggregate* — the
+work itself splits cleanly into independent chunks that can land one or two per
+session. Each numbered sub-phase below has explicit dependencies, an acceptance
+test, and a scope that fits in a session-or-two of focused work. The
+**MVP milestone** lands when 2.3a.1 through 2.3a.4 plus any one picker from
+2.3a.5 ship — at that point a grad student can author a reproducible paper
+end-to-end and export it to a journal as JATS-XML.
 
-**MVP milestone:** a grad student can author a reproducible paper end-to-end
-and export it to a journal as JATS-XML. Nothing more. Ship and listen.
+#### 2.3a.1 Editor shell foundation
 
-### 2.3b Editor Pro features (6–12 months after MVP, based on real feedback)
+- [ ] Electron app skeleton at `editor-desktop/` with main + renderer
+      processes split, contextIsolation: true, sandbox: true on the
+      renderer.
+- [ ] Vite dev server + production build for the renderer.
+- [ ] IPC channel for "open archive / save archive" (renderer asks
+      main; main does the disk I/O so the sandboxed renderer never
+      touches `node:fs` directly).
+- [ ] `electron-updater` plumbing (NOT raw Squirrel.Windows —
+      effectively unmaintained; `electron-updater` targets NSIS and
+      Squirrel.Mac through one API).
 
-Only build these after the MVP has real users and we know what they want:
+  **Acceptance:** `npm run dev` opens an Electron window with a
+  Vite-served React/Lit renderer, a "File → Open" menu that round-
+  trips an `.mdz` through the main process, and an `electron-updater`
+  no-op feed wired to a static-stub URL.
 
-- [ ] Jupyter kernel execution via Pyodide (honest caveat: Pyodide is ~10MB
-      download, supports most pure-Python and a large-but-not-complete set of
-      C extensions; arbitrary `pip install` does NOT work for compiled wheels;
-      numpy/scipy/matplotlib/pandas work, tensorflow/torch do not. Reviewers
-      get "re-execute most cells" not "re-execute any cell")
-- [ ] Accessibility checker: image alt text, heading order, color contrast,
-      reading order — export WCAG 2.1 AA / 2.2 AA compliance report
-- [ ] Diff view for versions: block-level granularity
-- [ ] Peer-review annotation layer (W3C Web Annotation extension per Phase 0.2
-      peer-review spec) — threaded discussion, accept/reject. **Note:** this is
-      *asynchronous* annotation, not real-time collaboration; the non-goal holds.
-- [ ] Multi-locale side-by-side editing
-- [ ] AVIF/WebP variant generation
-- [ ] Visual authoring for non-core directives (`::video`, `::audio`, `::model`,
-      `::embed`, `::data`)
+#### 2.3a.2 Source editor + live preview
 
-**Pro milestone:** feature parity with Quarto authoring + basic Jupyter editing.
-*Not* parity with InDesign or Acrobat Pro. Those are not the competition.
+- [ ] CodeMirror 6 in the renderer with the Markdown language pack
+      and the project's spec-defined syntax extensions (`::cell`,
+      `::include`, etc., highlighted via the `tree-sitter-mdz`
+      grammar already shipped at Phase 1.1).
+- [ ] `<mdz-viewer>` web component embedded in a split pane —
+      direct reuse of `packages/mdz-viewer/`, no fork.
+- [ ] Two-way sync: edits in CodeMirror flow to the viewer with a
+      150 ms debounce; viewer scroll position pinned across re-render.
+- [ ] Toggle: source-only / preview-only / split (default).
+
+  **Depends on:** 2.3a.1.
+  **Acceptance:** typing in the source pane re-renders the preview
+  in <300 ms for a 50 KB document; scroll position survives the
+  re-render.
+
+#### 2.3a.3 Asset sidebar
+
+- [ ] Drag-drop zone that accepts files and stages them into the
+      open archive's in-memory entries map.
+- [ ] On save: compute SHA-256 (Web Crypto API) for each new asset,
+      populate `manifest.assets[type][].content_hash`, and emit the
+      ZIP via `fflate` through the main-process IPC.
+- [ ] Tree view of `assets/images`, `assets/data`, etc., with
+      delete + rename.
+
+  **Depends on:** 2.3a.1 (IPC) + 2.3a.2 (renderer state model).
+  **Acceptance:** dropping a PNG into the sidebar produces a
+  `manifest.assets.images[]` entry with a correct `content_hash`,
+  visible in `mdz info` after save.
+
+#### 2.3a.4 `.ipynb` import flow
+
+- [ ] "File → Import → Jupyter notebook" menu item invokes the
+      existing `cli/src/commands/import-ipynb.js` via main-process
+      shell-out (NOT in-renderer because it spawns child processes
+      for kernel inspection).
+- [ ] Imported MDZ opens in the editor immediately for further
+      authoring.
+
+  **Depends on:** 2.3a.1.
+  **Acceptance:** a representative `.ipynb` from the
+  `tools/corpus-fetcher` test corpus imports to a syntactically
+  valid `.mdz` that opens in the editor without errors.
+
+#### 2.3a.5 Visual-authoring picker pack — `::cell`, `::include`, `::fig`, `::cite`
+
+Each picker is its own session-sized chunk. Sequencing within the
+chunk is bottom-up (insertion engine first, individual pickers
+second).
+
+- [ ] **2.3a.5.0 — Directive insertion engine.** A small CodeMirror
+      command API that places a directive at cursor with cursor
+      positioned at the first attribute. Used by every picker below.
+- [ ] **2.3a.5.1 — `::cell` picker.** Modal: language dropdown
+      (Python / R / Julia / JS), kernel field, optional
+      `execution_count`. Inserts a complete `::cell{...}` block plus
+      a fenced code shell.
+- [ ] **2.3a.5.2 — `::include` picker.** Modal: target (with
+      autocomplete on the open archive's entry list), optional
+      `fragment`, optional `content_hash`.
+- [ ] **2.3a.5.3 — `::fig` / `::eq` / `::tab` picker.** Modal: kind
+      (radio), id (with collision check against already-defined ids
+      in the document), title.
+- [ ] **2.3a.5.4 — `::cite` picker.** Modal: dropdown / search
+      against `references.json` keys (when present), multi-select,
+      optional locator (`prefix`, `suffix`).
+
+  **Depends on:** 2.3a.2 (CodeMirror) for all five.
+  **Acceptance per picker:** clicking the toolbar button + filling
+  the modal inserts a syntactically valid directive, and the
+  preview pane re-renders it correctly within the same debounce.
+
+#### 2.3a.6 Release engineering
+
+- [ ] Code-signed installers for macOS (notarized DMG), Windows
+      (signed NSIS via `electron-updater` flow), Linux (AppImage +
+      `.deb` + `.rpm`).
+- [ ] Auto-update feed served from GitHub Releases.
+- [ ] CI build matrix that produces all three platforms on every
+      tagged release.
+
+  **Depends on:** 2.3a.1.
+  **External-blocked:** macOS notarization requires an Apple
+  Developer account ($99/year); Windows EV cert signing requires
+  hardware token + ~$300/year cert. Reuse signing infra from the
+  MermaidJS desktop project.
+  **Acceptance:** a tagged release produces three signed installers
+  in GitHub Releases that auto-update each other on subsequent
+  tags.
+
+### 2.3b Editor Pro features (6–12 months aggregate, 7 independent chunks)
+
+Only build these after the MVP has real users and feedback. Each chunk
+is independent — sequence by user demand, not by checklist order.
+
+#### 2.3b.1 Pyodide kernel execution
+
+- [ ] In-renderer Pyodide bootstrap (lazy-loaded only when a user
+      first runs a Python `::cell`).
+- [ ] Output capture: stdout / display_data / execute_result →
+      `::output` blocks with the correct `type`.
+- [ ] Cell timeout (default 30 s, configurable) so a runaway cell
+      doesn't lock the editor.
+
+  **Honest caveat:** Pyodide is ~10 MB download, supports most
+  pure-Python plus the curated C-extension wheels in the Pyodide
+  distribution (numpy / scipy / matplotlib / pandas all work).
+  Arbitrary `pip install` does NOT work for compiled wheels;
+  TensorFlow / PyTorch do not run in Pyodide. Reviewers get
+  "re-execute most cells", not "re-execute any cell".
+  **Depends on:** 2.3a.2.
+
+#### 2.3b.2 Accessibility checker
+
+- [ ] In-editor pa11y-equivalent that runs the `tests/accessibility/`
+      rule set against the rendered preview on save.
+- [ ] Issues panel listing each violation with rule + WCAG
+      reference + jump-to-source.
+- [ ] Export WCAG 2.1 AA / 2.2 AA compliance report as a sidecar
+      JSON for journal submission.
+
+  **Depends on:** 2.3a.2 + the Phase 3.3 fixture pack (currently
+  23/50 fixtures).
+
+#### 2.3b.3 Block-level diff view
+
+- [ ] Compare current draft against any version in
+      `history/snapshots/`.
+- [ ] Block-level diff (paragraph / heading / cell / output as
+      atomic units) with line-level fall-back inside changed blocks.
+- [ ] Round-trip with the Phase 4.5 `delta-snapshots-v1` extension
+      so diffs and patches use the same algorithm.
+
+  **Depends on:** 2.3a.2 + Phase 4.5 implementation (currently
+  spec only).
+
+#### 2.3b.4 Peer-review annotation layer
+
+- [ ] Sidebar UI for the annotation tree (per
+      `spec/directives/peer-review-annotations.md` — already
+      shipped).
+- [ ] Comment / reply / accept / reject flows that create / update
+      `annotations/<uuid>.json` entries.
+- [ ] Reviewer identity surfaced via the signed-DID model
+      (`docs/security/SIGNATURE_TRUST.md`); `--role=public|editor`
+      flag for confidential-comment visibility per spec.
+
+  **Depends on:** 2.3a.2 + signature integration.
+  **NOT a real-time collaboration feature.** Asynchronous threaded
+  comments only — the no-real-time-collab non-goal still holds.
+
+#### 2.3b.5 Multi-locale side-by-side editing
+
+- [ ] Two CodeMirror editors stacked horizontally, each bound to
+      one of `manifest.content.locales.available[]`.
+- [ ] Sync-scroll between panes (paragraph-aligned).
+- [ ] "Add locale" command that creates a new
+      `document.<lang>.md` entry pre-populated from the current
+      pane.
+
+  **Depends on:** 2.3a.2.
+
+#### 2.3b.6 AVIF / WebP variant generation
+
+- [ ] On image add: spawn the main-process `sharp` (or
+      `@squoosh/lib`) to produce AVIF + WebP siblings.
+- [ ] Populate `manifest.assets.images[].variants[]` per spec
+      §17.2.
+- [ ] Configurable quality presets per image kind
+      (figure / icon / hero).
+
+  **Depends on:** 2.3a.3 (asset sidebar).
+
+#### 2.3b.7 Non-core directive picker pack
+
+- [ ] **2.3b.7.1 — `::video` picker** (src + poster + tracks).
+- [ ] **2.3b.7.2 — `::audio` picker.**
+- [ ] **2.3b.7.3 — `::model` picker** (glTF / GLB).
+- [ ] **2.3b.7.4 — `::embed` picker** (PDF).
+- [ ] **2.3b.7.5 — `::data` picker** (CSV/JSON viz config).
+
+  **Depends on:** 2.3a.5.0 (insertion engine).
+
+**Pro milestone:** feature parity with Quarto authoring + basic
+Jupyter editing. *Not* parity with InDesign or Acrobat Pro. Those
+are not the competition.
 
 ### 2.4 EPUB ↔ MDZ bridge
 

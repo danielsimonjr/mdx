@@ -196,6 +196,43 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Changed — ROADMAP: Phase 2.3 editor work chunked into session-sized sub-phases (2026-04-24)
+
+The original Phase 2.3a (Desktop editor MVP, 4–6 months) and Phase
+2.3b (Editor Pro features, 6–12 months) were each one bullet list of
+6–7 items. Each item was itself a multi-week build. The result: any
+attempt to "make progress on 2.3a" was open-ended and difficult to
+sequence.
+
+The work hasn't changed; the structure has. Phase 2.3a is now six
+numbered sub-phases (2.3a.1 through 2.3a.6) with explicit
+dependencies and acceptance tests, each scoped for one or two focused
+sessions. Phase 2.3b is seven independent sub-phases (2.3b.1 through
+2.3b.7), sequenceable by user demand rather than checklist order.
+The 2.3a.5 picker pack and 2.3b.7 non-core picker pack each split
+internally into per-directive chunks (one picker = one session).
+
+The aggregate timing estimates (4–6 months for MVP, 6–12 for Pro)
+are unchanged. The chunking model lets work happen incrementally
+rather than as one monolithic build.
+
+ROADMAP also gained a **status snapshot table** at the top of Phase
+2 listing each sub-phase's state (shipped / code-ready / chunked-
+not-started / partial), what landed, and what's pending — so a
+reader can see Phase 2's current posture at a glance instead of
+walking the entire section. The table reflects the work shipped
+this cycle:
+
+- **2.1 viewer** — 85/85 tests pass; cross-refs + citations +
+  bibliography + KaTeX math all live in `packages/mdz-viewer/src/`.
+- **2.2 hosted** — code-ready and test-covered (32 worker tests);
+  deployment to view.mdz-format.org is the only blocker.
+- **2.4 EPUB bridge** — fully shipped, both directions, with a
+  fidelity matrix doc and round-trip CI gate.
+- **2.5 browser extension** — hardened (13 manifest tests + AMO
+  reproducible-build doc); pending real icons + AMO submission.
+- **2.3a / 2.3b** — chunked, ready to pick up one chunk at a time.
+
 ### Added — Phase 2.2 hosted service polish (2026-04-24)
 
 The Cloudflare Worker fronting `view.mdz-format.org` (code at
