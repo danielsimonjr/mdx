@@ -1125,6 +1125,53 @@ cycle skipped. Items are split by origin so credit + blame are clear.
 - [ ] **W3C charter submission** — Phase 5.
 - [ ] **Funding decisions** — Phase 0.
 
+### 4.6.8 Code-level TODOs surfaced by the 2026-04-25 RLM audit
+
+Items present in source comments / docs that the prose ROADMAP
+sections didn't yet track. Discovered by a `grep` for
+`TODO|FIXME|XXX|HACK|TBD` plus "deferred / follow-up" mentions
+in code comments. Listed here so they round-trip through the
+normal completion flow.
+
+- [ ] **`examples/scientific-paper/` example papers directory**
+      (`docs/for-authors/SUBMITTING.md:250` flags as a Phase 0
+      deliverable). Concrete demo MDZ archives — minimal,
+      reviewer-round-trip, multi-locale — that authors can clone
+      as a starting point.
+- [ ] **Viewer-hosted bundled-viewer wiring**
+      (`packages/mdz-viewer-hosted/src/worker.ts:323` "TODO:
+      replace with bundled viewer once `npm run build` in
+      `packages/mdz-viewer/` produces a single-file ESM"). The
+      worker currently inlines a stub; the real viewer bundle
+      should be embedded once the build pipeline emits one.
+- [ ] **Directive label i18n**
+      (`packages/mdz-viewer/src/directives.ts:60` "see TODO at
+      end of file"). Per-kind label prefixes (`Figure`,
+      `Equation`, `Table`) currently English-only; localized
+      labels keyed off `manifest.document.language` are deferred.
+- [ ] **EPUB export `adm-zip → yazl` swap**
+      (`cli/src/commands/export-epub.js:218`). adm-zip orders
+      entries non-deterministically; yazl supports explicit
+      ordering, which the EPUB 3.3 spec actually requires for
+      reproducible zip output (mimetype first, etc.).
+- [ ] **EPUB import symmetric-export rule**
+      (`cli/src/commands/import-epub.js:426`). When exporting a
+      previously-imported EPUB back out, the import-side asset
+      naming rule should match the export-side — currently they
+      can drift.
+- [ ] **Browser-extension reproducible-build bundler**
+      (`browser-extension/REPRODUCIBLE_BUILD.md:70`). Bundling
+      the viewer into the extension's `viewer/` directory should
+      be wired through CI; currently a manual step. Phase 2.5
+      follow-up.
+- [ ] **Rust binding blake3 implementation**
+      (`bindings/rust/src/lib.rs:804` returns
+      `"blake3 (spec'd but deferred in this binding)"`). The
+      spec calls for blake3 as an alternative content-hash
+      algorithm; the Rust binding currently returns a clear
+      error rather than computing it. Implement once the
+      `blake3` crate's no_std story stabilizes (it has).
+
 ---
 
 ## Phase 5 — Governance (Q4 2027+)
