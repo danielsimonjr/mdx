@@ -1,6 +1,6 @@
 {
-  "$schema": "https://mdx-format.org/schemas/profile.schema.json",
-  "id": "https://mdx-format.org/profiles/api-reference/v1",
+  "$schema": "https://mdz-format.org/schemas/profile.schema.json",
+  "id": "https://mdz-format.org/profiles/api-reference/v1",
   "name": "API Reference",
   "version": "1.0.0",
   "description": "A technical API reference document covering endpoints, authentication, errors, and examples.",

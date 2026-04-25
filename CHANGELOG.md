@@ -8,6 +8,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Phase 4.6.4: Audit cluster (2026-04-25)
+
+Three of the four 4.6.4 audit-cluster items closed:
+
+- **`mdx → mdz` grep-pass** completed via the RLM-driven
+  inventory: 692 lower-case `mdx` references across 107 files.
+  Most were legitimate (legacy dual-extension support per the
+  2027-01-01 deprecation policy, historical CHANGELOG entries,
+  deferred-rename paths in `implementations/{ts,py}/mdx_format.{ts,py}`).
+  Two stale-and-renameable hits got fixed:
+  - `cli/package.json` `name` was `mdx-cli`; renamed to `mdz-cli`.
+    `bin` exposed only `mdx`; now exposes both `mdz` (preferred)
+    and `mdx` (legacy alias) so the CLI is invokable as either.
+  - `spec/profiles/api-reference-v1.json` `$schema` and `id` URLs
+    pointed at `mdx-format.org`; corrected to `mdz-format.org`
+    so all four profile files agree.
+- **Prose-grammar duplication audit:** verified clean — no fenced
+  ABNF blocks outside `spec/grammar/mdz-directives.abnf` duplicate
+  the directive grammar. Single source of truth confirmed.
+- **Conformance Core vs Advanced split:** verified the
+  `mdz-core-v1` (6 required fields, no required extensions, viewer
+  capability level 0) and `mdz-advanced-v1` (8 required fields, 17
+  validation rules, JCS canonicalization mandatory, signatures
+  required, content-addressing required) profiles are real and
+  non-overlapping. Advanced is explicitly a strict superset of
+  Core; `scientific-paper-v1` and `api-reference-v1` are
+  independent third-party-style profiles built atop Core.
+
+The fourth item (Chevrotain claim) was already classified as
+"keep regex parser, no Chevrotain rebuild" in earlier audit
+notes; nothing further to do.
+
+The Rust wasm32 `debug_assert!` ROADMAP entry from 4.6.1 was
+also stale — verified the assert is in place at
+`bindings/rust/src/lib.rs:502–506`. Marked done.
+
 ### Changed — Phase 4.6: Housekeeping batch (2026-04-25)
 
 Five small open items closed:

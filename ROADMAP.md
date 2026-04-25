@@ -66,7 +66,7 @@ assumes the new name is in place so we don't have to re-brand docs/URLs/tests tw
 - [ ] Domain: move spec to `mdz-format.org` (keep old domain redirecting) — external action
 - [x] Spec title: "Markdown eXtended Container" → "Markdown Zipped Container" — v2.0 spec already renamed; v1.0 + v1.1 historical specs renamed 2026-04-25 with archival-banner pointers to v2.0.
 - [x] Update `CLAUDE.md`, `README.md`, `CHANGELOG.md`, all agent-facing docs — README leads with "MDZ Format / Markdown Zipped Container"; STATUS banner at README:11; CLAUDE.md Phase 4.6 tree current; CHANGELOG v2.0 block wrapped
-- [ ] Grep-pass: `grep -rIn 'mdx' .` — audit every remaining reference — tracked in Phase 4.6.4; deliberately scoped to exclude the deferred-rename paths
+- [x] Grep-pass: `grep -rIn 'mdx' .` — done 2026-04-25. RLM-driven audit found 692 lower-case `mdx` references across 107 files. Most are legitimate (legacy dual-extension support per the 2027-01-01 deprecation policy, historical CHANGELOG entries, deferred-rename paths in `implementations/{ts,py}/mdx_format.{ts,py}`). One real fix: `cli/package.json` `name` was `mdx-cli` and `bin` exposed `mdx` only — now `mdz-cli` with both `mdz` (preferred) and `mdx` (legacy alias) bin entries. One real fix: `spec/profiles/api-reference-v1.json` `$schema` and `id` URLs pointed at `mdx-format.org` — corrected to `mdz-format.org` to match the other three profiles.
 
 **Migration policy for existing `.mdx` archives:** readers MUST accept either
 extension and either MIME type through 2027-01-01, after which `.mdx` becomes
@@ -1030,7 +1030,7 @@ cycle skipped. Items are split by origin so credit + blame are clear.
 ### 4.6.1 Skipped review findings (code-review / silent-failure / type-design)
 
 - [x] **Rust `resolve_entry_point`** — fixed: returns `Error::Manifest` when `locales.default` is missing from `available[]` (commit b498682).
-- [ ] **Rust wasm32 32-bit `usize` cast** — the bounded-reader fix effectively neutralizes the risk (cap is `.min(1024 * 1024) as usize` which fits on all 32-bit targets), but the explicit `debug_assert!` for the theoretical case was not added.
+- [x] **Rust wasm32 32-bit `usize` cast** — verified done 2026-04-25: `bindings/rust/src/lib.rs:502–506` carries the explicit `debug_assert!(cap_u64 <= usize::MAX as u64, …)` that pins the invariant. ROADMAP entry was stale; the audit was tracking a still-true risk that had already been mitigated.
 - [x] **Rust `SignatureEntry.role` enum** — shipped as `Role` enum (`Author`/`Reviewer`/`Editor`/`Publisher`/`Notary`/`Custom(String)`) with `#[serde(try_from = "String")]` (commits 9ea73d1, b498682; widened to spec §16 "custom URI" semantics after type-design review).
 - [x] **Rust `entry_paths` ordering docstring** — docstring now states stable lexicographic ordering via BTreeMap, explicitly tying it to reproducible content-hashing.
 - [x] **Rust `manifest_bytes` invariant docstring** — documents the byte-identity invariant; correction on 04748bf clarified it refers to the inflated manifest entry, not the caller's input buffer.
@@ -1067,12 +1067,18 @@ cycle skipped. Items are split by origin so credit + blame are clear.
 
 ### 4.6.4 Phase 0 / 1 items claimed done but unverified
 
-- [ ] **Repository `.mdx` → `.mdz` audit** — the rename commit landed
-      but I claimed ROADMAP completion without running the
-      `grep -rIn 'mdx' .` pass called for in §0.1. Actually do it.
+- [x] **Repository `.mdx` → `.mdz` audit** — done 2026-04-25 by an
+      RLM-driven grep-pass: 692 references across 107 files,
+      classified as legitimate dual-extension support (per the
+      2027-01-01 deprecation policy), historical CHANGELOG /
+      spec entries, or deferred-rename paths
+      (`implementations/{ts,py}/mdx_format.{ts,py}`). Two
+      stale-and-renameable hits found + fixed: `cli/package.json`
+      `name`/`bin` and `spec/profiles/api-reference-v1.json` URLs.
 - [ ] **npm `@mdz-format` scope reservation** — not verified.
-- [ ] **Spec prose-grammar removal** — verify nothing outside
-      `spec/grammar/*.abnf` duplicates the directive grammar.
+- [x] **Spec prose-grammar removal** — verified done 2026-04-25:
+      no fenced ABNF blocks outside `spec/grammar/mdz-directives.abnf`
+      duplicate the directive grammar.
 - [ ] **Chevrotain TypeScript parser** — audit 2026-04-24 found ZERO
       `chevrotain` references in `implementations/` or `spec/`. The
       Phase 1.2 ROADMAP item "New TypeScript parser built on Chevrotain"
@@ -1094,10 +1100,17 @@ cycle skipped. Items are split by origin so credit + blame are clear.
       tests still pass. The `toHTML` stub itself stays through the
       2027-01-01 deprecation cliff so callers see a clear runtime
       pointer rather than a `TypeError: not a function`.
-- [ ] **Conformance Core vs Advanced split** — Phase 0.3 claims the
-      split is done. Verify `spec/profiles/mdz-advanced-v1.json`
-      actually requires advanced features and that the parser
-      differentiates.
+- [x] **Conformance Core vs Advanced split** — verified done
+      2026-04-25. `mdz-core-v1.json` declares 6 required manifest
+      fields, no required extensions, viewer_capability_level: 0
+      — the minimal portability promise. `mdz-advanced-v1.json`
+      declares 8 required manifest fields, 17 validation rules,
+      JCS canonicalization mandatory, signatures required,
+      content-addressing required — explicitly a strict superset.
+      The `scientific-paper-v1` and `api-reference-v1` profiles
+      are independent third-party-style profiles built atop Core.
+      The split is real and the profiles are non-overlapping in
+      scope.
 
 ### 4.6.5 Accessibility conformance expansion
 
