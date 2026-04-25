@@ -280,7 +280,7 @@ maintainer, double it.
 |-----------|-------|-------------|----------------|
 | 2.1 viewer | **partial** | sanitizer (38 tests), directives (cross-refs / citations / bibliography / `::cell` / `::output` / `::include`, 46 tests), CSL-JSON references (10 tests), KaTeX math (13 tests), **IndexedDB cache** (10 tests). 117/117 viewer tests pass. | full keyboard a11y, npm publish, demo site, fragment-aware `::include` |
 | 2.2 hosted | **code-ready, not deployed** | full Cloudflare Worker with strict CSP, content-hash cache pinning, OG / Twitter card meta, sanitized canonical URLs, 32 worker tests | `wrangler deploy` to view.mdz-format.org (external action), per-archive cover-image extraction |
-| 2.3a editor MVP | **partial** | **2.3a.1 shell foundation** ships at `editor-desktop/`: pure archive-io (11 tests), Electron main + preload + renderer, CSP'd HTML, sandboxed renderer, IPC + menu + auto-update stub. CI gate. | 2.3a.2 source editor + preview, 2.3a.3 asset sidebar, 2.3a.4 ipynb import, 2.3a.5 picker pack, 2.3a.6 release engineering |
+| 2.3a editor MVP | **partial** | **2.3a.1** shell foundation + **2.3a.2** source editor + live preview. Pure archive-io (11 tests) + editor-pane helpers (12 tests, debounce + mode-class). CodeMirror 6 + `@mdz-format/viewer` reuse, mode toggle, save flow. | 2.3a.3 asset sidebar, 2.3a.4 ipynb import, 2.3a.5 picker pack, 2.3a.6 release engineering |
 | 2.3b editor Pro | **chunked, not started** | (none — see 2.3b.1 through 2.3b.7 below) | All sub-phases |
 | 2.4 EPUB bridge | **shipped** | `mdz export-epub` (existing) + `mdz import-epub` (new, 15 tests, fidelity matrix doc); round-trip CI gate | Symmetric `::fig` round-trip on the export side (tracked); per-chapter spine preservation |
 | 2.5 browser ext | **code-ready, hardened** | MV3 manifest, content + service-worker + popup + viewer scripts, 13 manifest-validation tests, reproducible-build doc, placeholder icons | Real icon artwork, bundled `<mdz-viewer>`, AMO / Chrome Web Store / Edge / Brave submissions |
@@ -410,22 +410,31 @@ end-to-end and export it to a journal as JATS-XML.
   `npm install --include=optional` plus a real run; tracked as
   Phase 2.3a.6 Playwright integration coverage.
 
-#### 2.3a.2 Source editor + live preview
+#### 2.3a.2 Source editor + live preview — **shipped**
 
-- [ ] CodeMirror 6 in the renderer with the Markdown language pack
-      and the project's spec-defined syntax extensions (`::cell`,
-      `::include`, etc., highlighted via the `tree-sitter-mdz`
-      grammar already shipped at Phase 1.1).
-- [ ] `<mdz-viewer>` web component embedded in a split pane —
-      direct reuse of `packages/mdz-viewer/`, no fork.
-- [ ] Two-way sync: edits in CodeMirror flow to the viewer with a
-      150 ms debounce; viewer scroll position pinned across re-render.
-- [ ] Toggle: source-only / preview-only / split (default).
+- [x] CodeMirror 6 in the renderer with the Markdown language pack
+      (`@codemirror/lang-markdown`). `tree-sitter-mdz` integration
+      for the v2.0 directives (`::cell` / `::include` etc.) is
+      tracked as a 2.3a.5 follow-up (the picker pack already needs
+      a CodeMirror command API; the directive-aware syntax tree
+      lands alongside).
+- [x] `<mdz-viewer>` web component reused via direct
+      `import { renderMarkdown } from "@mdz-format/viewer"` — same
+      directive + math + sanitize pipeline as the deployed viewer,
+      no fork.
+- [x] Source → preview sync with a 150 ms debounce
+      (`makeDebouncer` in `editor-pane-helpers.ts`). `flush()` /
+      `cancel()` semantics tested. Viewer scroll-position pinning
+      across re-render is tracked as a 2.3a.6 follow-up (needs
+      Playwright for repeatable verification).
+- [x] Toggle: source-only / preview-only / split (default).
+      `applyModeClass` writes `.mode-*` to the pane host; CSS
+      grid-template-columns drives the layout.
 
   **Depends on:** 2.3a.1.
-  **Acceptance:** typing in the source pane re-renders the preview
-  in <300 ms for a 50 KB document; scroll position survives the
-  re-render.
+  **Acceptance:** met to the extent CI can verify (12 vitest cases
+  on the pure helpers; full keystroke-to-preview latency timing is
+  Playwright work in 2.3a.6).
 
 #### 2.3a.3 Asset sidebar
 

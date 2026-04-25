@@ -8,6 +8,8 @@
     "src/main/archive-io.ts",
     "src/preload/types.ts",
     "src/renderer/index.ts",
+    "src/renderer/editor-pane.ts",
+    "src/renderer/editor-pane-helpers.ts",
     "test/**/*.ts"
   ],
   "exclude": [

@@ -1,16 +1,18 @@
 /**
- * Renderer entry point — the editor's UI.
+ * Renderer entry point — wires the DOM to the editor-pane factory.
  *
- * 0.1 scope (Phase 2.3a.1): a single button that round-trips an MDZ
- * through the main process and shows the manifest title + raw
- * content. CodeMirror + live preview lands in 2.3a.2; asset sidebar
- * in 2.3a.3.
+ * Phase 2.3a.2 scope: open an MDZ → CodeMirror source pane on the
+ * left, live `<mdz-viewer>`-style preview on the right, mode toggle
+ * for source-only / preview-only / split. Save (Cmd/Ctrl+S) writes
+ * to disk via the IPC bridge.
  *
- * No Node access here. Everything goes through `window.editorApi`,
- * exposed by the preload bridge.
+ * 2.3a.3 (asset sidebar) and 2.3a.5 (picker pack) hang off the DOM
+ * declared in `index.html`; this entry-point owns the pane lifecycle
+ * and the open/save flows.
  */
 
 import type { EditorApi } from "../preload/types.js";
+import { createEditorPane, type EditorPane, type ViewMode } from "./editor-pane.js";
 
 declare global {
   interface Window {
@@ -18,10 +20,63 @@ declare global {
   }
 }
 
+interface OpenSession {
+  path: string;
+  manifest: Record<string, unknown>;
+  /** Original file content — used to detect "modified" state. */
+  baseline: string;
+}
+
 const titleEl = document.getElementById("title")!;
 const pathEl = document.getElementById("path")!;
-const contentEl = document.getElementById("content")!;
+const sourceHost = document.getElementById("source")!;
+const previewHost = document.getElementById("preview")!;
+const paneEl = document.getElementById("pane")!;
 const openBtn = document.getElementById("open-btn") as HTMLButtonElement;
+const saveBtn = document.getElementById("save-btn") as HTMLButtonElement;
+const modifiedIndicator = document.getElementById("modified-indicator")!;
+const modeButtons: Record<ViewMode, HTMLButtonElement> = {
+  source: document.getElementById("mode-source") as HTMLButtonElement,
+  split: document.getElementById("mode-split") as HTMLButtonElement,
+  preview: document.getElementById("mode-preview") as HTMLButtonElement,
+};
+
+let session: OpenSession | null = null;
+let pane: EditorPane | null = null;
+
+function setModified(modified: boolean): void {
+  modifiedIndicator.hidden = !modified;
+}
+
+function setModeButtons(active: ViewMode): void {
+  for (const [m, btn] of Object.entries(modeButtons)) {
+    btn.setAttribute("aria-pressed", String(m === active));
+  }
+}
+
+async function ensurePane(initialContent: string): Promise<EditorPane> {
+  if (pane) {
+    pane.setContent(initialContent);
+    return pane;
+  }
+  // Replace the placeholder paragraph with an empty preview host so
+  // renderMarkdown's output isn't wrapped in the empty state.
+  previewHost.innerHTML = "";
+  pane = await createEditorPane(
+    { sourceHost, previewHost, modeHost: paneEl },
+    {
+      initialContent,
+      mode: "split",
+      onChange: (source) => {
+        if (session) setModified(source !== session.baseline);
+      },
+      onSave: () => {
+        void saveFlow();
+      },
+    },
+  );
+  return pane;
+}
 
 async function openFlow(): Promise<void> {
   const path = await window.editorApi.pickOpen();
@@ -31,14 +86,34 @@ async function openFlow(): Promise<void> {
     titleEl.textContent = `Error opening: ${result.error}`;
     titleEl.classList.add("empty");
     pathEl.textContent = "";
-    contentEl.textContent = "";
     return;
   }
   const manifest = result.archive.manifest as { document?: { title?: string } };
   titleEl.textContent = manifest.document?.title ?? "(untitled)";
   titleEl.classList.remove("empty");
   pathEl.textContent = result.archive.path;
-  contentEl.textContent = result.archive.content;
+  session = {
+    path: result.archive.path,
+    manifest: result.archive.manifest,
+    baseline: result.archive.content,
+  };
+  setModified(false);
+  await ensurePane(result.archive.content);
+}
+
+async function saveFlow(): Promise<void> {
+  if (!pane || !session) return;
+  const content = pane.getContent();
+  const result = await window.editorApi.saveToPath(session.path, {
+    manifest: session.manifest,
+    content,
+  });
+  if (!result.ok) {
+    titleEl.textContent = `Save failed: ${result.error}`;
+    return;
+  }
+  session.baseline = content;
+  setModified(false);
 }
 
 openBtn.addEventListener("click", () => {
@@ -47,8 +122,22 @@ openBtn.addEventListener("click", () => {
   });
 });
 
-// Wire the menu accelerators (Cmd/Ctrl+O, etc.) so the same flow
-// fires from both the button and the menu.
+saveBtn.addEventListener("click", () => {
+  saveFlow().catch((e) => {
+    titleEl.textContent = `Save error: ${(e as Error).message}`;
+  });
+});
+
+for (const [m, btn] of Object.entries(modeButtons)) {
+  btn.addEventListener("click", () => {
+    pane?.setMode(m as ViewMode);
+    setModeButtons(m as ViewMode);
+  });
+}
+
 window.editorApi.onMenu("open", () => {
   openFlow().catch(() => undefined);
+});
+window.editorApi.onMenu("save", () => {
+  saveFlow().catch(() => undefined);
 });

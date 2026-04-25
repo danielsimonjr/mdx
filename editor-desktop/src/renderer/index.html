@@ -6,31 +6,67 @@
         content="default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self';"/>
   <title>MDZ Editor</title>
   <style>
-    body { font-family: system-ui, sans-serif; margin: 0; padding: 1rem; line-height: 1.5; }
-    header { display: flex; align-items: center; gap: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid #ddd; }
-    .archive-title { font-size: 1.25rem; font-weight: 600; }
-    .archive-path { color: #666; font-size: 0.85rem; font-family: ui-monospace, monospace; }
-    button { padding: 0.4rem 0.8rem; background: #1d4ed8; color: white; border: none; border-radius: 4px; cursor: pointer; }
-    main { padding-top: 1rem; }
-    pre { background: #f5f5f5; padding: 1rem; border-radius: 4px; overflow-x: auto; }
+    body { font-family: system-ui, sans-serif; margin: 0; height: 100vh; display: flex; flex-direction: column; }
+    header { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-bottom: 1px solid #ddd; }
+    .archive-title { font-size: 1rem; font-weight: 600; }
+    .archive-path { color: #666; font-size: 0.8rem; font-family: ui-monospace, monospace; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    button, .mode-toggle button {
+      padding: 0.3rem 0.7rem; background: #1d4ed8; color: white; border: none;
+      border-radius: 4px; cursor: pointer; font-size: 0.85rem;
+    }
+    .mode-toggle button { background: transparent; color: inherit; border: 1px solid #ccc; }
+    .mode-toggle button[aria-pressed="true"] { background: #1d4ed8; color: white; border-color: #1d4ed8; }
+    .mode-toggle { display: flex; gap: 0; }
+    .mode-toggle button:not(:last-child) { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+    .mode-toggle button:not(:first-child) { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: -1px; }
     .empty { color: #888; font-style: italic; }
+
+    /* Pane layout — CSS classes mode-source / mode-preview / mode-split
+       set at runtime by the editor-pane factory. Default split shows both. */
+    .pane { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #ddd; overflow: hidden; }
+    .pane.mode-source { grid-template-columns: 1fr 0fr; }
+    .pane.mode-preview { grid-template-columns: 0fr 1fr; }
+    .pane.mode-split { grid-template-columns: 1fr 1fr; }
+    .pane > * { background: white; overflow: auto; min-width: 0; }
+    .pane.mode-source .preview { display: none; }
+    .pane.mode-preview .source { display: none; }
+    .source { font-family: ui-monospace, monospace; font-size: 0.9rem; }
+    .preview { padding: 1.5rem; line-height: 1.6; }
+    .preview img { max-width: 100%; }
+
+    /* CodeMirror styling — minimal; the editor brings its own. */
+    .cm-editor { height: 100%; }
+    .cm-scroller { overflow: auto; }
+
     @media (prefers-color-scheme: dark) {
       body { background: #0a0a0a; color: #f5f5f5; }
       header { border-color: #333; }
       .archive-path { color: #888; }
-      pre { background: #1a1a1a; }
+      .pane { background: #222; }
+      .pane > * { background: #111; }
+      .mode-toggle button { color: #f5f5f5; border-color: #333; }
     }
   </style>
 </head>
 <body>
   <header>
     <button id="open-btn">Open MDZ…</button>
+    <button id="save-btn">Save</button>
     <span id="title" class="archive-title empty">No archive open.</span>
     <span id="path" class="archive-path"></span>
+    <span id="modified-indicator" hidden aria-label="modified" title="Unsaved changes">●</span>
+    <div class="mode-toggle" role="group" aria-label="View mode">
+      <button id="mode-source" aria-pressed="false">Source</button>
+      <button id="mode-split" aria-pressed="true">Split</button>
+      <button id="mode-preview" aria-pressed="false">Preview</button>
+    </div>
   </header>
-  <main>
-    <pre id="content"></pre>
-  </main>
+  <div class="pane mode-split" id="pane">
+    <div class="source" id="source"></div>
+    <div class="preview" id="preview">
+      <p class="empty">Open an MDZ archive to start editing.</p>
+    </div>
+  </div>
   <script type="module" src="./index.ts"></script>
 </body>
 </html>

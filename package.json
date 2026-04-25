@@ -6,7 +6,8 @@
   "workspaces": [
     "packages/*",
     "cli",
-    "implementations/typescript"
+    "implementations/typescript",
+    "editor-desktop"
   ],
   "scripts": {
     "test": "npm run test --workspaces --if-present",

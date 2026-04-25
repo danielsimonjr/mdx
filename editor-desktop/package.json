@@ -12,6 +12,12 @@
     "typecheck:core": "tsc --noEmit -p tsconfig.test.json"
   },
   "dependencies": {
+    "@codemirror/commands": "^6.5.0",
+    "@codemirror/lang-markdown": "^6.2.5",
+    "@codemirror/language": "^6.10.2",
+    "@codemirror/state": "^6.4.1",
+    "@codemirror/view": "^6.28.0",
+    "@mdz-format/viewer": "*",
     "fflate": "^0.8.2"
   },
   "optionalDependencies": {
@@ -20,6 +26,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
+    "@types/trusted-types": "^2.0.7",
     "typescript": "^5.5.0",
     "vite": "^5.4.19",
     "vitest": "^2.1.9"

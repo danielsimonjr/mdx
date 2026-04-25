@@ -196,6 +196,55 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Added — Phase 2.3a.2: Source editor + live preview (2026-04-24)
+
+The editor shell from 2.3a.1 gains a real editing surface. CodeMirror
+6 on the left, live `<mdz-viewer>`-style preview on the right,
+mode-toggle for source-only / preview-only / split.
+
+- **CodeMirror 6** integration via `@codemirror/{state,view,
+  commands,language,lang-markdown}`. Markdown language pack
+  highlights the prose; `::cell` / `::include` / etc. land as raw
+  text for now (tree-sitter-mdz integration tracked as 2.3a.5
+  follow-up alongside the picker pack's CodeMirror command API).
+  History (undo/redo) + default keymap + Cmd/Ctrl+S save binding.
+- **Preview pane** reuses `import { renderMarkdown } from
+  "@mdz-format/viewer"`. The full directive + math + sanitize
+  pipeline runs on every render, so what the editor previews is
+  what the deployed viewer produces.
+- **150 ms debounced render** via `makeDebouncer` (separately
+  testable). `flush()` / `cancel()` semantics let `setContent`
+  bypass the debounce when a programmatic update fires; `Save`
+  / `Open` callouts cancel pending renders so old previews don't
+  clobber freshly-loaded content.
+- **Mode toggle** (`source` / `preview` / `split`) writes a
+  `.mode-*` class to the pane host. CSS `grid-template-columns`
+  drives the layout — no JS show/hide gymnastics, no scroll
+  thrash. Active mode reflected on the toolbar via
+  `aria-pressed`.
+- **Save flow**: Cmd/Ctrl+S OR menu OR toolbar button calls the
+  IPC bridge with the manifest + new content. Modified-indicator
+  (●) clears on successful save. Save errors surface in the
+  title area (full toast UI lands when the picker pack does in
+  2.3a.5).
+- **Pure helpers extracted** to `editor-pane-helpers.ts` so
+  `makeDebouncer` / `applyModeClass` / `modeClassName` can be
+  unit-tested in vitest's Node env without dragging in
+  `<mdz-viewer>` (which extends `HTMLElement` at module load
+  and breaks Node-only tests).
+
+Tests at `test/editor-pane.test.ts`: 12 vitest cases. Cover
+debounce schedule + flush + cancel + last-call-wins coalescing,
+mode-class idempotency + multi-stale-class cleanup, mode-name
+mapping. Total editor-desktop tests: **23** (11 archive-io + 12
+editor-pane). All pass; tsc --noEmit -p tsconfig.test.json
+clean.
+
+CodeMirror's measurement layer needs a real browser DOM, so the
+keystroke-to-preview latency timing + scroll-position pinning are
+Phase 2.3a.6 Playwright coverage. The 23 vitest cases pin every
+piece of logic that doesn't need a browser.
+
 ### Added — Phase 2.3a.1: Editor shell foundation (2026-04-24)
 
 The desktop editor's Electron skeleton ships at `editor-desktop/`,
