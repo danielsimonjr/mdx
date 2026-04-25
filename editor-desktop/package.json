@@ -1,0 +1,31 @@
+{
+  "name": "@mdz-format/editor-desktop",
+  "version": "0.1.0-alpha.0",
+  "private": true,
+  "description": "Electron desktop editor for MDZ archives. Source pane + live <mdz-viewer> preview, asset sidebar, .ipynb import. Ships as code-signed installers for macOS, Windows, Linux.",
+  "type": "module",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.main.json && vite build",
+    "test": "vitest run",
+    "typecheck:core": "tsc --noEmit -p tsconfig.test.json"
+  },
+  "dependencies": {
+    "fflate": "^0.8.2"
+  },
+  "optionalDependencies": {
+    "electron": "^31.0.0",
+    "electron-updater": "^6.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0",
+    "vite": "^5.4.19",
+    "vitest": "^2.1.9"
+  },
+  "comment-optional-deps": "electron + electron-updater are optional so CI can validate the editor's testable core (archive-io.ts + tests) without pulling ~200 MB of Electron platform binaries on every build. Local devs: npm install --include=optional once. Phase 2.3a.6 (release engineering) will wire a separate electron-builder job that DOES install them.",
+  "engines": {
+    "node": ">=20"
+  }
+}

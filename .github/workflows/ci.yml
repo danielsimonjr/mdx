@@ -436,6 +436,36 @@ jobs:
       - name: Run helper unit tests
         run: node --test integrations/vscode/test/*.test.js
 
+  validate-editor-desktop:
+    name: Validate Editor Desktop (Phase 2.3a.1)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install editor deps (skip Electron platform binaries)
+        # `npm install --omit=optional` keeps CI fast (~5 s vs ~5 min for
+        # the full Electron download). The optional deps are exercised
+        # by the Phase 2.3a.6 release-engineering job that DOES install
+        # them (separate workflow, not yet wired).
+        run: |
+          cd editor-desktop
+          npm install --omit=optional --no-audit --no-fund
+
+      - name: Type-check the testable core (excludes Electron-deps)
+        run: |
+          cd editor-desktop
+          npx tsc --noEmit -p tsconfig.test.json
+
+      - name: Run archive-io unit tests
+        run: |
+          cd editor-desktop
+          npx vitest run
+
   validate-browser-extension:
     name: Validate Browser Extension (Phase 2.5)
     runs-on: ubuntu-latest

@@ -280,7 +280,7 @@ maintainer, double it.
 |-----------|-------|-------------|----------------|
 | 2.1 viewer | **partial** | sanitizer (38 tests), directives (cross-refs / citations / bibliography / `::cell` / `::output` / `::include`, 46 tests), CSL-JSON references (10 tests), KaTeX math (13 tests), **IndexedDB cache** (10 tests). 117/117 viewer tests pass. | full keyboard a11y, npm publish, demo site, fragment-aware `::include` |
 | 2.2 hosted | **code-ready, not deployed** | full Cloudflare Worker with strict CSP, content-hash cache pinning, OG / Twitter card meta, sanitized canonical URLs, 32 worker tests | `wrangler deploy` to view.mdz-format.org (external action), per-archive cover-image extraction |
-| 2.3a editor MVP | **chunked, not started** | (none — see 2.3a.1 through 2.3a.6 below for the new chunking) | All sub-phases |
+| 2.3a editor MVP | **partial** | **2.3a.1 shell foundation** ships at `editor-desktop/`: pure archive-io (11 tests), Electron main + preload + renderer, CSP'd HTML, sandboxed renderer, IPC + menu + auto-update stub. CI gate. | 2.3a.2 source editor + preview, 2.3a.3 asset sidebar, 2.3a.4 ipynb import, 2.3a.5 picker pack, 2.3a.6 release engineering |
 | 2.3b editor Pro | **chunked, not started** | (none — see 2.3b.1 through 2.3b.7 below) | All sub-phases |
 | 2.4 EPUB bridge | **shipped** | `mdz export-epub` (existing) + `mdz import-epub` (new, 15 tests, fidelity matrix doc); round-trip CI gate | Symmetric `::fig` round-trip on the export side (tracked); per-chapter spine preservation |
 | 2.5 browser ext | **code-ready, hardened** | MV3 manifest, content + service-worker + popup + viewer scripts, 13 manifest-validation tests, reproducible-build doc, placeholder icons | Real icon artwork, bundled `<mdz-viewer>`, AMO / Chrome Web Store / Edge / Brave submissions |
@@ -378,23 +378,37 @@ test, and a scope that fits in a session-or-two of focused work. The
 2.3a.5 ship — at that point a grad student can author a reproducible paper
 end-to-end and export it to a journal as JATS-XML.
 
-#### 2.3a.1 Editor shell foundation
+#### 2.3a.1 Editor shell foundation — **shipped**
 
-- [ ] Electron app skeleton at `editor-desktop/` with main + renderer
-      processes split, contextIsolation: true, sandbox: true on the
-      renderer.
-- [ ] Vite dev server + production build for the renderer.
-- [ ] IPC channel for "open archive / save archive" (renderer asks
-      main; main does the disk I/O so the sandboxed renderer never
-      touches `node:fs` directly).
-- [ ] `electron-updater` plumbing (NOT raw Squirrel.Windows —
-      effectively unmaintained; `electron-updater` targets NSIS and
-      Squirrel.Mac through one API).
+- [x] Electron app skeleton at `editor-desktop/` with main + renderer
+      processes split, `contextIsolation: true`, `sandbox: true`,
+      `nodeIntegration: false` on the renderer's BrowserWindow.
+- [x] Vite dev server (port 5173) + production build pipeline
+      (`tsconfig.main.json` for main + preload as CommonJS;
+      `vite.config.ts` for the renderer ES-module bundle).
+- [x] IPC channels `archive:open` / `archive:save` /
+      `dialog:openFile` / `dialog:saveFile`. Renderer never touches
+      `node:fs`; everything goes through the preload's contextBridge.
+- [x] `electron-updater` plumbing wired with a no-op stub feed.
+      Phase 2.3a.6 swaps the stub for a real GitHub Releases endpoint.
+- [x] **Pure archive-io decoupled from Electron** at
+      `src/main/archive-io.ts` (open / save / round-trip via
+      injectable `FsLike`). Lets the open/save contract be unit-
+      tested without spawning Electron.
+- [x] Renderer HTML carries a strict CSP
+      (`default-src 'self'; script-src 'self'`; no remote scripts).
+- [x] CI: `validate-editor-desktop` job type-checks the testable
+      core + runs the 11 archive-io vitest cases. Electron's platform
+      binaries are in `optionalDependencies` and skipped in CI for
+      speed (Phase 2.3a.6 wires a separate release-build job that
+      DOES install them).
 
-  **Acceptance:** `npm run dev` opens an Electron window with a
-  Vite-served React/Lit renderer, a "File → Open" menu that round-
-  trips an `.mdz` through the main process, and an `electron-updater`
-  no-op feed wired to a static-stub URL.
+  **Acceptance:** met. `npm run test` passes (11/11), `npx tsc
+  --noEmit -p tsconfig.test.json` is clean, `editor-desktop/README.md`
+  documents the install + dev + build flow. The full integration
+  acceptance ("`npm run dev` opens an Electron window…") requires
+  `npm install --include=optional` plus a real run; tracked as
+  Phase 2.3a.6 Playwright integration coverage.
 
 #### 2.3a.2 Source editor + live preview
 

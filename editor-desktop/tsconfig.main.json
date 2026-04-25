@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "noEmit": false,
+    "rootDir": "./src",
+    "module": "CommonJS",
+    "moduleResolution": "node"
+  },
+  "comment": "Compiles main.ts + preload.ts to CommonJS for Electron's main-process loader. Renderer code (index.ts) goes through Vite separately (vite.config.ts) and ships as an ES module bundle.",
+  "include": [
+    "src/main/**/*.ts",
+    "src/preload/**/*.ts"
+  ],
+  "exclude": [
+    "src/renderer/**/*",
+    "test/**/*"
+  ]
+}

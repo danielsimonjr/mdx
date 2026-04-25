@@ -79,6 +79,13 @@ mdx/                                    # (directory name deferred-rename)
 │   │             manifest-types.ts)
 │   └── mdz-viewer-hosted/                          # Cloudflare Worker
 │       └── src/worker.ts
+├── editor-desktop/                                 # Phase 2.3a.1 Electron editor shell
+│   ├── src/main/archive-io.ts                      # pure open / save (FsLike-injected)
+│   ├── src/main/main.ts                            # Electron main-process glue
+│   ├── src/preload/preload.ts                      # contextBridge surface
+│   ├── src/renderer/{index.html,index.ts}          # minimal "open MDZ" UI
+│   ├── test/archive-io.test.ts                     # 11 vitest cases
+│   └── README.md
 ├── browser-extension/                              # Phase 2.5 WebExtensions
 │   ├── manifest.json
 │   ├── background/ content/ popup/ viewer/ icons/
@@ -199,7 +206,7 @@ tsc implementations/typescript/mdx_format.ts --target es2020 --module esnext
 - Open `.mdx` files with any ZIP utility to inspect contents
 
 ### CI Validation
-The GitHub Actions workflow (`.github/workflows/ci.yml`) runs 15 jobs:
+The GitHub Actions workflow (`.github/workflows/ci.yml`) runs 16 jobs:
 - Validate TypeScript (type-check via `tsc --noEmit`)
 - TypeScript Unit Tests (vitest; includes fast-check property tests)
 - Validate Python (py_compile + example generation)
@@ -213,6 +220,7 @@ The GitHub Actions workflow (`.github/workflows/ci.yml`) runs 15 jobs:
 - Validate Rust Binding (Phase 4.1 — cargo build+test, default + no-default)
 - Validate Pandoc Lua Filter (Phase 4.2 — smoke + fixture pack if present)
 - Validate VS Code Extension (Phase 4.2 — JSON + syntax check)
+- Validate Editor Desktop (Phase 2.3a.1 — type-check testable core + 11 archive-io tests; Electron deps are optional, skipped in CI)
 - Validate Browser Extension (Phase 2.5 — manifest.json structural + JS syntax + reproducible-build doc)
 - Validate Corpus Fetcher (Phase 4.3 — py_compile + import smoke)
 - Lint Markdown (DavidAnson/markdownlint-cli2-action)

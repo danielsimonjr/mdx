@@ -196,6 +196,54 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Added — Phase 2.3a.1: Editor shell foundation (2026-04-24)
+
+The desktop editor's Electron skeleton ships at `editor-desktop/`,
+unblocking the rest of Phase 2.3a (source editor, asset sidebar,
+ipynb import, picker pack, release engineering).
+
+- **Pure archive-io layer** at `src/main/archive-io.ts` — `openArchive`
+  + `saveArchive` accept an injected `FsLike` adapter so the open /
+  save contract is unit-testable against an in-memory fake without
+  spawning Electron's chrome. Production wires `node:fs/promises`;
+  tests wire `MemoryFs`.
+- **Electron main process** at `src/main/main.ts`. Sandboxed renderer
+  (`sandbox: true`, `contextIsolation: true`, `nodeIntegration:
+  false`); IPC handlers for `archive:open` / `archive:save` /
+  `dialog:openFile` / `dialog:saveFile`; application menu (File →
+  Open / Save / Save As / Quit) with accelerators; `electron-
+  updater` wired with a no-op stub feed.
+- **Preload bridge** at `src/preload/preload.ts` — minimal
+  `contextBridge` surface (`window.editorApi`) auditing each method
+  the renderer can call into main. New methods require a security
+  review.
+- **Renderer** at `src/renderer/{index.html,index.ts}` — minimal
+  "open MDZ, show title + content" UI with a strict CSP
+  (`default-src 'self'; script-src 'self'`; no remote scripts). The
+  CodeMirror source pane + `<mdz-viewer>` preview replace the
+  current `<pre>` in 2.3a.2.
+- **Build pipeline**:
+  - `tsconfig.main.json` compiles main + preload to CommonJS
+    (Electron's main-process loader expects it).
+  - `tsconfig.test.json` excludes Electron-dependent files so CI can
+    type-check the testable core without installing Electron.
+  - `vite.config.ts` for the renderer dev server (port 5173) +
+    production bundle.
+  - `vitest.config.ts` separately because vite's root is the
+    renderer subdir but tests need the package root.
+- **Optional Electron deps**: `electron` + `electron-updater` are in
+  `optionalDependencies` so CI skips ~200 MB of platform binaries.
+  Local devs run `npm install --include=optional`. Phase 2.3a.6
+  release-engineering will wire a separate workflow that DOES
+  install them.
+
+Tests at `test/archive-io.test.ts`: 11 vitest cases. Cover the
+happy path, missing file, non-ZIP bytes, missing manifest, invalid
+JSON, missing entry_point, custom entry_point honoring, save +
+round-trip, asset path collision refusal, and spec §10.2 manifest-
+first ZIP ordering. CI: new `validate-editor-desktop` job runs
+type-check + tests. Job count: 15 → 16.
+
 ### Added — Phase 2.1 viewer: IndexedDB archive cache (2026-04-24)
 
 `<mdz-viewer>` now caches loaded archives by URL so a return visit
