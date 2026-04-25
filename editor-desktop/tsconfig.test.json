@@ -13,6 +13,8 @@
     "src/renderer/editor-pane-helpers.ts",
     "src/renderer/asset-store.ts",
     "src/renderer/directive-insert.ts",
+    "src/renderer/directive-pickers.ts",
+    "src/renderer/directive-modal.ts",
     "test/**/*.ts"
   ],
   "exclude": [

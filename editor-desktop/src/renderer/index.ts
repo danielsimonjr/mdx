@@ -14,6 +14,13 @@
 import type { EditorApi } from "../preload/types.js";
 import { createEditorPane, type EditorPane, type ViewMode } from "./editor-pane.js";
 import { AssetStore, formatSize, webCryptoHasher } from "./asset-store.js";
+import {
+  openCellPicker,
+  openIncludePicker,
+  openFigPicker,
+  openCitePicker,
+} from "./directive-modal.js";
+import { collectExistingIds, collectBibliographyKeys } from "./directive-pickers.js";
 
 declare global {
   interface Window {
@@ -45,6 +52,13 @@ const modeButtons: Record<ViewMode, HTMLButtonElement> = {
 let session: OpenSession | null = null;
 let pane: EditorPane | null = null;
 const assetStore = new AssetStore(webCryptoHasher);
+
+const pickerButtons = {
+  cell: document.getElementById("picker-cell") as HTMLButtonElement,
+  include: document.getElementById("picker-include") as HTMLButtonElement,
+  fig: document.getElementById("picker-fig") as HTMLButtonElement,
+  cite: document.getElementById("picker-cite") as HTMLButtonElement,
+};
 
 const dropzone = document.getElementById("asset-dropzone") as HTMLDivElement;
 const assetListEl = document.getElementById("asset-list") as HTMLUListElement;
@@ -120,9 +134,53 @@ function setModeButtons(active: ViewMode): void {
   }
 }
 
+function setPickersEnabled(enabled: boolean): void {
+  for (const btn of Object.values(pickerButtons)) btn.disabled = !enabled;
+}
+
+/**
+ * Bibliography lookup. CSL-JSON is read from the archive's
+ * `references.json` (root-level by convention) when the archive is
+ * opened — `referencesJson` below holds the raw text. When absent
+ * or malformed the cite picker falls back to permissive mode (any
+ * key accepted, no validation).
+ */
+let referencesJson: string | null = null;
+function bibliographyKeysFromAssets(): ReadonlySet<string> | null {
+  return referencesJson == null ? null : collectBibliographyKeys(referencesJson);
+}
+
+async function runPicker(
+  open: () => Promise<import("./directive-insert.js").InsertionPayload | null>,
+): Promise<void> {
+  if (!pane) return;
+  const payload = await open();
+  if (!payload) return;
+  pane.insertDirective(payload);
+  if (session) setModified(true);
+}
+
+pickerButtons.cell.addEventListener("click", () => {
+  void runPicker(() => openCellPicker(document.body));
+});
+pickerButtons.include.addEventListener("click", () => {
+  void runPicker(() =>
+    openIncludePicker(document.body, assetStore.list().map((e) => e.path)),
+  );
+});
+pickerButtons.fig.addEventListener("click", () => {
+  void runPicker(() =>
+    openFigPicker(document.body, collectExistingIds(pane?.getContent() ?? "")),
+  );
+});
+pickerButtons.cite.addEventListener("click", () => {
+  void runPicker(() => openCitePicker(document.body, bibliographyKeysFromAssets()));
+});
+
 async function ensurePane(initialContent: string): Promise<EditorPane> {
   if (pane) {
     pane.setContent(initialContent);
+    setPickersEnabled(true);
     return pane;
   }
   // Replace the placeholder paragraph with an empty preview host so
@@ -166,7 +224,13 @@ async function openFlow(): Promise<void> {
   setModified(false);
   await assetStore.loadFromArchive(result.archive.entries);
   renderAssetList();
+  // Pick up references.json (root-level CSL-JSON) for the cite
+  // picker's bibliography validation. AssetStore filters to `assets/`
+  // entries only, so we read it straight from the archive map.
+  const refsBytes = result.archive.entries.get("references.json");
+  referencesJson = refsBytes ? new TextDecoder().decode(refsBytes) : null;
   await ensurePane(result.archive.content);
+  setPickersEnabled(true);
 }
 
 async function saveFlow(): Promise<void> {
@@ -239,7 +303,12 @@ async function importIpynbFlow(): Promise<void> {
     baseline: opened.archive.content,
   };
   setModified(false);
+  await assetStore.loadFromArchive(opened.archive.entries);
+  renderAssetList();
+  const refsBytes = opened.archive.entries.get("references.json");
+  referencesJson = refsBytes ? new TextDecoder().decode(refsBytes) : null;
   await ensurePane(opened.archive.content);
+  setPickersEnabled(true);
 }
 
 window.editorApi.onMenu("open", () => {

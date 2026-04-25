@@ -196,6 +196,44 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Added — Phase 2.3a.5.1–4: Directive picker pack (2026-04-24)
+
+The editor's header toolbar now has four picker buttons —
+`::cell`, `::include`, `::fig`, `::cite` — each opening a modal
+that collects the directive's parameters, validates them, and
+splices a syntactically-valid directive at the cursor via
+`EditorPane.insertDirective` (Phase 2.3a.5.0). Buttons are
+disabled until an archive is open.
+
+Architecture: a pure validation layer in
+`editor-desktop/src/renderer/directive-pickers.ts` handles
+form-state → InsertionPayload conversion (testable in vitest's
+node env), and a thin DOM wrapper in `directive-modal.ts` provides
+the `<dialog>`-based UI (browser-only). Validators enforce:
+
+- **`::cell`**: non-empty language + kernel; non-negative integer
+  execution count when provided.
+- **`::include`**: target required, no leading slash, no `..`
+  traversal; when archive entries are provided, target must exist
+  in the archive.
+- **`::fig` / `::eq` / `::tab`**: id matches
+  `[A-Za-z][A-Za-z0-9_-]*` and isn't already used by another
+  directive of the same kind. Cross-kind reuse is allowed (so
+  `::fig{id=overview}` and `::eq{id=overview}` can coexist).
+  `collectExistingIds` regex-scans the open document.
+- **`::cite`**: ≥1 key; when `references.json` is present in the
+  archive root and parseable as CSL-JSON, each key must match an
+  item id (empty / malformed bibliography = permissive). Keys are
+  deduplicated while preserving order.
+
+32 vitest cases for the validation layer — every error branch and
+the bibliography parser's three malformed-input fallbacks. All
+113 editor-desktop tests pass (113 = 81 prior + 32 new).
+
+The picker pack completes Phase 2.3a.5 and brings the editor MVP
+to feature-complete except for code-signed installers (Phase
+2.3a.6 — partly external dependencies).
+
 ### Added — Phase 2.3a.5.0: Directive insertion engine (2026-04-24)
 
 Foundation layer for the picker pack (2.3a.5.1–4) and the Pro-tier

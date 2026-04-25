@@ -71,6 +71,35 @@
     .cm-editor { height: 100%; }
     .cm-scroller { overflow: auto; }
 
+    /* Directive picker toolbar */
+    .directive-toolbar { display: flex; gap: 0.25rem; }
+    .directive-toolbar button { background: transparent; color: inherit; border: 1px solid #ccc; padding: 0.3rem 0.6rem; }
+    .directive-toolbar button:hover:not([disabled]) { background: #eef2ff; color: #1d4ed8; border-color: #1d4ed8; }
+    .directive-toolbar button[disabled] { opacity: 0.4; cursor: not-allowed; }
+    @media (prefers-color-scheme: dark) {
+      .directive-toolbar button { color: #f5f5f5; border-color: #333; }
+      .directive-toolbar button:hover:not([disabled]) { background: #1e3a8a; color: #dbeafe; border-color: #60a5fa; }
+    }
+
+    /* Directive modal */
+    .directive-modal { border: 1px solid #ccc; border-radius: 6px; padding: 1.25rem; min-width: 360px; max-width: 90vw; }
+    .directive-modal::backdrop { background: rgba(0, 0, 0, 0.4); }
+    .directive-modal-title { margin: 0 0 0.75rem; font-size: 1.05rem; }
+    .directive-modal-fields { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 0.75rem; }
+    .directive-modal-field { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.85rem; }
+    .directive-modal-field input, .directive-modal-field select {
+      padding: 0.35rem 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem;
+      font-family: inherit;
+    }
+    .directive-modal-error { color: #dc2626; font-size: 0.85rem; margin: 0 0 0.5rem; }
+    .directive-modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+    .directive-modal .cancel-btn { background: transparent; color: inherit; border: 1px solid #ccc; }
+    @media (prefers-color-scheme: dark) {
+      .directive-modal { background: #181818; border-color: #444; color: #f5f5f5; }
+      .directive-modal-field input, .directive-modal-field select { background: #0a0a0a; color: #f5f5f5; border-color: #333; }
+      .directive-modal .cancel-btn { color: #f5f5f5; border-color: #444; }
+    }
+
     @media (prefers-color-scheme: dark) {
       body { background: #0a0a0a; color: #f5f5f5; }
       header { border-color: #333; }
@@ -88,6 +117,12 @@
     <span id="title" class="archive-title empty">No archive open.</span>
     <span id="path" class="archive-path"></span>
     <span id="modified-indicator" hidden aria-label="modified" title="Unsaved changes">●</span>
+    <div class="directive-toolbar" role="group" aria-label="Insert directive">
+      <button id="picker-cell" type="button" disabled title="Insert ::cell">::cell</button>
+      <button id="picker-include" type="button" disabled title="Insert ::include">::include</button>
+      <button id="picker-fig" type="button" disabled title="Insert ::fig / ::eq / ::tab">::fig</button>
+      <button id="picker-cite" type="button" disabled title="Insert ::cite">::cite</button>
+    </div>
     <div class="mode-toggle" role="group" aria-label="View mode">
       <button id="mode-source" aria-pressed="false">Source</button>
       <button id="mode-split" aria-pressed="true">Split</button>

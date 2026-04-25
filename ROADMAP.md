@@ -280,7 +280,7 @@ maintainer, double it.
 |-----------|-------|-------------|----------------|
 | 2.1 viewer | **partial** | sanitizer (38 tests), directives (cross-refs / citations / bibliography / `::cell` / `::output` / `::include`, 46 tests), CSL-JSON references (10 tests), KaTeX math (13 tests), **IndexedDB cache** (10 tests). 117/117 viewer tests pass. | full keyboard a11y, npm publish, demo site, fragment-aware `::include` |
 | 2.2 hosted | **code-ready, not deployed** | full Cloudflare Worker with strict CSP, content-hash cache pinning, OG / Twitter card meta, sanitized canonical URLs, 32 worker tests | `wrangler deploy` to view.mdz-format.org (external action), per-archive cover-image extraction |
-| 2.3a editor MVP | **partial** | **2.3a.1** shell foundation + **2.3a.2** source editor + live preview + **2.3a.3** asset sidebar + **2.3a.4** .ipynb import wiring + **2.3a.5.0** directive insertion engine. 81 vitest cases (11 archive-io + 12 editor-pane + 7 ipynb-import + 32 asset-store + 19 directive-insert). CodeMirror 6 + `@mdz-format/viewer` reuse, mode toggle, save flow, File → Import Jupyter notebook menu, drag-drop asset sidebar with SHA-256 + manifest projection, pure builders for `::cell`/`::include`/`::fig`/`::cite` directives. | 2.3a.5.1–4 individual pickers, 2.3a.6 release engineering |
+| 2.3a editor MVP | **partial** | **2.3a.1** shell + **2.3a.2** editor+preview + **2.3a.3** asset sidebar + **2.3a.4** .ipynb import + **2.3a.5.0** insertion engine + **2.3a.5.1–4** picker pack. 113 vitest cases (11 archive-io + 12 editor-pane + 7 ipynb-import + 32 asset-store + 19 directive-insert + 32 directive-pickers). Toolbar buttons for `::cell`, `::include`, `::fig`/`::eq`/`::tab`, `::cite`; `<dialog>`-based modal scaffolding; CSL-JSON bibliography lookup; document-scan id-collision check; archive-entry membership check for include targets. | 2.3a.6 release engineering (signed installers — partly external) |
 | 2.3b editor Pro | **chunked, not started** | (none — see 2.3b.1 through 2.3b.7 below) | All sub-phases |
 | 2.4 EPUB bridge | **shipped** | `mdz export-epub` (existing) + `mdz import-epub` (new, 15 tests, fidelity matrix doc); round-trip CI gate | Symmetric `::fig` round-trip on the export side (tracked); per-chapter spine preservation |
 | 2.5 browser ext | **code-ready, hardened** | MV3 manifest, content + service-worker + popup + viewer scripts, 13 manifest-validation tests, reproducible-build doc, placeholder icons | Real icon artwork, bundled `<mdz-viewer>`, AMO / Chrome Web Store / Edge / Brave submissions |
@@ -495,19 +495,26 @@ second).
       replaces selection) and parks the caret at the requested
       offset. 19 vitest cases cover all four builders + the
       sentinel-split helper. Picker pack 2.3a.5.1+ builds on this.
-- [ ] **2.3a.5.1 — `::cell` picker.** Modal: language dropdown
-      (Python / R / Julia / JS), kernel field, optional
-      `execution_count`. Inserts a complete `::cell{...}` block plus
-      a fenced code shell.
-- [ ] **2.3a.5.2 — `::include` picker.** Modal: target (with
-      autocomplete on the open archive's entry list), optional
-      `fragment`, optional `content_hash`.
-- [ ] **2.3a.5.3 — `::fig` / `::eq` / `::tab` picker.** Modal: kind
-      (radio), id (with collision check against already-defined ids
-      in the document), title.
-- [ ] **2.3a.5.4 — `::cite` picker.** Modal: dropdown / search
-      against `references.json` keys (when present), multi-select,
-      optional locator (`prefix`, `suffix`).
+- [x] **2.3a.5.1 — `::cell` picker.** Modal with language select
+      (Python/R/Julia/JS), kernel field, optional `execution_count`.
+      `validateCell` enforces non-empty language+kernel and a
+      non-negative integer execution_count.
+- [x] **2.3a.5.2 — `::include` picker.** Modal with target,
+      fragment, and content_hash fields. `validateInclude` rejects
+      absolute paths and `..` traversal; when archive entry list is
+      provided, also rejects targets not present in the archive.
+- [x] **2.3a.5.3 — `::fig` / `::eq` / `::tab` picker.** Modal with
+      kind select (fig/eq/tab) + id text. `collectExistingIds`
+      scans the open document for already-defined ids per kind;
+      `validateFig` enforces the spec id grammar
+      (`[A-Za-z][A-Za-z0-9_-]*`) and rejects collisions within the
+      same kind (cross-kind reuse is allowed).
+- [x] **2.3a.5.4 — `::cite` picker.** Modal with comma-separated
+      keys + optional prefix/suffix locator.
+      `collectBibliographyKeys` parses CSL-JSON from
+      `references.json` (root-level archive entry); `validateCite`
+      checks each key against the bibliography when present (empty
+      bibliography = permissive). Order-preserving deduplication.
 
   **Depends on:** 2.3a.2 (CodeMirror) for all five.
   **Acceptance per picker:** clicking the toolbar button + filling
