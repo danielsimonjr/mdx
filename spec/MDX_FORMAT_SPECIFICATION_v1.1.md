@@ -1,4 +1,9 @@
-# MDX Format Specification
+# MDZ Format Specification (v1.1 — historical)
+
+> **Note:** This is the v1.1 historical specification (alignment + block
+> attributes), retained for archival readers. The current spec is
+> `MDX_FORMAT_SPECIFICATION_v2.0.md`. Format renamed from MDX to MDZ on
+> 2026-04-24; readers MUST accept both extensions through 2027-01-01.
 
 ## Version 1.1.0 — Draft
 

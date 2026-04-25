@@ -2333,7 +2333,11 @@ export interface SaveOptions {
 }
 
 /**
- * Options for exporting to HTML.
+ * @deprecated Removed alongside `MDZDocument.toHTML` on 2026-04-25
+ * because the Phase 2.1 `<mdz-viewer>` web component is the
+ * production-ready renderer. The interface declaration is kept for
+ * type-only backward compat — no runtime code reads it. Will be
+ * removed entirely after the 2027-01-01 deprecation cliff.
  */
 export interface HTMLExportOptions {
   /** Whether to embed assets as base64 */
@@ -2369,10 +2373,6 @@ export class MDZDocument {
   private _assets: Map<string, Uint8Array>;
   private _versions: VersionEntry[];
   private _annotations: Annotation[];
-
-  // Guards the once-per-process deprecation warning on toHTML(); see §2.1
-  // roadmap item on replacing this with the <mdz-viewer> web component.
-  private static _toHtmlWarningEmitted = false;
 
   /**
    * Creates a new MDZDocument instance.
@@ -3253,128 +3253,33 @@ export class MDZDocument {
   }
 
   /**
-   * Exports the document as standalone HTML.
+   * Removed: `toHTML` was a dev-only stub that wrapped raw markdown
+   * in a `<pre>`. The `<mdz-viewer>` web component (Phase 2.1
+   * shipped 2026 Q2) is the production renderer. Code that called
+   * `toHTML` should call `renderMarkdown(content)` from
+   * `@mdz-format/viewer` instead.
    *
-   * @deprecated This produces a toy HTML representation powered by a
-   * regex-based Markdown converter that is NOT production-safe. It exists
-   * for quick dev preview only. For real rendering, use the Phase 2
-   * `<mdz-viewer>` web component. Will emit a console warning on first
-   * call and is scheduled for removal once the viewer ships.
+   * This stub remains for one release cycle so callers see a clear
+   * runtime error pointing them at the replacement; it will be
+   * deleted entirely on 2027-01-01.
    *
-   * Scheduled removal: 2027-01-01, or first viewer release, whichever is
-   * earlier.
-   *
-   * @param options - Export options
-   * @returns HTML string (best-effort, not spec-compliant)
+   * @deprecated Removed 2026-04-25 — call sites must migrate to
+   * `renderMarkdown` from `@mdz-format/viewer`.
+   * @throws {Error} always
    */
-  toHTML(options: HTMLExportOptions = {}): string {
-    if (!MDZDocument._toHtmlWarningEmitted) {
-      MDZDocument._toHtmlWarningEmitted = true;
-      // eslint-disable-next-line no-console
-      console.warn(
-        "[MDZ] MDZDocument.toHTML is a toy renderer — regex-based Markdown " +
-          "conversion, not CommonMark-compliant. Use the Phase 2 <mdz-viewer> " +
-          "web component or export via mdz-to-html (Phase 2) instead.",
-      );
-    }
-    const escapedTitle = this.escapeHTML(this.title);
-
-    let processedContent = this._content;
-
-    // Toy Markdown → HTML. Will be replaced by a real parser call or
-    // removed entirely in Phase 2.
-    processedContent = this.basicMarkdownToHTML(processedContent);
-
-    const customCSS = options.customCSS || "";
-
-    return `<!DOCTYPE html>
-<html lang="${this._manifest.language || "en"}">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${escapedTitle}</title>
-    <style>
-        body {
-            font-family: system-ui, -apple-system, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 2rem;
-            line-height: 1.6;
-            color: #333;
-        }
-        img { max-width: 100%; height: auto; }
-        pre {
-            background: #f5f5f5;
-            padding: 1rem;
-            overflow-x: auto;
-            border-radius: 4px;
-        }
-        code {
-            background: #f5f5f5;
-            padding: 0.2em 0.4em;
-            border-radius: 3px;
-            font-family: 'Fira Code', monospace;
-        }
-        pre code { background: none; padding: 0; }
-        blockquote {
-            border-left: 4px solid #ddd;
-            margin-left: 0;
-            padding-left: 1rem;
-            color: #666;
-        }
-        table {
-            border-collapse: collapse;
-            width: 100%;
-            margin: 1rem 0;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 0.5rem;
-            text-align: left;
-        }
-        th { background: #f5f5f5; }
-        /* v1.1 Alignment classes */
-        .align-left { text-align: left; }
-        .align-center { text-align: center; }
-        .align-right { text-align: right; }
-        .align-justify { text-align: justify; }
-        ${customCSS}
-    </style>
-</head>
-<body>
-<article>
-${processedContent}
-</article>
-</body>
-</html>`;
+  toHTML(_options: HTMLExportOptions = {}): string {
+    throw new Error(
+      "MDZDocument.toHTML was removed on 2026-04-25. The replacement is " +
+        "`renderMarkdown(content)` from `@mdz-format/viewer` — same input, " +
+        "production-grade output via the <mdz-viewer> sanitizer pipeline. " +
+        "See ROADMAP.md Phase 4.6.4.",
+    );
   }
 
-  /**
-   * Toy Markdown → HTML stub for the deprecated {@link toHTML} preview.
-   *
-   * Deliberately minimal: wraps the raw content in a single `<pre>` block
-   * with HTML-escaped text. Earlier revisions implemented a ~240-line
-   * regex-based converter that mimicked CommonMark badly; the regex soup
-   * gave a false impression of correctness. This stub is honest about the
-   * fact that `toHTML` is a dev-preview escape hatch, not a renderer.
-   *
-   * For real rendering, use the Phase 2 `<mdz-viewer>` web component.
-   */
-  private basicMarkdownToHTML(markdown: string): string {
-    return `<pre class="mdz-raw-markdown">${this.escapeHTML(markdown)}</pre>`;
-  }
-
-  /**
-   * Escapes HTML special characters.
-   */
-  private escapeHTML(text: string): string {
-    return text
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
+  // `basicMarkdownToHTML` and `escapeHTML` were the toy renderer's
+  // private helpers; both removed alongside `toHTML` on 2026-04-25.
+  // Production callers use `renderMarkdown` from `@mdz-format/viewer`,
+  // whose internal escape pass + sanitizer handle this safely.
 
   // --------------------------------------------------------------------------
   // Utility Methods

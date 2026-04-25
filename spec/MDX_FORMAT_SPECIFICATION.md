@@ -1,4 +1,10 @@
-# MDX Format Specification
+# MDZ Format Specification (v1.0 — historical)
+
+> **Note:** This is the v1.0 historical specification, retained for
+> archival readers. The current spec is `MDX_FORMAT_SPECIFICATION_v2.0.md`.
+> The format was renamed from MDX to MDZ on 2026-04-24; through 2027-01-01
+> readers MUST accept both `.mdx` and `.mdz` extensions and both MIME
+> types. See `ROADMAP.md` Phase 0 for the rename rationale.
 
 ## Version 1.0.0 — Draft
 

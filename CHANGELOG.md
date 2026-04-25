@@ -8,6 +8,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Phase 4.6: Housekeeping batch (2026-04-25)
+
+Five small open items closed:
+
+- **Spec title rename completed.** `MDX_FORMAT_SPECIFICATION.md`
+  (v1.0) and `MDX_FORMAT_SPECIFICATION_v1.1.md` now carry "MDZ
+  Format Specification (v1.0/v1.1 — historical)" headings with an
+  archival banner pointing forward to the v2.0 spec, matching the
+  v2.0 file's heading. Through 2027-01-01 readers MUST still
+  accept `.mdx` extensions per the existing dual-extension policy.
+- **`basicMarkdownToHTML` retired.** The toy regex-based renderer
+  in `implementations/typescript/mdx_format.ts` has been removed.
+  `MDZDocument.toHTML` now throws with a migration message pointing
+  at `renderMarkdown` from `@mdz-format/viewer`. The
+  `_toHtmlWarningEmitted` static guard and the `escapeHTML` private
+  helper that supported it are also gone. 125/125 TS tests still
+  pass — no caller depended on the toy output.
+- **CHANGELOG line-length wrap.** A pass over the file brought
+  prose lines under 90 chars; remaining over-80 lines are
+  intentional (URL-bearing, fenced code).
+- **Cargo.lock** is still ungenerated — needs a build host with
+  `cargo` available, which this environment doesn't have. Item
+  remains externally blocked but is now scoped to a one-command
+  follow-up (`cargo generate-lockfile && git add Cargo.lock`).
+
 ### Added — Phase 2.3b.4.2: Annotation sidebar UI (2026-04-25)
 
 The editor's right rail now has an Assets / Annotations tab pair.
@@ -1346,7 +1371,7 @@ followed by a fenced block does NOT get consumed as a phantom
 cell. Total viewer tests now: **96** (38 sanitizer + 35 directives
 + 13 math + 10 references). All pass; tsc --noEmit clean.
 
-### Changed — ROADMAP: Phase 2.3 editor work chunked into session-sized sub-phases (2026-04-24)
+### Changed — ROADMAP: Phase 2.3 editor chunked into sub-phases (2026-04-24)
 
 The original Phase 2.3a (Desktop editor MVP, 4–6 months) and Phase
 2.3b (Editor Pro features, 6–12 months) were each one bullet list of
@@ -1749,7 +1774,9 @@ accessibility surfacing at Level ≥ 3.
 
 ### Breaking changes
 
-**None.** v2.0 is intentionally backward-compatible. A valid v1.1 manifest with `mdx_version` bumped to `2.0.0` is a valid v2.0 manifest.
+**None.** v2.0 is intentionally backward-compatible. A valid v1.1
+manifest with `mdx_version` bumped to `2.0.0` is a valid v2.0
+manifest.
 
 ### Previous — v1.1.0 Draft
 
@@ -1780,7 +1807,8 @@ accessibility surfacing at Level ≥ 3.
   - Added `alignment_classes` to styles configuration
   - Added `attributes` section to rendering configuration
 
-- Python script to generate v1.1 examples (`implementations/python/create_v11_examples.py`)
+- Python script to generate v1.1 examples
+  (`implementations/python/create_v11_examples.py`)
 
 - JSON Schema for manifest validation (`spec/manifest.schema.json`)
   - Full schema for all manifest fields and asset types
@@ -1799,7 +1827,8 @@ accessibility surfacing at Level ≥ 3.
   - `extract` command - Extract archive contents to folder
   - `info` command - Display document metadata, assets, and content
   - `edit` command - Interactive terminal editor for metadata and content
-  - `create` command - Create new documents from templates (blank, article, report, presentation)
+  - `create` command - Create new documents from templates
+    (blank, article, report, presentation)
   - `validate` command - Validate document structure and manifest
   - Cross-platform executable builds via pkg
 

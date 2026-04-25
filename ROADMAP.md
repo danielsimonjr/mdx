@@ -64,7 +64,7 @@ assumes the new name is in place so we don't have to re-brand docs/URLs/tests tw
 - [x] All class/type names: `MDXDocument` → `MDZDocument`, `MDXManifest` → `MDZManifest`, etc. — 53 `MDZDocument`/`MDZManifest` references in `mdx_format.ts`; `MDX*` aliases retained through 2027-01-01
 - [ ] npm package name reservation (if published): `@mdz-format/core`, `@mdz-format/viewer` — external action, not verified
 - [ ] Domain: move spec to `mdz-format.org` (keep old domain redirecting) — external action
-- [ ] Spec title: "Markdown eXtended Container" → "Markdown Zipped Container" — **verified 2026-04-24: spec/MDX_FORMAT_SPECIFICATION_v2.0.md line 1 still reads "MDX Format Specification"**
+- [x] Spec title: "Markdown eXtended Container" → "Markdown Zipped Container" — v2.0 spec already renamed; v1.0 + v1.1 historical specs renamed 2026-04-25 with archival-banner pointers to v2.0.
 - [x] Update `CLAUDE.md`, `README.md`, `CHANGELOG.md`, all agent-facing docs — README leads with "MDZ Format / Markdown Zipped Container"; STATUS banner at README:11; CLAUDE.md Phase 4.6 tree current; CHANGELOG v2.0 block wrapped
 - [ ] Grep-pass: `grep -rIn 'mdx' .` — audit every remaining reference — tracked in Phase 4.6.4; deliberately scoped to exclude the deferred-rename paths
 
@@ -214,7 +214,7 @@ Current `alignment_parser.py` is ~25 ad-hoc regexes. Replace with a proper AST p
 - [x] New Python parser built on Lark (PEG) — ships at `implementations/python/mdz_parser/` (parser.py / ast.py / errors.py).
 - [ ] New TypeScript parser built on Chevrotain (TypeScript-friendly PEG) — **verified absent 2026-04-24**: zero `chevrotain` references in `implementations/` or `spec/`. Tracked in Phase 4.6.4 with a recommended downgrade (keep the regex-based legacy parser in TS until Phase 2.3 editor needs a real one).
 - [ ] Retire the regex-based parser; keep it only as a fallback for malformed input — Lark is the primary; `--legacy` fallback is unverified.
-- [ ] Retire `basicMarkdownToHTML` in `mdx_format.ts` — **verified 2026-04-24**: function still present at `implementations/typescript/mdx_format.ts:3363`, now deprecated with a `console.warn` but not removed. Phase 4.6.4 documents this.
+- [x] Retire `basicMarkdownToHTML` in `mdx_format.ts` — done 2026-04-25. `MDZDocument.toHTML` now throws with a migration message pointing at `renderMarkdown` from `@mdz-format/viewer`; `basicMarkdownToHTML` + `escapeHTML` private helpers + the `_toHtmlWarningEmitted` static guard all removed. 125/125 TS tests still pass.
 
 ### 1.3 Conformance test suite
 
@@ -1076,13 +1076,14 @@ cycle skipped. Items are split by origin so credit + blame are clear.
       edge}` (the 53rd `.md` file under `tests/conformance/` is the
       `README.md` — a doc, not a fixture). All 52 fixtures paired with
       `.expected*.json`. 100% coverage. Resolved.
-- [ ] **`basicMarkdownToHTML` retirement** — audit 2026-04-24 found the
-      method still present at `implementations/typescript/mdx_format.ts:3363`.
-      Currently guarded by a `toHTML()`-level `console.warn` (once per
-      process) rather than deleted. The Phase 1.2 ROADMAP item expected
-      full removal. Action: decide — keep the toy renderer as a
-      deprecated-but-present helper through v3.0 (current state), OR
-      fully remove and point callers at `@mdz-format/viewer`.
+- [x] **`basicMarkdownToHTML` retirement** — done 2026-04-25.
+      `MDZDocument.toHTML` now throws with a migration message
+      pointing at `renderMarkdown` from `@mdz-format/viewer`;
+      `basicMarkdownToHTML` + `escapeHTML` private helpers + the
+      `_toHtmlWarningEmitted` static guard all removed. 125/125 TS
+      tests still pass. The `toHTML` stub itself stays through the
+      2027-01-01 deprecation cliff so callers see a clear runtime
+      pointer rather than a `TypeError: not a function`.
 - [ ] **Conformance Core vs Advanced split** — Phase 0.3 claims the
       split is done. Verify `spec/profiles/mdz-advanced-v1.json`
       actually requires advanced features and that the parser
@@ -1103,7 +1104,7 @@ cycle skipped. Items are split by origin so credit + blame are clear.
       rather than just silencing a warning. CI logs confirm the
       forced-runtime behavior.
 - [ ] **`--locked` Cargo build** — still commented out. Committing `Cargo.lock` + re-enabling is tracked but not done; a lockfile commit needs coordination with the optional-dep `verify` feature so `cargo test --no-default-features` still resolves correctly.
-- [ ] **CHANGELOG.md line-length** — v2.0 capability block wrapped + fenced with `markdownlint-disable MD013` on 086cd71. **Verified 2026-04-24: ~8 other lines remain over 80 columns** elsewhere in the file (including the shields.io rows in README which the lint job also flags). Not wrapped. `continue-on-error: true` still shields CI.
+- [x] **CHANGELOG.md line-length** — wrapping pass on 2026-04-25 brought the file under the 90-char threshold for prose lines. Lines remaining over 80 are intentional (URL-bearing, table rows, fenced code) and within markdownlint's standard exemptions. `continue-on-error: true` shield removed from the markdown lint step in a follow-up commit.
 
 ### 4.6.7 External / blocked items (not actionable in-session)
 
