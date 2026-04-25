@@ -8,6 +8,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 2.3a.7.1: deterministic fixture archive + open/save round-trip (2026-04-25)
+
+Lands the fixture that the Phase 2.3a.7 scaffold's `.skip` stubs were
+waiting on, and unskips the open/save round-trip — the most
+self-contained of the four stubs (no UI selector dependencies, just
+the contextBridge IPC surface).
+
+New: `editor-desktop/e2e/fixtures/build-fixtures.mjs` — a
+deterministic builder that packs a 3.5 KB MDZ archive containing:
+
+- `manifest.json` (mdx_version 2.0.0, id pinned, two locales en/fr,
+  one image asset with verified sha256 content_hash)
+- `document.md` + `document.fr.md` (locale split with one
+  `::cell{language=python}` and one `::fig` directive each)
+- `assets/images/example.png` (1×1 transparent PNG, 67-byte literal)
+- `history/snapshots/index.json` + `base/v1.md` + `deltas/v2.patch`
+  (a real two-version chain so the Compare-versions stub has a
+  target to point at when 2.3a.7.2 unskips it)
+
+Determinism was the design constraint:
+
+- `fflate.zipSync` writes ZIP entries with mtime=1980-01-01 (the
+  ZIP epoch) by default, so re-running the builder produces a
+  byte-identical archive. Verified locally: two consecutive runs
+  hash to `c8222ee9…fbbbfd0b`.
+- The builder includes a self-check assertion: it computes sha256
+  of the inlined PNG bytes at startup and aborts if the manifest's
+  declared `content_hash` has drifted. Catches the failure mode
+  where someone edits the PNG without updating the hash.
+- Compression is disabled (`level: 0` / STORED). The fixture is
+  4 KB — compression doesn't pay off, and STORED removes the
+  zlib-version axis from the determinism contract.
+
+Spec change: `e2e/open-save-roundtrip.spec.ts` is now a passing
+test instead of a `.skip` stub. It exercises the full IPC chain:
+
+1. `editorApi.openFromPath(fixture)` → asserts the manifest title
+   matches the fixture's pinned `E2E Sample Archive`.
+2. Mutates the manifest title to `Mutated by e2e` and calls
+   `editorApi.saveToPath(tmpdir, mutated)` to write a fresh archive.
+3. `editorApi.openFromPath(saved)` and asserts the mutation
+   persisted, proving the open → mutate → save → reopen round-trip
+   through the production code path.
+
+The fixture is checked in (binary, 3505 bytes); `build-fixtures.mjs`
+is checked in alongside it so any contributor can rebuild and
+verify byte-equality. The remaining stubs
+(`picker-modals.spec.ts`, `compare-modals.spec.ts`,
+`cell-runner.spec.ts`) stay `.skip`-marked: they need
+`data-test-id` selectors on the picker / modal / cell-run UI that
+2.3a.7.2 adds in a focused renderer-pass PR.
+
 ### Added — Phase 2.3a.7: Playwright integration test scaffold (2026-04-25)
 
 Lands the e2e test surface that the rest of the editor's shipped
