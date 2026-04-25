@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTD/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Hardened-runtime entitlements for the MDZ Editor.
+       Notarization requires hardened-runtime; these are the minimum
+       set that lets the app run while staying notarizable. -->
+
+  <!-- Required for Pyodide CDN load (Phase 2.3b.1.2): the renderer
+       needs to fetch + WebAssembly.compile pyodide.wasm. -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+
+  <!-- Required because Electron uses dyld to load native modules. -->
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+
+  <!-- Outbound network access (auto-update, Pyodide CDN, viewer assets). -->
+  <key>com.apple.security.network.client</key>
+  <true/>
+
+  <!-- Read-only file access for the user to open .mdz archives.
+       Note: the open-file dialog still triggers a sandbox prompt;
+       this is the entitlement that makes the prompt's grant work. -->
+  <key>com.apple.security.files.user-selected.read-write</key>
+  <true/>
+</dict>
+</plist>

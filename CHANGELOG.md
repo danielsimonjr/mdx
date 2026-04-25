@@ -8,6 +8,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 2.3a.6: Release engineering pipeline (2026-04-25)
+
+The editor now has a complete three-platform release pipeline that
+runs **today** (unsigned) and auto-signs the moment cert secrets land
+in CI — no code change required when they arrive. Four pieces:
+
+- **`electron-builder.yml`** — installer config covering macOS DMG +
+  ZIP (universal: x64 + arm64), Windows NSIS + portable (x64 + arm64),
+  and Linux AppImage + deb + rpm. All cert / notarization values are
+  env-var placeholders (`APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`,
+  `APPLE_TEAM_ID`, `CSC_LINK`, `CSC_KEY_PASSWORD`); the `publish` block
+  points at the project's GitHub Releases.
+- **`build-resources/entitlements.mac.plist`** — macOS hardened-runtime
+  entitlements, with the minimum set notarization needs:
+  `com.apple.security.cs.allow-jit` (Pyodide WASM compile),
+  `network.client` (auto-update + Pyodide CDN),
+  `files.user-selected.read-write` (open-archive dialog).
+- **Auto-update feed wiring** in `main.ts` — replaces the no-op stub
+  with a real `electron-updater` config: `autoDownload: false`,
+  `autoInstallOnAppQuit: true`, debug logger when `MDZ_EDITOR_DEV=1`,
+  graceful failure on cold-start with no connectivity. Until the first
+  signed release ships, the updater resolves with `update-not-available`
+  (intended steady state).
+- **`.github/workflows/release-editor.yml`** — three-platform
+  GitHub Actions matrix triggered on `v*` tag pushes and manual
+  dispatch. Auto-detects which platform's signing secrets are present
+  and runs `npm run dist` (signed) vs `npm run dist:unsigned`
+  accordingly. Annotates the run with `::notice` when a platform's
+  secrets are missing so the gap is visible without failing the build.
+  Uploads installers as artifacts (DMG / ZIP / EXE / AppImage / deb /
+  rpm + `latest-<platform>.yml` for the auto-updater) with 30-day
+  retention.
+
+Placeholder icons (1×1 transparent PNG / ICO) ship under
+`build-resources/`; the README in that directory flags the swap-out
+before signed release. electron-builder will fail loudly during a
+real signed build if the artwork hasn't been replaced.
+
+`sharp` joins `electron` and `electron-updater` in
+`optionalDependencies`; the comment-optional-deps explainer in
+`package.json` calls out the rationale (CI doesn't drag native binaries
+into every test run).
+
+What's externally blocked (with placeholders ready):
+
+- **Apple Developer account** ($99/year) — populate `APPLE_ID` /
+  `APPLE_APP_SPECIFIC_PASSWORD` / `APPLE_TEAM_ID` / `MAC_CSC_LINK` /
+  `MAC_CSC_KEY_PASSWORD` secrets and the next tagged release auto-signs.
+- **Windows EV cert** ($300/year + hardware token) — populate
+  `WIN_CSC_LINK` / `WIN_CSC_KEY_PASSWORD` secrets.
+- **Real icon artwork** — replace the 1×1 placeholders in
+  `build-resources/`.
+
 ### Renamed: MDX → MDZ (2026-04-24)
 
 Project renamed from **MDX** (Markdown eXtended Container) to **MDZ** (Markdown

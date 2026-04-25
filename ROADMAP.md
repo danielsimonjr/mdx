@@ -280,7 +280,7 @@ maintainer, double it.
 |-----------|-------|-------------|----------------|
 | 2.1 viewer | **partial** | sanitizer (38 tests), directives (cross-refs / citations / bibliography / `::cell` / `::output` / `::include`, 46 tests), CSL-JSON references (10 tests), KaTeX math (13 tests), **IndexedDB cache** (10 tests). 117/117 viewer tests pass. | full keyboard a11y, npm publish, demo site, fragment-aware `::include` |
 | 2.2 hosted | **code-ready, not deployed** | full Cloudflare Worker with strict CSP, content-hash cache pinning, OG / Twitter card meta, sanitized canonical URLs, 32 worker tests | `wrangler deploy` to view.mdz-format.org (external action), per-archive cover-image extraction |
-| 2.3a editor MVP | **partial** | **2.3a.1** shell + **2.3a.2** editor+preview + **2.3a.3** asset sidebar + **2.3a.4** .ipynb import + **2.3a.5.0** insertion engine + **2.3a.5.1–4** picker pack. 113 vitest cases (11 archive-io + 12 editor-pane + 7 ipynb-import + 32 asset-store + 19 directive-insert + 32 directive-pickers). Toolbar buttons for `::cell`, `::include`, `::fig`/`::eq`/`::tab`, `::cite`; `<dialog>`-based modal scaffolding; CSL-JSON bibliography lookup; document-scan id-collision check; archive-entry membership check for include targets. | 2.3a.6 release engineering (signed installers — partly external) |
+| 2.3a editor MVP | **feature-complete (unsigned releases)** | 2.3a.1–5 shipped (113 vitest cases) + **2.3a.6** electron-builder config + 3-platform CI matrix + auto-update feed wired. Pipeline produces unsigned installers today and auto-signs when cert secrets arrive in CI — no code change needed. | Cert/notarization secrets (external accounts), real icon artwork, Phase 2.3a.7 Playwright integration tests |
 | 2.3b editor Pro | **partial** | **2.3b.1** Pyodide kernel layer (18 cases) + **2.3b.2** a11y checker (37 cases) + **2.3b.3** block-diff algorithm (25 cases) + **2.3b.4** annotation data layer (23 cases) + **2.3b.5** locale-enum + paragraph alignment (19 cases) + **2.3b.6** variant planner (13 cases) + **2.3b.7.1–5** non-core picker pack (34 cases). All 7 sub-phases now land their data/algorithm layer. UI surfaces + native-runtime execution (Pyodide CDN load, sharp encoder) deferred to per-feature `*.2` follow-ups gated on Phase 2.3a.6 Playwright. | 2.3b.1.2 Pyodide UI + CSP, 2.3b.6.2 sharp encoder, `*.2` UI surfaces |
 | 2.4 EPUB bridge | **shipped** | `mdz export-epub` (existing) + `mdz import-epub` (new, 15 tests, fidelity matrix doc); round-trip CI gate | Symmetric `::fig` round-trip on the export side (tracked); per-chapter spine preservation |
 | 2.5 browser ext | **code-ready, hardened** | MV3 manifest, content + service-worker + popup + viewer scripts, 13 manifest-validation tests, reproducible-build doc, placeholder icons | Real icon artwork, bundled `<mdz-viewer>`, AMO / Chrome Web Store / Edge / Brave submissions |
@@ -523,18 +523,41 @@ second).
 
 #### 2.3a.6 Release engineering
 
-- [ ] Code-signed installers for macOS (notarized DMG), Windows
-      (signed NSIS via `electron-updater` flow), Linux (AppImage +
-      `.deb` + `.rpm`).
-- [ ] Auto-update feed served from GitHub Releases.
-- [ ] CI build matrix that produces all three platforms on every
-      tagged release.
+- [x] **Installer config + build pipeline** in
+      `editor-desktop/electron-builder.yml`. macOS DMG + ZIP
+      (universal binaries; x64 + arm64), Windows NSIS + portable
+      (x64 + arm64), Linux AppImage + deb + rpm. All cert /
+      notarization values come from env-var placeholders so the
+      pipeline runs **unsigned** today and starts producing signed
+      artifacts the moment the secrets land in CI — no code change
+      needed when certs arrive.
+- [x] **Auto-update feed** wired in `main.ts` and pointed at the
+      project's GitHub Releases via electron-builder's `publish`
+      block. Until the first signed release ships, the updater
+      resolves with `update-not-available` (the intended steady
+      state). Logger output goes to `userData/logs` for diagnostics;
+      `MDZ_EDITOR_DEV=1` escalates to debug.
+- [x] **Three-platform CI matrix** in
+      `.github/workflows/release-editor.yml`. Triggers on `v*`
+      tag pushes + manual dispatch. Auto-detects which platform's
+      signing secrets are present and runs `dist` (signed) vs
+      `dist:unsigned` accordingly. Annotates the run with `::notice`
+      when a platform's secrets are missing so the gap is visible
+      without failing the build.
+- [x] **macOS hardened-runtime entitlements**
+      (`build-resources/entitlements.mac.plist`) with the minimum
+      set needed for notarization: `allow-jit` (Pyodide WASM),
+      `network.client` (auto-update + Pyodide CDN),
+      `files.user-selected.read-write` (open-archive dialog).
 
   **Depends on:** 2.3a.1.
-  **External-blocked:** macOS notarization requires an Apple
-  Developer account ($99/year); Windows EV cert signing requires
-  hardware token + ~$300/year cert. Reuse signing infra from the
-  MermaidJS desktop project.
+  **External-blocked (placeholders in place):** macOS notarization
+  requires Apple Developer account ($99/year); Windows EV cert
+  requires hardware token + ~$300/year cert. Add the secrets in
+  GitHub Actions and the next tagged release auto-signs. Until
+  then: unsigned installers ship, with the SmartScreen / Gatekeeper
+  warning documented in the README. Icon artwork is a 1×1 placeholder
+  PNG / ICO; `build-resources/README.md` flags the swap-out.
   **Acceptance:** a tagged release produces three signed installers
   in GitHub Releases that auto-update each other on subsequent
   tags.

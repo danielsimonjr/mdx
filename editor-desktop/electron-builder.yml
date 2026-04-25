@@ -1,0 +1,105 @@
+# electron-builder config — Phase 2.3a.6 release engineering.
+#
+# Cert / signing / notarization values are env-var placeholders so the
+# pipeline runs **unsigned** today and starts producing signed artifacts
+# the moment the secrets land in CI. None of these env vars are required
+# for a local build — `npm run dist` produces unsigned installers that
+# install + run on macOS (with Gatekeeper warning), Windows (with
+# SmartScreen warning), and Linux (no warning needed).
+#
+# Required env vars when signing:
+#
+#   macOS:
+#     APPLE_ID                 — Apple developer-account email
+#     APPLE_APP_SPECIFIC_PASSWORD  — app-specific password from
+#                                    appleid.apple.com (NOT the account pw)
+#     APPLE_TEAM_ID            — 10-char team ID from developer.apple.com
+#     CSC_LINK                 — base64-encoded .p12 cert (or file://path)
+#     CSC_KEY_PASSWORD         — .p12 password
+#
+#   Windows:
+#     CSC_LINK                 — same env var, contains a Windows
+#                                EV / OV cert .pfx
+#     CSC_KEY_PASSWORD         — .pfx password
+#     WIN_CSC_TIMESTAMP_SERVER — defaults to http://timestamp.digicert.com
+#
+#   Linux: no signing required for AppImage / deb / rpm.
+
+appId: org.mdz-format.editor
+productName: MDZ Editor
+copyright: Copyright © 2026 MDZ Format Authors
+artifactName: ${productName}-${version}-${os}-${arch}.${ext}
+
+directories:
+  output: dist-installers
+  buildResources: build-resources
+
+files:
+  - dist/**/*
+  - package.json
+  - "!**/*.map"
+  - "!**/*.test.*"
+  - "!test/**/*"
+
+# macOS
+mac:
+  category: public.app-category.productivity
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build-resources/entitlements.mac.plist
+  entitlementsInherit: build-resources/entitlements.mac.plist
+  notarize: false  # toggled to true in CI when APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD set
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+    - target: zip
+      arch: [x64, arm64]
+
+# Windows
+win:
+  target:
+    - target: nsis
+      arch: [x64, arm64]
+    - target: portable
+      arch: [x64]
+  # Cert + password come from CSC_LINK / CSC_KEY_PASSWORD env vars.
+  # When unset, electron-builder produces unsigned installers without
+  # failing — the SmartScreen warning is documented in the README.
+  signingHashAlgorithms: ["sha256"]
+  rfc3161TimeStampServer: http://timestamp.digicert.com
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  installerIcon: build-resources/installer.ico
+  uninstallerIcon: build-resources/uninstaller.ico
+  installerHeaderIcon: build-resources/installer-header.ico
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: MDZ Editor
+
+# Linux
+linux:
+  category: Office
+  target:
+    - target: AppImage
+      arch: [x64, arm64]
+    - target: deb
+      arch: [x64]
+    - target: rpm
+      arch: [x64]
+
+# Auto-update feed — points at the project's GitHub Releases.
+# electron-updater reads this when `autoUpdater.checkForUpdates()`
+# fires. Until the first signed release ships, the feed returns
+# "no update available" because no release matches the current
+# version's update channel.
+publish:
+  - provider: github
+    owner: danielsimonjr
+    repo: mdx
+    releaseType: release
+    # `private: false` is the default; setting it explicit so a
+    # future repo-rename audit catches this line.
+    private: false

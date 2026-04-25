@@ -1,0 +1,167 @@
+# Editor desktop release pipeline — Phase 2.3a.6.
+#
+# Runs on tag pushes (v*) and on manual dispatch. Three-platform
+# matrix produces installers; signing toggles based on whether the
+# corresponding secrets are set in the repo.
+#
+# Secrets the workflow looks for (all OPTIONAL — pipeline runs
+# unsigned when missing, signed when present):
+#
+#   APPLE_ID                      — Apple developer-account email
+#   APPLE_APP_SPECIFIC_PASSWORD   — app-specific password (NOT account)
+#   APPLE_TEAM_ID                 — 10-char team ID
+#   MAC_CSC_LINK                  — base64 .p12 macOS cert
+#   MAC_CSC_KEY_PASSWORD          — .p12 password
+#   WIN_CSC_LINK                  — base64 .pfx Windows EV/OV cert
+#   WIN_CSC_KEY_PASSWORD          — .pfx password
+#   GH_TOKEN                      — auto-provided by Actions; used
+#                                   for publishing to GitHub Releases
+#
+# To produce signed installers: add the secrets above in
+# repo settings → Secrets and variables → Actions, then push a
+# version tag. The workflow auto-detects which platform's secrets
+# are present and signs accordingly.
+
+name: Release editor desktop
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version tag to build (e.g. v0.1.0-alpha.1)"
+        required: false
+        default: ""
+      publish:
+        description: "Publish to GitHub Releases (requires GH_TOKEN)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write  # for actions/upload-release-asset
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install workspace dependencies
+        run: npm install --include=optional
+        env:
+          # Skip the Electron platform-binary download until the
+          # editor-desktop install needs it.
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "0"
+
+      - name: Type check
+        run: |
+          cd editor-desktop
+          npm run typecheck:core
+
+      - name: Run unit tests
+        run: |
+          cd editor-desktop
+          npm run test
+
+      - name: Build editor (TypeScript + vite)
+        run: |
+          cd editor-desktop
+          npm run build
+
+      - name: Detect signing secrets (macOS)
+        if: matrix.os == 'macos-latest'
+        id: mac-signing
+        shell: bash
+        run: |
+          if [ -n "${{ secrets.MAC_CSC_LINK }}" ] && [ -n "${{ secrets.APPLE_ID }}" ]; then
+            echo "sign=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "sign=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::macOS signing skipped — MAC_CSC_LINK or APPLE_ID secret not set."
+          fi
+
+      - name: Detect signing secrets (Windows)
+        if: matrix.os == 'windows-latest'
+        id: win-signing
+        shell: bash
+        run: |
+          if [ -n "${{ secrets.WIN_CSC_LINK }}" ]; then
+            echo "sign=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "sign=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Windows signing skipped — WIN_CSC_LINK secret not set."
+          fi
+
+      - name: Build installer (macOS, signed)
+        if: matrix.os == 'macos-latest' && steps.mac-signing.outputs.sign == 'true'
+        run: |
+          cd editor-desktop
+          npm run dist
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build installer (macOS, unsigned)
+        if: matrix.os == 'macos-latest' && steps.mac-signing.outputs.sign == 'false'
+        run: |
+          cd editor-desktop
+          npm run dist:unsigned
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build installer (Windows, signed)
+        if: matrix.os == 'windows-latest' && steps.win-signing.outputs.sign == 'true'
+        run: |
+          cd editor-desktop
+          npm run dist
+        env:
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build installer (Windows, unsigned)
+        if: matrix.os == 'windows-latest' && steps.win-signing.outputs.sign == 'false'
+        run: |
+          cd editor-desktop
+          npm run dist:unsigned
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build installer (Linux — no signing required)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cd editor-desktop
+          npm run dist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.os }}
+          path: |
+            editor-desktop/dist-installers/*.dmg
+            editor-desktop/dist-installers/*.zip
+            editor-desktop/dist-installers/*.exe
+            editor-desktop/dist-installers/*.AppImage
+            editor-desktop/dist-installers/*.deb
+            editor-desktop/dist-installers/*.rpm
+            editor-desktop/dist-installers/latest*.yml
+          if-no-files-found: warn
+          retention-days: 30

@@ -215,13 +215,37 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(buildMenu());
   createWindow();
 
-  // Phase 2.3a.6 will replace the stub feed below with a real
-  // GitHub Releases endpoint. Until then, just check-and-no-op.
+  // Auto-update feed wired to GitHub Releases via electron-builder's
+  // publish config (electron-builder.yml). The feed URL is generated
+  // at build time and embedded in the installer; at runtime, the
+  // updater fetches the latest-<platform>.yml from
+  // github.com/danielsimonjr/mdx/releases and compares versions.
+  //
+  // Until the first signed release ships, no release matches the
+  // current version's update channel, so checkForUpdates resolves
+  // with `update-not-available` — that's the intended steady state
+  // for a pre-release build.
   if (autoUpdater) {
     autoUpdater.autoDownload = false;
+    autoUpdater.autoInstallOnAppQuit = true;
+    // Logger output goes to the Electron app's userData/logs dir;
+    // useful for diagnosing "why didn't my update fire?" on user
+    // reports. Production builds keep it at info; debug builds
+    // (MDZ_EDITOR_DEV=1) escalate to debug.
+    if (process.env.MDZ_EDITOR_DEV === "1") {
+      // electron-updater's logger field is typed loosely; cast.
+      const updaterAny = autoUpdater as unknown as { logger?: { transports?: { file?: { level?: string } } } };
+      if (updaterAny.logger?.transports?.file) {
+        updaterAny.logger.transports.file.level = "debug";
+      }
+    }
     autoUpdater
       .checkForUpdates()
-      .catch(() => undefined); // no real feed yet; failures are expected
+      .catch((e: Error) => {
+        // Network failures are expected on cold-start with no
+        // connectivity; log to stderr but don't surface to the user.
+        console.error("[auto-update] checkForUpdates failed:", e.message);
+      });
   }
 });
 
