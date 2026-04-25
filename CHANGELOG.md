@@ -196,6 +196,63 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Added — Phase 4.5.2 (writer + CLI): mdz snapshot subcommands (2026-04-24)
+
+Three new CLI subcommands round out Phase 4.5:
+
+- `mdz snapshot create <file> <version>` — adds a new snapshot of
+  the archive's `document.md`. First snapshot ever seeds a base
+  chain; subsequent snapshots reconstruct the parent (defaults to
+  the latest version in the last chain; override with `--parent`),
+  diff against the current document, write the patch, and
+  update `index.json`. Round-trip verification is on by default
+  per the spec's "verify by round-tripping" writer rule — the
+  command aborts before writing if the generated patch doesn't
+  re-apply to byte-identical output.
+- `mdz snapshot view <file> <version>` — reconstructs and prints
+  any version from the chain.
+- `mdz snapshot list <file>` — prints all chains and their
+  versions in tree form.
+
+Implementation lives in `cli/src/lib/snapshots.js` — a CommonJS
+port of `packages/mdz-viewer/src/snapshots.ts` plus the
+writer-only helpers:
+
+- `generateUnifiedDiff(oldText, newText, oldLabel, newLabel)` —
+  LCS-based unified-diff generator. Two-pass hunk grouping (find
+  change runs first, pad with context, then merge overlapping
+  windows) so adjacent hunks can't produce overlapping line ranges.
+- `shouldStartNewChain(parentText, patchText, depth)` — implements
+  the spec's "20% of parent" threshold and the
+  "approaching depth 50" trigger.
+- `addDeltaToIndex(index, opts)` — immutable index mutation
+  (deep-cloned input, no surprise side effects).
+
+A real bug surfaced while writing the round-trip tests: my
+first-pass hunk grouping extended trailing context by
+`contextLines * 2` and could overshoot into the next change's
+leading window, producing two hunks whose line ranges overlapped.
+The applier rejected those (correctly — overlapping hunks would
+double-emit lines). Fix: split the grouping into "find runs" then
+"pad and merge if windows overlap," matching how `diffutils`
+actually behaves.
+
+23 new node:test cases — every parse error branch (mirrored from
+the TS suite for parity), `shouldStartNewChain` thresholds,
+`addDeltaToIndex` immutability, and seven `generateUnifiedDiff`
+round-trip cases (single-line replace, insert, delete,
+multi-distant-changes, identical-input header-only patch, no-
+trailing-newline preservation, and explicit-label headers with no
+`a/`/`b/` prefixes per spec).
+
+Net CLI tests: 31 → 54 (the suite now includes
+`test/snapshots.test.js` alongside `test/verify.test.js` and
+`test/import-epub.test.js`).
+
+End-to-end smoke test verified: seeding a fresh archive →
+creating a 1.1.0 delta → reconstructing both 1.0.0 and 1.1.0
+returns the original and the modified content, respectively.
+
 ### Added — Phase 4.5 (reader): delta-snapshots-v1 reference impl (2026-04-24)
 
 Closes the spec → impl gap that blocked Phase 2.3b.3's

@@ -23,6 +23,7 @@ const exportJatsCommand = require('./commands/export-jats');
 const exportEpubCommand = require('./commands/export-epub');
 const importEpubCommand = require('./commands/import-epub');
 const verifyCommand = require('./commands/verify');
+const snapshotCommands = require('./commands/snapshot');
 
 // CLI Banner
 const banner = `
@@ -125,6 +126,27 @@ program
   .option('--no-exit', 'Do not exit with error code on validation failure')
   .option('--profile <id-or-path>', 'Enforce conformance against a profile (e.g., mdz-core, mdz-advanced, scientific-paper-v1, or a path to a profile JSON)')
   .action(validateCommand);
+
+// Snapshot command - manage delta-encoded version history
+const snapshot = program.command('snapshot')
+  .description('Manage delta-encoded version history (delta-snapshots-v1 extension)');
+
+snapshot
+  .command('view <file> <version>')
+  .description('Reconstruct and print a version from the archive\'s delta chain')
+  .action(snapshotCommands.viewSubcommand);
+
+snapshot
+  .command('list <file>')
+  .description('List all versions declared in the archive\'s delta chains')
+  .action(snapshotCommands.listSubcommand);
+
+snapshot
+  .command('create <file> <version>')
+  .description('Add a new snapshot of document.md to the archive at the given version label')
+  .option('-p, --parent <version>', 'Parent version (defaults to the latest in the last chain)')
+  .option('-m, --message <text>', 'Free-form note shown after writing (not stored)')
+  .action((file, version, options) => snapshotCommands.createSubcommand(file, { ...options, version }));
 
 // Default action when file is passed directly
 program

@@ -870,9 +870,17 @@ against its parent, not a full copy. Relevant once documents commonly have >20 v
       package as `parseSnapshotIndex`, `resolveSnapshotVersion`,
       `applyUnifiedDiff`, `reconstructVersion[Sync]`,
       `SnapshotError`.
-- [ ] **Writer CLI subcommand** — `mdz snapshot create|view|export`
-      using the same unified-diff format. Reader was the blocker
-      for downstream UI; writer can ship next.
+- [x] **Writer + reader CLI subcommands** — `mdz snapshot create
+      <file> <version>` / `mdz snapshot view <file> <version>` /
+      `mdz snapshot list <file>`. The CLI ships a CommonJS port of
+      the reader logic at `cli/src/lib/snapshots.js` (deliberate
+      duplication so the CLI doesn't pull in an ESM runtime) plus a
+      writer-side LCS-based unified-diff generator
+      (`generateUnifiedDiff`) that produces patches the reader
+      round-trips byte-for-byte (verified at write time per the
+      spec's "verify by round-tripping" rule). Auto-starts a new
+      base chain when the patch exceeds 20% of the parent OR the
+      depth would approach the 50-chain cap. 23 node:test cases.
 - [ ] **Conformance fixtures** in `tests/conformance/history/`
       (chain-walk, invalid-chain, circular-chain). 24 unit cases
       cover the algorithm; archive-level fixtures are a follow-up.
