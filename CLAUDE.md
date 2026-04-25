@@ -2,6 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Single source of truth: feature × implementation
+
+For "which implementation supports which feature" lookups, see
+[`docs/SUPPORT_MATRIX.md`](docs/SUPPORT_MATRIX.md). It's
+hand-maintained per Phase 4.6.9 #190 and the cited-path
+gate (`tests/roadmap/check_cited_paths.py`) keeps the
+underlying ROADMAP entries honest.
+
 ## Project Overview
 
 **This project was renamed from MDX to MDZ on 2026-04-24.** See `ROADMAP.md`
@@ -86,22 +94,31 @@ mdx/                                    # (directory name deferred-rename)
 │   │   ├── main.ts                                # Electron glue + IPC handlers
 │   │   └── variant-encoder.ts                     # main-process sharp encoder (2.3b.6.2)
 │   ├── src/preload/{preload,types}.ts              # contextBridge surface + EditorApi types
-│   ├── src/renderer/                               # 18 modules, see source directory for full list
-│   │   ├── index.{html,ts}                        # main entry
+│   ├── src/renderer/                               # 22 modules; see source directory for full list
+│   │   ├── index.{html,ts}                        # main entry, sets body[data-mdz-ready=1] on bootstrap
 │   │   ├── editor-pane.ts                         # CodeMirror 6 + onPreviewRendered hook
 │   │   ├── asset-store.ts, assets sidebar, drag-drop
 │   │   ├── directive-{insert,pickers,modal}.ts    # picker pack (2.3a.5.1–4 + 2.3b.7.1–5)
 │   │   ├── accessibility-checker.ts               # live WCAG scan (2.3b.2)
 │   │   ├── block-diff.ts, diff-render.ts          # block-level diff + Compare-versions modal (2.3b.3)
 │   │   ├── annotations.ts, annotations-render.ts  # peer-review data + sidebar UI (2.3b.4)
+│   │   │                                           # createAnnotation factory + filterAnnotationsForRole (2.3b.4.3)
+│   │   │                                           # Reply button + IPC annotations:save (2.3b.4.3)
 │   │   ├── locales.ts, sync-scroll.ts             # multi-locale data + Compare-locales modal (2.3b.5)
 │   │   ├── variant-{planner,flow}.ts              # AVIF/WebP variant pipeline (2.3b.6)
 │   │   ├── python-kernel.ts, cell-runner.ts       # Pyodide integration (2.3b.1)
 │   │   ├── cell-run-buttons.ts                    # per-cell ▶ Run injection (2.3b.1.3)
-│   │   └── kernel-manifest.ts                     # kernels.python.runtime save (2.3b.1.3)
+│   │   ├── kernel-manifest.ts                     # kernels.python.runtime save (2.3b.1.3)
+│   │   └── html-escape.ts                         # canonical escapeHtml (4.6.9 #183)
+│   ├── e2e/                                        # Phase 2.3a.7 Playwright integration suite
+│   │   ├── fixtures/{electron-app.ts,build-fixtures.mjs,sample.mdz}
+│   │   ├── smoke.spec.ts                          # always-on baseline (passing)
+│   │   ├── open-save-roundtrip.spec.ts            # Phase 2.3a.7.1 (passing against sample.mdz)
+│   │   └── {picker-modals,compare-modals,cell-runner}.spec.ts  # .skip stubs
+│   ├── playwright.config.ts                        # Phase 2.3a.7 e2e config
 │   ├── electron-builder.yml                        # 2.3a.6 release pipeline (env-var cert placeholders)
 │   ├── build-resources/                            # entitlements + placeholder icons
-│   ├── test/                                       # 19 test files, 376 cases
+│   ├── test/                                       # 21 test files, 394 cases
 │   └── README.md
 ├── browser-extension/                              # Phase 2.5 WebExtensions
 │   ├── manifest.json
@@ -216,19 +233,36 @@ tsc implementations/typescript/mdx_format.ts --noEmit --target es2020 --moduleRe
 tsc implementations/typescript/mdx_format.ts --target es2020 --module esnext
 ```
 
+### Editor desktop runtime flags
+
+The Electron editor accepts a **`--role=public|editor`** launch
+argument (Phase 2.3b.4.3). Defaults to `editor`. Public mode hides
+`review-confidential-comment` motivations and in-progress
+`review-request-changes` editorial deliberation per
+`spec/directives/peer-review-annotations.md`. The flag is a
+usability gate, not a security boundary — public archives must
+not carry confidential annotations regardless.
+
 ### Testing
 - Use CLI: `node cli/src/index.js view examples/example-document.mdx`
 - Run the production editor: `npm run dev -w @mdz-format/editor-desktop`
+- Run the editor's e2e suite (Phase 2.3a.7 — opt-in, requires
+  Electron + `@playwright/test` from optionalDependencies):
+  `cd editor-desktop && npm run build && npm run test:e2e`
+- Run the axe-core accessibility runner (Phase 3.3b — opt-in,
+  requires Playwright + axe-core): `npm run test:a11y-real`
+- Always-on Python a11y baseline:
+  `python tests/accessibility/run_accessibility.py`
 - Render an archive in the production viewer: import `@mdz-format/viewer`
   and pass the archive blob to `<mdz-viewer>` (see Phase 2.1 docs)
 - Generate examples with Python script and verify structure
-- Open `.mdx` files with any ZIP utility to inspect contents
+- Open `.mdz` files with any ZIP utility to inspect contents
 - Pre-Phase-2 demos (`legacy/editor/`, `legacy/viewer/`,
   `legacy/chrome-extension/`) still open in any browser but are not
   the supported entry points for new work.
 
 ### CI Validation
-The GitHub Actions workflow (`.github/workflows/ci.yml`) runs 16 jobs:
+The GitHub Actions workflow (`.github/workflows/ci.yml`) runs 18 jobs:
 - Validate TypeScript (type-check via `tsc --noEmit`)
 - TypeScript Unit Tests (vitest; includes fast-check property tests)
 - Validate Python (py_compile + example generation)
@@ -237,15 +271,24 @@ The GitHub Actions workflow (`.github/workflows/ci.yml`) runs 16 jobs:
 - Validate v2.0 Examples and Parser (includes Lark parity, 52-fixture
   conformance suite, hypothesis property tests)
 - Validate JSON Schema (ajv-cli + schema negative-rejection tests)
-- Validate CLI Tool (info/validate/extract against example-document.mdx)
+- Validate CLI Tool (info/validate/extract against example-document.mdx,
+  plus dedicated steps for `verify`, `import-epub`, `snapshot`, and
+  `--a11y-report` test suites + the integrity conformance runner)
 - Phase 2/3 Tests (viewer sanitizer XSS + accessibility)
 - Validate Rust Binding (Phase 4.1 — cargo build+test, default + no-default)
 - Validate Pandoc Lua Filter (Phase 4.2 — smoke + fixture pack if present)
 - Validate VS Code Extension (Phase 4.2 — JSON + syntax check)
-- Validate Editor Desktop (Phase 2.3a.1 — type-check testable core + 11 archive-io tests; Electron deps are optional, skipped in CI)
+- Validate Editor Desktop (Phase 2.3a.1 — type-check testable core + 394 vitest cases; Electron + Playwright deps are optional, skipped in CI)
 - Validate Browser Extension (Phase 2.5 — manifest.json structural + JS syntax + reproducible-build doc)
 - Validate Corpus Fetcher (Phase 4.3 — py_compile + import smoke)
-- Lint Markdown (DavidAnson/markdownlint-cli2-action)
+- Validate ROADMAP cited paths (Phase 4.6.9 #179 — every `[x]` cited
+  backtick-quoted path must resolve on disk)
+- Validate viewer build pipeline (Phase 4.6.9 #186 — asserts
+  `dist/index.js` + `dist/index.d.ts` emit; greps the bundle for
+  `customElements` registration)
+- Lint Markdown (DavidAnson/markdownlint-cli2-action against
+  `.markdownlint.json` — Phase 4.6.9 #181 dropped the
+  `continue-on-error` shield)
 
 ## Architecture
 
@@ -322,7 +365,30 @@ Node.js command-line tool using Commander.js and Inquirer.js.
 - `info <file>` - Displays metadata, assets, content in terminal
 - `edit <file>` - Interactive terminal editor (inquirer-based)
 - `create [title]` - Creates new MDX from templates (blank, article, report, presentation)
-- `validate <file>` - Validates MDX structure and manifest against JSON Schema
+- `validate <file>` - Validates MDZ structure and manifest against JSON Schema
+  - `--profile <id-or-path>` - Enforce conformance against a profile
+    (`mdz-core`, `mdz-advanced`, `scientific-paper-v1`, or a path to
+    a profile JSON)
+  - `--a11y-report [path]` - **Phase 3.3**: write a WCAG 2.2 AA sidecar
+    JSON next to the input archive (or to `[path]` if specified). Walks
+    the primary entry-point + every locale; rules ported from
+    `cli/src/lib/a11y.js` (image-alt / heading-order / link-name /
+    document-language) stay in lockstep with the TS + Python siblings.
+- `verify <file>` - **Phase 3.2**: verify the signature chain + integrity
+  hashes of an MDZ archive (manifest checksum, content_id, per-asset
+  `content_hash`).
+- `import-ipynb <file>` - **Phase 2.4**: convert a Jupyter notebook to MDZ.
+- `import-epub <file>` / `export-epub <file>` - **Phase 2.4**: round-trip
+  MDZ ↔ EPUB 3.3 with deterministic ordering and labeled-directive
+  preservation.
+- `snapshot view|create|list|export <file>` - **Phase 4.5 + 4.6.9**:
+  manage delta-snapshots-v1 chains.
+  - `snapshot view` reconstructs a version and prints to stdout
+  - `snapshot create` writes a unified-diff delta against a parent
+  - `snapshot list` enumerates the archive's chain heads + deltas
+  - `snapshot export` (Phase 4.6.9 #192) extracts a specific version
+    to a standalone file; pair with `--with-manifest` for a
+    version-specific manifest projection
 
 **Dependencies:** commander, inquirer, adm-zip, marked, marked-terminal, chalk (v4.x for CommonJS), open, ora
 

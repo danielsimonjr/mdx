@@ -133,6 +133,43 @@ manifest declares it explicitly.
 | Compare-versions diff UI | — | — | — | — | — | ✅ |
 | Conformance fixtures | — | — | — | — | ✅ 5 fixtures | — |
 
+## Accessibility (spec §11 + Phase 3.3)
+
+| Capability | TS | PY | VW | CLI | ED |
+|---|---|---|---|---|---|
+| WCAG structural rules: image-alt / heading-order / link-name / document-language | — | ✅ runner | — | ✅ `cli/src/lib/a11y.js` | ✅ live scan |
+| Compliance-report sidecar JSON (`<archive>.a11y.json`) | — | — | — | ✅ `--a11y-report` Phase 3.3 | — |
+| axe-core + Playwright runner (browser rules: contrast / labels / landmarks / button-name / link-name) | — | — | 🟡 7 fixtures | — | — |
+
+🟡 The axe-core runner at `tests/accessibility/run_axe.js` is opt-in
+(requires `npm install playwright axe-core` + `npx playwright install
+chromium`). Initial fixture pack of 7 covers WCAG 1.4.3 / 1.3.1 /
+4.1.2 / 1.1.1 / 2.4.4. CI promotion happens when the pack reaches a
+count that justifies the ~150 MB Playwright install on every push.
+
+## Annotations (spec §11.4 + Phase 2.3b.4)
+
+| Capability | TS | PY | VW | ED | CLI |
+|---|---|---|---|---|---|
+| Read `annotations/*.json` with W3C Web Annotation Data Model + 4 MDZ review motivations | ✅ | ✅ | ✅ render | ✅ sidebar | — |
+| Reply-thread building (motivation=`replying`, target=parent id) | ✅ | ✅ | ✅ | ✅ | — |
+| Trust warnings (unsigned editor decisions, unsigned author/reviewer comments) | ✅ | ✅ | 🟡 surface | ✅ | — |
+| **Reply creation flow** (`createAnnotation` factory + `annotations:save` IPC + Reply button) | — | — | — | ✅ Phase 2.3b.4.3 | — |
+| **Comment / accept / reject creation flows** (target-selecting UX) | — | — | — | ❌ Phase 2.3b.4.4 | — |
+| **Cryptographic signing of created annotations** (ed25519 + `security/signatures.json` patch) | — | — | — | ❌ Phase 2.3b.4.4 | — |
+| **`--role=public\|editor` launch flag** (filter confidential + in-progress editorial) | — | — | — | ✅ Phase 2.3b.4.3 | — |
+
+## Editor-desktop integration tests (Phase 2.3a.7)
+
+| Capability | ED |
+|---|---|
+| Playwright + `_electron` scaffold (`editor-desktop/playwright.config.ts` + `e2e/fixtures/electron-app.ts`) | ✅ |
+| Smoke spec (window mount + 10-method contextBridge surface) | ✅ |
+| Deterministic fixture archive (`e2e/fixtures/sample.mdz` + `build-fixtures.mjs`) | ✅ Phase 2.3a.7.1 |
+| Open / save round-trip via IPC | ✅ |
+| Picker / compare / cell-runner stubs | 🟡 `.skip` (need `data-test-id` selectors, Phase 2.3a.7.2) |
+| CI integration | ❌ scaffold-only (Electron + Playwright are optional deps) |
+
 ## Profiles (spec §7)
 
 | Profile | Validator | Notes |
