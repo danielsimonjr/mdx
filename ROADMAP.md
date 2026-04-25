@@ -610,10 +610,18 @@ is independent — sequence by user demand, not by checklist order.
       `text/plain`) and inlines images as `data:` URIs so outputs
       render without an asset write. 22 vitest cases cover every
       mapping branch + the splice ordering invariant.
-- [ ] **Manifest `kernels.python.runtime: "pyodide"` declaration**
-      so readers know cells were executed under Pyodide's
-      constraints. Phase 2.3b.1.3 follow-up — small, but needs the
-      save flow to merge it into the manifest at write time.
+- [x] **Manifest `kernels.python.runtime: "pyodide"` declaration**
+      — done 2026-04-25. New
+      `editor-desktop/src/renderer/kernel-manifest.ts` ships a
+      pure `mergeKernelDeclaration(manifest, pyodideVersion?)`
+      that writes `{python: {runtime: "pyodide", version: "0.26.4"}}`
+      while preserving any non-Python kernel slots the manifest
+      already carried (R/Julia/etc.). Wired into `saveFlow`:
+      whenever the user has loaded the Pyodide kernel during the
+      session (`pythonKernel != null`), the merge runs against
+      the manifest copy at save time. 6 new vitest cases pin the
+      add / preserve / overwrite / immutability / malformed-input
+      branches.
 - [ ] **Per-cell Run buttons** in the preview pane (vs the current
       "Run all" toolbar). Phase 2.3b.1.3 follow-up — needs DOM
       injection into the rendered preview.

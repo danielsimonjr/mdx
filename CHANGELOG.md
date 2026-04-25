@@ -8,6 +8,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 2.3b.1.3: Manifest kernels declaration on save (2026-04-25)
+
+When the editor has loaded the Pyodide kernel during a session
+(i.e. the user clicked "Run Python cells" at least once), the
+saved archive's manifest now declares
+`kernels.python.runtime: "pyodide"` plus the pinned Pyodide
+version. This tells downstream readers / reviewers exactly which
+interpreter constraints applied — Pyodide isn't CPython
+(no compiled-wheel `pip install`, no TensorFlow / PyTorch).
+
+New module `editor-desktop/src/renderer/kernel-manifest.ts`:
+
+- `mergeKernelDeclaration(manifest, version?)` — pure projection
+  that returns the merged `kernels` slot. Existing non-Python
+  kernel declarations (R via WebR, Julia, etc.) are preserved
+  verbatim; an existing Python declaration gets its version
+  field updated to the current Pyodide release. Malformed
+  `kernels` fields (non-object) are ignored — fresh slot.
+
+`saveFlow` in the renderer now splices the merged kernels slot
+into the manifest copy at write time, gated on the lazy-load
+sentinel `pythonKernel != null`. Save failures still leave the
+in-memory state untouched (the manifest copy is a deep-clone
+projection).
+
+6 new vitest cases pin every branch: add to empty,
+preserve-other-kernels, overwrite-stale-version, default
+version, no-input-mutation, malformed-`kernels`-input recovery.
+
+Net editor-desktop tests: 367 → 373.
+
 ### Added — Phase 4.6.8: Directive label i18n (2026-04-25)
 
 `packages/mdz-viewer/src/directives.ts` now localizes the

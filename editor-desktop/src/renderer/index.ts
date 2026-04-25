@@ -27,6 +27,7 @@ import { checkMarkdown, summarize, type A11yViolation } from "./accessibility-ch
 import { runVariantFlow, summarizeFlow, type VariantEncoderCallback } from "./variant-flow.js";
 import { extractPythonCells, runCells, insertOutputs } from "./cell-runner.js";
 import { loadPyodideKernel, type PythonKernel } from "./python-kernel.js";
+import { mergeKernelDeclaration } from "./kernel-manifest.js";
 import { tokenizeBlocks, diffBlocks } from "./block-diff.js";
 import { renderBlockOps, renderDiffStats } from "./diff-render.js";
 import {
@@ -643,6 +644,7 @@ async function saveFlow(): Promise<void> {
   const manifestCopy: Record<string, unknown> = {
     ...session.manifest,
     assets: assetStore.manifestProjection(),
+    ...(pythonKernel ? { kernels: mergeKernelDeclaration(session.manifest) } : {}),
   };
   const result = await window.editorApi.saveToPath(session.path, {
     manifest: manifestCopy,
