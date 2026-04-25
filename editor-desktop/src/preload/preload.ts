@@ -26,6 +26,8 @@ const api: EditorApi = {
   pickIpynb: async () => ipcRenderer.invoke("dialog:openIpynb") as Promise<string | null>,
   importIpynb: async (ipynbPath) =>
     ipcRenderer.invoke("ipynb:import", ipynbPath) as ReturnType<EditorApi["importIpynb"]>,
+  encodeVariants: async (payload) =>
+    ipcRenderer.invoke("variants:encode", payload) as ReturnType<EditorApi["encodeVariants"]>,
   onMenu: (event, handler) => {
     const channel = `menu:${event}`;
     const listener = () => handler();

@@ -16,6 +16,31 @@ export interface OpenedArchiveSerialized {
   content: string;
 }
 
+/** Mirror of `VariantPlanEntry` from the renderer-side variant planner. */
+export interface VariantPlanEntrySerialized {
+  sourcePath: string;
+  variantPath: string;
+  preset: { format: "webp" | "avif"; quality: number; maxWidth: number | null };
+}
+
+export interface EncodeVariantsPayload {
+  /** Map flattened to tuple-form for IPC serialization. */
+  sources: Array<[string, Uint8Array]>;
+  plan: VariantPlanEntrySerialized[];
+}
+
+export interface EncodeVariantsResultSerialized {
+  ok: boolean;
+  reason?: "sharp-not-installed" | "encode-failed";
+  variants: Array<{
+    variantPath: string;
+    bytes: Uint8Array;
+    width?: number;
+    height?: number;
+  }>;
+  errors: Array<{ variantPath: string; message: string }>;
+}
+
 export interface EditorApi {
   openFromPath(
     path: string,
@@ -45,6 +70,14 @@ export interface EditorApi {
   importIpynb(
     ipynbPath: string,
   ): Promise<{ ok: true; mdzPath: string } | { ok: false; error: string }>;
+  /**
+   * Encode variant images. Renderer hands the planner output + the
+   * source bytes; main process invokes sharp and returns the encoded
+   * payloads. When sharp is missing, resolves with `ok: false` and
+   * `reason: 'sharp-not-installed'` — the caller surfaces a clear
+   * install hint instead of crashing.
+   */
+  encodeVariants(payload: EncodeVariantsPayload): Promise<EncodeVariantsResultSerialized>;
   /**
    * Subscribe to a menu event from main. Returns an unsubscribe
    * function.

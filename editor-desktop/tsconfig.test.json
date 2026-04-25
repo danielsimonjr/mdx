@@ -22,6 +22,7 @@
     "src/renderer/locales.ts",
     "src/renderer/variant-planner.ts",
     "src/renderer/python-kernel.ts",
+    "src/renderer/variant-flow.ts",
     "test/**/*.ts"
   ],
   "exclude": [

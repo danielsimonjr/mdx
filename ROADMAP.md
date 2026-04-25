@@ -752,9 +752,28 @@ is independent — sequence by user demand, not by checklist order.
       output into `[{path, format, width, height, size_bytes}]`
       entries sorted alphabetically by path for stable
       content-hashing.
-- [ ] IPC wiring + "Generate variants" button (renderer → main
-      process plan handoff → writeback into AssetStore +
-      manifest). Phase 2.3b.6.3 follow-up.
+- [x] **IPC wiring** — `variants:encode` channel
+      (`preload.ts` → `main.ts` ipcMain handler → `encodeVariants`).
+      Renderer hands `{sources: [path, bytes][], plan: PlanEntry[]}`;
+      main returns the encoded payloads. Sharp-not-installed surfaces
+      cleanly through to the renderer's status text rather than
+      crashing the channel.
+- [x] **Renderer-side flow** in
+      `editor-desktop/src/renderer/variant-flow.ts`. Pure
+      orchestration (no DOM): enumerates encodable image entries,
+      builds `PlannerSourceImage[]` with a path-based kind heuristic
+      (`icon`/`hero`/`inline`/`figure`), invokes `planVariants`,
+      hands the plan to the IPC encoder via injected callback,
+      writes encoded bytes back into the asset store at the
+      pre-decided variant paths with format-specific MIME types.
+      Filters generated variants out of the source list so re-runs
+      don't re-encode and `.webp`/`.avif` files-as-sources don't
+      try to variant themselves. 10 vitest cases.
+- [x] **"Generate variants" toolbar button** wired into the
+      header. Disabled until an archive is open; flips to
+      "Generating…" while in flight; surfaces the flow's status
+      summary in the title bar (`No images`, `All up to date`,
+      `Generated N variants`, `requires sharp`, etc.).
 - [x] Configurable quality presets per image kind via the
       `presets` parameter to `planVariants`.
 

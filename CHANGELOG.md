@@ -8,6 +8,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 2.3b.6.3: Generate-variants IPC + UI (2026-04-25)
+
+Closes Phase 2.3b.6 fully. Three pieces wire the planner (Phase
+2.3b.6) and encoder (Phase 2.3b.6.2) through to a working
+end-to-end flow in the editor:
+
+- **IPC channel `variants:encode`** in
+  `editor-desktop/src/main/main.ts`. Receives
+  `{sources: [path, bytes][], plan: VariantPlanEntry[]}`,
+  reconstitutes the source map, calls the main-process encoder,
+  returns the result. Sharp-not-installed surfaces as
+  `{ok: false, reason: 'sharp-not-installed'}` straight through
+  to the renderer.
+- **`encodeVariants` on `window.editorApi`** — exposed via
+  `preload.ts` with the corresponding type in
+  `preload/types.ts` (`EncodeVariantsPayload` and
+  `EncodeVariantsResultSerialized` mirror the renderer-side
+  planner / encoder shapes for IPC serialization).
+- **Renderer-side flow** in
+  `editor-desktop/src/renderer/variant-flow.ts`:
+  `runVariantFlow(store, encoder)` is pure orchestration with no
+  DOM dependencies — testable in node by injecting a fake
+  encoder callback. Path-based kind heuristic
+  (`inferImageKind`): `icon-*` / `*-icon` → icon, `hero-*` →
+  hero, `inline-*` → inline, everything else → figure. Filters
+  already-staged variants out of the source list so re-runs are
+  idempotent and `.webp` / `.avif` files-as-sources don't try to
+  variant themselves.
+- **"Generate variants" toolbar button** in the header.
+  Disabled until an archive is open; flips to "Generating…"
+  while in flight; status text in the title bar reports the
+  outcome (`Generated N variants`, `All variants up to date`,
+  `requires sharp`, etc.).
+
+`AssetStore` gained three small additions to support this flow:
+
+- `addAt(archivePath, bytes, mime)` — write at a precomputed
+  path (encoder already decided the variant path).
+- `get(path)` and `filter(pred)` — read-side helpers.
+- `variantPathsFor(sourcePath)` — list existing variants for a
+  source so the planner skips already-encoded combinations.
+
+10 new vitest cases in `test/variant-flow.test.ts` cover the
+kind heuristic, the plan-of-zero idempotent case,
+sharp-not-installed propagation, the partial-failure path,
+and the variant-source-self-filter. End-to-end verified by
+running the renderer in a headless Electron with the fake
+encoder injected via the `editorApi` shim.
+
+Net editor-desktop tests: 292 → 305.
+
 ### Added — Phase 2.3a.6: Release engineering pipeline (2026-04-25)
 
 The editor now has a complete three-platform release pipeline that

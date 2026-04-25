@@ -24,6 +24,7 @@ import {
 import type { AssetPointerKind } from "./directive-insert.js";
 import { collectExistingIds, collectBibliographyKeys } from "./directive-pickers.js";
 import { checkMarkdown, summarize, type A11yViolation } from "./accessibility-checker.js";
+import { runVariantFlow, summarizeFlow, type VariantEncoderCallback } from "./variant-flow.js";
 
 declare global {
   interface Window {
@@ -70,6 +71,7 @@ const pickerButtons = {
 
 const a11yStatusEl = document.getElementById("a11y-status")!;
 const a11yPanelEl = document.getElementById("a11y-panel")!;
+const generateVariantsBtn = document.getElementById("generate-variants-btn") as HTMLButtonElement;
 
 const dropzone = document.getElementById("asset-dropzone") as HTMLDivElement;
 const assetListEl = document.getElementById("asset-list") as HTMLUListElement;
@@ -147,7 +149,33 @@ function setModeButtons(active: ViewMode): void {
 
 function setPickersEnabled(enabled: boolean): void {
   for (const btn of Object.values(pickerButtons)) btn.disabled = !enabled;
+  generateVariantsBtn.disabled = !enabled;
 }
+
+const ipcEncoder: VariantEncoderCallback = (input) =>
+  window.editorApi.encodeVariants({ sources: input.sources, plan: input.plan });
+
+generateVariantsBtn.addEventListener("click", () => {
+  void (async () => {
+    if (!session) return;
+    generateVariantsBtn.disabled = true;
+    const original = generateVariantsBtn.textContent;
+    generateVariantsBtn.textContent = "Generating…";
+    try {
+      const result = await runVariantFlow(assetStore, ipcEncoder);
+      titleEl.textContent = summarizeFlow(result);
+      if (result.written > 0) {
+        renderAssetList();
+        setModified(true);
+      }
+    } catch (e) {
+      titleEl.textContent = `Variant generation error: ${(e as Error).message}`;
+    } finally {
+      generateVariantsBtn.textContent = original;
+      generateVariantsBtn.disabled = !session;
+    }
+  })();
+});
 
 /**
  * Run the accessibility checker over the current source + manifest

@@ -143,6 +143,50 @@ export class AssetStore {
     return entry;
   }
 
+  /**
+   * Stage an entry at a precomputed archive path (skips
+   * categorization). Used for variant generation: the encoder
+   * already decided the path (`assets/images/x.1600w.webp`) and
+   * we just need to write it back into the store with the right
+   * MIME + content hash.
+   */
+  async addAt(archivePath: string, bytes: Uint8Array, mimeType: string): Promise<AssetEntry> {
+    const contentHash = await this.#hasher(bytes);
+    const entry: AssetEntry = {
+      path: archivePath,
+      bytes,
+      contentHash,
+      mimeType,
+      sizeBytes: bytes.byteLength,
+    };
+    this.#entries.set(archivePath, entry);
+    return entry;
+  }
+
+  /** Look up an entry by archive path. */
+  get(path: string): AssetEntry | undefined {
+    return this.#entries.get(path);
+  }
+
+  /** Filter entries by predicate (read-only). */
+  filter(pred: (entry: AssetEntry) => boolean): AssetEntry[] {
+    return Array.from(this.#entries.values()).filter(pred);
+  }
+
+  /** Existing variant paths an image source already has (used for idempotent encoding). */
+  variantPathsFor(sourcePath: string): string[] {
+    const dot = sourcePath.lastIndexOf(".");
+    const stem = dot >= 0 ? sourcePath.slice(0, dot) : sourcePath;
+    const out: string[] = [];
+    for (const path of this.#entries.keys()) {
+      if (path === sourcePath) continue;
+      // Match `<stem>.<width>w.<format>` or `<stem>.<format>`
+      if (path === `${stem}.webp` || path === `${stem}.avif`) out.push(path);
+      else if (/^.+\.\d+w\.(webp|avif)$/.test(path) && path.startsWith(`${stem}.`)) out.push(path);
+    }
+    return out;
+  }
+
   /** Remove an entry by path. Returns true when something was deleted. */
   remove(path: string): boolean {
     return this.#entries.delete(path);

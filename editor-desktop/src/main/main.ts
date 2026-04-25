@@ -32,6 +32,7 @@ import {
   type FsLike,
 } from "./archive-io.js";
 import { runIpynbImport } from "./ipynb-import.js";
+import { encodeVariants, type VariantPlanEntry } from "./variant-encoder.js";
 
 // Electron is in optionalDependencies; require lazily so the module
 // can be imported by typecheck even when electron isn't installed.
@@ -152,6 +153,25 @@ ipcMain.handle("dialog:openIpynb", async () => {
   });
   return result.canceled ? null : result.filePaths[0];
 });
+
+ipcMain.handle(
+  "variants:encode",
+  async (
+    _e,
+    payload: { sources: Array<[string, Uint8Array]>; plan: VariantPlanEntry[] },
+  ) => {
+    const sources = new Map(payload.sources);
+    const result = await encodeVariants({ sources, plan: payload.plan });
+    // Variants come back as Uint8Array — IPC happens to serialize those
+    // cleanly, no tuple-flattening needed for individual byte arrays.
+    return {
+      ok: result.ok,
+      reason: result.reason,
+      variants: result.variants,
+      errors: result.errors,
+    };
+  },
+);
 
 ipcMain.handle("ipynb:import", async (_e, ipynbPath: string) => {
   try {
