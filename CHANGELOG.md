@@ -196,6 +196,42 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Added — Phase 2.3b.2: In-editor accessibility checker (2026-04-24)
+
+The editor's status bar now shows a live WCAG 2.2 AA structural
+scan of the open document; clicking the status text opens a panel
+listing each violation with rule, WCAG reference, line number,
+and human-readable message.
+
+Implementation: `editor-desktop/src/renderer/accessibility-checker.ts`
+is a pure TS port of the Python rule set at
+`tests/accessibility/run_accessibility.py`. Both implementations
+catch the same four rules:
+
+- `image-alt` (WCAG 1.1.1) — `![](src)` with empty alt
+- `heading-order` (WCAG 2.4.10) — h1 → h3 (skipped levels)
+- `link-name` (WCAG 2.4.4) — vague link text
+  ("click here", "here", "more", etc.)
+- `document-language` (WCAG 3.1.1) — manifest.document.language
+  unset
+
+What this does NOT catch (requires a real browser): color
+contrast, keyboard nav, focus visible, ARIA correctness. Phase 3.3
+brings a Playwright + axe-core runner for those.
+
+37 vitest cases — 14 individual rule tests plus 23 cross-impl
+parity tests that drive the TS checker against every fixture in
+`tests/accessibility/fixtures/` and assert the same
+`expected_violations` set the Python runner produces. Lockstep with
+the Python runner is now a CI invariant; either implementation
+diverging will fail one of the parity tests.
+
+The compliance-report export (WCAG sidecar JSON for journal
+submission) is deferred until the Phase 3.3 fixture pack expands
+from 23 → 50 fixtures.
+
+Net editor-desktop tests: 113 → 150.
+
 ### Added — Phase 2.3a.5.1–4: Directive picker pack (2026-04-24)
 
 The editor's header toolbar now has four picker buttons —

@@ -6,9 +6,27 @@
         content="default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self';"/>
   <title>MDZ Editor</title>
   <style>
-    body { font-family: system-ui, sans-serif; margin: 0; height: 100vh; display: grid; grid-template-rows: auto 1fr; grid-template-columns: 1fr 220px; }
+    body { font-family: system-ui, sans-serif; margin: 0; height: 100vh; display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: 1fr 220px; }
     header { grid-column: 1 / -1; }
     .pane { grid-column: 1; }
+    footer.status-bar {
+      grid-column: 1 / -1; padding: 0.25rem 0.75rem; border-top: 1px solid #ddd;
+      font-size: 0.8rem; color: #666; display: flex; gap: 1rem; align-items: center;
+    }
+    footer.status-bar .a11y-status.has-issues { color: #b45309; cursor: pointer; }
+    footer.status-bar .a11y-status.ok { color: #15803d; }
+    footer.status-bar .a11y-panel {
+      position: absolute; bottom: 2rem; left: 0.75rem; right: 0.75rem; max-width: 640px;
+      background: white; border: 1px solid #ccc; border-radius: 4px; padding: 0.75rem;
+      max-height: 40vh; overflow-y: auto; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    }
+    footer.status-bar .a11y-panel ul { list-style: none; padding: 0; margin: 0; font-family: ui-monospace, monospace; font-size: 0.78rem; }
+    footer.status-bar .a11y-panel li { padding: 0.2rem 0; border-bottom: 1px solid #eee; }
+    @media (prefers-color-scheme: dark) {
+      footer.status-bar { border-color: #333; color: #888; }
+      footer.status-bar .a11y-panel { background: #1a1a1a; border-color: #333; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5); }
+      footer.status-bar .a11y-panel li { border-color: #2a2a2a; }
+    }
     .asset-sidebar {
       grid-column: 2; grid-row: 2; border-left: 1px solid #ddd;
       display: flex; flex-direction: column; min-height: 0; overflow: hidden;
@@ -146,6 +164,10 @@
     </div>
     <ul id="asset-list" class="asset-list" role="list"></ul>
   </aside>
+  <footer class="status-bar" role="contentinfo">
+    <span id="a11y-status" class="a11y-status" aria-live="polite" tabindex="0">Accessibility: —</span>
+    <div id="a11y-panel" class="a11y-panel" hidden role="region" aria-label="Accessibility issues"></div>
+  </footer>
   <script type="module" src="./index.ts"></script>
 </body>
 </html>

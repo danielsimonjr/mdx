@@ -15,6 +15,7 @@
     "src/renderer/directive-insert.ts",
     "src/renderer/directive-pickers.ts",
     "src/renderer/directive-modal.ts",
+    "src/renderer/accessibility-checker.ts",
     "test/**/*.ts"
   ],
   "exclude": [

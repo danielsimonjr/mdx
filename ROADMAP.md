@@ -281,7 +281,7 @@ maintainer, double it.
 | 2.1 viewer | **partial** | sanitizer (38 tests), directives (cross-refs / citations / bibliography / `::cell` / `::output` / `::include`, 46 tests), CSL-JSON references (10 tests), KaTeX math (13 tests), **IndexedDB cache** (10 tests). 117/117 viewer tests pass. | full keyboard a11y, npm publish, demo site, fragment-aware `::include` |
 | 2.2 hosted | **code-ready, not deployed** | full Cloudflare Worker with strict CSP, content-hash cache pinning, OG / Twitter card meta, sanitized canonical URLs, 32 worker tests | `wrangler deploy` to view.mdz-format.org (external action), per-archive cover-image extraction |
 | 2.3a editor MVP | **partial** | **2.3a.1** shell + **2.3a.2** editor+preview + **2.3a.3** asset sidebar + **2.3a.4** .ipynb import + **2.3a.5.0** insertion engine + **2.3a.5.1–4** picker pack. 113 vitest cases (11 archive-io + 12 editor-pane + 7 ipynb-import + 32 asset-store + 19 directive-insert + 32 directive-pickers). Toolbar buttons for `::cell`, `::include`, `::fig`/`::eq`/`::tab`, `::cite`; `<dialog>`-based modal scaffolding; CSL-JSON bibliography lookup; document-scan id-collision check; archive-entry membership check for include targets. | 2.3a.6 release engineering (signed installers — partly external) |
-| 2.3b editor Pro | **chunked, not started** | (none — see 2.3b.1 through 2.3b.7 below) | All sub-phases |
+| 2.3b editor Pro | **partial** | **2.3b.2** in-editor accessibility checker (37 vitest cases; cross-impl parity with the Python runner across 23 fixtures). | 2.3b.1 Pyodide kernel, 2.3b.3 block-level diff, 2.3b.4 review annotations, 2.3b.5 multi-locale, 2.3b.6 image variants, 2.3b.7 non-core pickers |
 | 2.4 EPUB bridge | **shipped** | `mdz export-epub` (existing) + `mdz import-epub` (new, 15 tests, fidelity matrix doc); round-trip CI gate | Symmetric `::fig` round-trip on the export side (tracked); per-chapter spine preservation |
 | 2.5 browser ext | **code-ready, hardened** | MV3 manifest, content + service-worker + popup + viewer scripts, 13 manifest-validation tests, reproducible-build doc, placeholder icons | Real icon artwork, bundled `<mdz-viewer>`, AMO / Chrome Web Store / Edge / Brave submissions |
 
@@ -563,12 +563,21 @@ is independent — sequence by user demand, not by checklist order.
 
 #### 2.3b.2 Accessibility checker
 
-- [ ] In-editor pa11y-equivalent that runs the `tests/accessibility/`
-      rule set against the rendered preview on save.
-- [ ] Issues panel listing each violation with rule + WCAG
-      reference + jump-to-source.
-- [ ] Export WCAG 2.1 AA / 2.2 AA compliance report as a sidecar
-      JSON for journal submission.
+- [x] **In-editor live checker** in
+      `editor-desktop/src/renderer/accessibility-checker.ts`. Pure
+      TS port of the Python `tests/accessibility/run_accessibility.py`
+      rules — image-alt (WCAG 1.1.1), heading-order (WCAG 2.4.10),
+      link-name (WCAG 2.4.4), document-language (WCAG 3.1.1).
+      Status-bar widget summarises violation counts; clicking opens
+      a panel with rule / WCAG / line-number for each finding.
+- [x] **Cross-impl parity tests:** the vitest suite drives the TS
+      checker against every fixture in `tests/accessibility/fixtures/`
+      and asserts the same `expected_violations` set the Python
+      runner enforces. 23 fixtures × parity + 14 unit tests = 37
+      vitest cases.
+- [ ] Compliance-report export (WCAG 2.1 / 2.2 AA sidecar JSON for
+      journal submission). Deferred to a follow-up — needs the
+      Phase 3.3 fixture pack expanded from 23 → 50 fixtures first.
 
   **Depends on:** 2.3a.2 + the Phase 3.3 fixture pack (currently
   23/50 fixtures).

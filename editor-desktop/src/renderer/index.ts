@@ -21,6 +21,7 @@ import {
   openCitePicker,
 } from "./directive-modal.js";
 import { collectExistingIds, collectBibliographyKeys } from "./directive-pickers.js";
+import { checkMarkdown, summarize, type A11yViolation } from "./accessibility-checker.js";
 
 declare global {
   interface Window {
@@ -59,6 +60,9 @@ const pickerButtons = {
   fig: document.getElementById("picker-fig") as HTMLButtonElement,
   cite: document.getElementById("picker-cite") as HTMLButtonElement,
 };
+
+const a11yStatusEl = document.getElementById("a11y-status")!;
+const a11yPanelEl = document.getElementById("a11y-panel")!;
 
 const dropzone = document.getElementById("asset-dropzone") as HTMLDivElement;
 const assetListEl = document.getElementById("asset-list") as HTMLUListElement;
@@ -139,6 +143,48 @@ function setPickersEnabled(enabled: boolean): void {
 }
 
 /**
+ * Run the accessibility checker over the current source + manifest
+ * and update the status bar. Wired to the editor pane's onChange so
+ * findings track keystrokes; the underlying check is regex-based and
+ * fast enough that no extra debounce is needed (the source-render
+ * debounce coalesces it for free).
+ */
+function refreshA11y(source: string): void {
+  const violations = checkMarkdown(source, session?.manifest ?? null);
+  a11yStatusEl.textContent = summarize(violations);
+  a11yStatusEl.classList.toggle("has-issues", violations.length > 0);
+  a11yStatusEl.classList.toggle("ok", violations.length === 0);
+  renderA11yPanel(violations);
+}
+
+function renderA11yPanel(violations: ReadonlyArray<A11yViolation>): void {
+  a11yPanelEl.innerHTML = "";
+  if (violations.length === 0) {
+    a11yPanelEl.hidden = true;
+    return;
+  }
+  const ul = document.createElement("ul");
+  for (const v of violations) {
+    const li = document.createElement("li");
+    const where = v.line > 0 ? `line ${v.line}` : "document";
+    li.textContent = `[${v.rule} / WCAG ${v.wcag}] ${where}: ${v.message}`;
+    ul.appendChild(li);
+  }
+  a11yPanelEl.appendChild(ul);
+}
+
+a11yStatusEl.addEventListener("click", () => {
+  if (a11yPanelEl.children.length === 0) return;
+  a11yPanelEl.hidden = !a11yPanelEl.hidden;
+});
+a11yStatusEl.addEventListener("keydown", (e) => {
+  if ((e as KeyboardEvent).key === "Enter" || (e as KeyboardEvent).key === " ") {
+    e.preventDefault();
+    a11yStatusEl.click();
+  }
+});
+
+/**
  * Bibliography lookup. CSL-JSON is read from the archive's
  * `references.json` (root-level by convention) when the archive is
  * opened — `referencesJson` below holds the raw text. When absent
@@ -193,6 +239,7 @@ async function ensurePane(initialContent: string): Promise<EditorPane> {
       mode: "split",
       onChange: (source) => {
         if (session) setModified(source !== session.baseline);
+        refreshA11y(source);
       },
       onSave: () => {
         void saveFlow();
@@ -231,6 +278,7 @@ async function openFlow(): Promise<void> {
   referencesJson = refsBytes ? new TextDecoder().decode(refsBytes) : null;
   await ensurePane(result.archive.content);
   setPickersEnabled(true);
+  refreshA11y(result.archive.content);
 }
 
 async function saveFlow(): Promise<void> {
@@ -309,6 +357,7 @@ async function importIpynbFlow(): Promise<void> {
   referencesJson = refsBytes ? new TextDecoder().decode(refsBytes) : null;
   await ensurePane(opened.archive.content);
   setPickersEnabled(true);
+  refreshA11y(opened.archive.content);
 }
 
 window.editorApi.onMenu("open", () => {
