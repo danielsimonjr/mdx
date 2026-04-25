@@ -52,3 +52,7 @@ implementations/python/example-extracted/
 # TypeScript test infrastructure
 implementations/typescript/node_modules/
 implementations/typescript/package-lock.json
+
+# Browser-extension build output (CI regenerates; not source of truth)
+mdz-viewer-extension-*.zip
+mdz-viewer-extension-*.xpi
