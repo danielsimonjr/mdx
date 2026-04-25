@@ -14,6 +14,25 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  validate-roadmap:
+    name: Validate ROADMAP cited paths
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Assert every [x] cited path exists (Phase 4.6.9)
+        # Walks each `- [x]` ROADMAP entry, extracts every backtick-
+        # quoted path-shaped string ending in a tracked extension,
+        # asserts each resolves on disk (or matches a basename
+        # somewhere in the tree). Catches doc/code drift before it
+        # ships.
+        run: python tests/roadmap/check_cited_paths.py
+
   validate-typescript:
     name: Validate TypeScript
     runs-on: ubuntu-latest

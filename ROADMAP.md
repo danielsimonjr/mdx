@@ -1299,12 +1299,15 @@ the drift this session found."
 
 **A. CI gates that prevent doc/code drift**
 
-- [ ] **ROADMAP `[x]` cited-path existence check.** A CI step that
-      walks every backtick-quoted file/test path inside `[x]`
-      entries and asserts each resolves on the filesystem. Would
-      have caught the `cli/test/import-ipynb.test.js` drift this
-      session's cross-check found. ~30 lines of Python; goes in a
-      new `validate-roadmap` job.
+- [x] **ROADMAP `[x]` cited-path existence check** — done
+      2026-04-25. New `tests/roadmap/check_cited_paths.py` walks
+      every `- [x]` ROADMAP entry, extracts each backtick-quoted
+      path-shaped string ending in a tracked extension, and
+      asserts each resolves on disk or matches a basename
+      somewhere in the tree (citation-style tolerance for cases
+      like `mdx_format.ts` that the doc cites bare). Wired into a
+      new `validate-roadmap` CI job that runs before everything
+      else. Currently 128 citations checked, 0 drifted.
 - [ ] **Status-snapshot date freshness.** Assert the
       `### Status snapshot (YYYY-MM-DD)` heading is within N days
       of the `git log -1 --format=%ad` for ROADMAP.md. Catches

@@ -8,6 +8,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 4.6.9: ROADMAP cited-path CI gate (2026-04-25)
+
+`tests/roadmap/check_cited_paths.py` is a standing CI gate
+that prevents future doc/code drift like the
+`cli/test/import-ipynb.test.js` issue this session's cross-check
+caught.
+
+The script walks every `- [x]` ROADMAP entry, extracts each
+backtick-quoted path-shaped string ending in a tracked extension
+(`.ts`, `.tsx`, `.js`, `.py`, `.rs`, `.md`, `.json`, `.toml`,
+`.yml`, `.yaml`, `.html`, `.plist`, `.abnf`, `.lark`), and asserts
+each one either resolves directly on disk OR matches a basename
+somewhere in the tree (citation-style tolerance — the ROADMAP
+often cites `mdx_format.ts` without its full path).
+
+The path-shape regex deliberately excludes whitespace and
+backticks inside the match, so multi-line shell commands that
+happen to end in a path-shaped suffix don't false-positive
+(an earlier version of the regex hit `npx tsc … tsconfig.test.json`
+as a "path" — fixed).
+
+Wired into a new `validate-roadmap` CI job that runs first in
+the workflow (before TypeScript / Rust / Python validations) so
+drift is caught at the cheapest possible stage. 128 citations
+checked, 0 drifted on the current ROADMAP.
+
 ### Changed — RLM cross-check: ROADMAP / CHANGELOG / CLAUDE.md sync (2026-04-25)
 
 Used the RLM skill to compare doc claims against the actual
