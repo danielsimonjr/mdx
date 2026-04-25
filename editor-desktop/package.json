@@ -15,7 +15,7 @@
     "fflate": "^0.8.2"
   },
   "optionalDependencies": {
-    "electron": "^31.0.0",
+    "electron": "^39.8.5",
     "electron-updater": "^6.3.0"
   },
   "devDependencies": {
