@@ -10,6 +10,7 @@
 import { unzipSync } from "fflate";
 import type { Manifest } from "./manifest-types.js";
 import { parseReferences, type CslEntry } from "./references.js";
+import { defaultArchiveCache, type ArchiveCache } from "./archive-cache.js";
 
 // ---------------------------------------------------------------------------
 // ZIP-bomb + path-traversal defenses (threat-model T3 + T4)
@@ -77,12 +78,42 @@ export class ArchiveLoadError extends Error {
  * @param source ArrayBuffer | Uint8Array | Blob | string (URL)
  * @param opts.preferredLocales BCP 47 tags in preference order; the viewer
  *        resolves the first matching locale, else falls back per manifest.
+ * @param opts.cache Optional override for the IndexedDB-backed cache
+ *        (Phase 2.1 perf win — second-load skips fetch + inflate).
+ *        When `source` is a URL, the loader checks the cache first;
+ *        on a miss it fetches and stores. Pass `null` to opt out of
+ *        caching entirely.
  */
 export async function loadArchive(
   source: ArrayBuffer | Uint8Array | Blob | string,
-  opts: { preferredLocales?: readonly string[] } = {},
+  opts: {
+    preferredLocales?: readonly string[];
+    cache?: ArchiveCache | null;
+  } = {},
 ): Promise<LoadedArchive> {
-  const bytes = await toBytes(source);
+  // Cache is consulted ONLY for URL sources — for ArrayBuffer / Blob
+  // / Uint8Array the caller already has the bytes; caching them
+  // would only help if THIS process re-loads the same Blob, which
+  // doesn't happen in practice.
+  const cache: ArchiveCache | null =
+    opts.cache === undefined ? defaultArchiveCache() : opts.cache;
+  let bytes: Uint8Array;
+  let cacheKey: string | null = null;
+  if (typeof source === "string" && cache) {
+    cacheKey = source;
+    const cached = await cache.get(cacheKey);
+    if (cached) {
+      bytes = cached;
+    } else {
+      bytes = await toBytes(source);
+      // Fire-and-forget: caching is a perf optimization. Failures
+      // (IDB quota, no IDB at all) are silently swallowed by the
+      // cache impl itself.
+      void cache.put(cacheKey, bytes);
+    }
+  } else {
+    bytes = await toBytes(source);
+  }
   const entries = inflateZip(bytes);
 
   const manifestBytes = entries.get("manifest.json");

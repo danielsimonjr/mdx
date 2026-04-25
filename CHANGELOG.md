@@ -196,6 +196,42 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Added — Phase 2.1 viewer: IndexedDB archive cache (2026-04-24)
+
+`<mdz-viewer>` now caches loaded archives by URL so a return visit
+or a re-render skips the fetch + ZIP-inflate path entirely. Closes
+the "Offline-first: uses IndexedDB for archive caching" Phase 2.1
+deliverable.
+
+- **Two backends** in `packages/mdz-viewer/src/archive-cache.ts`:
+  `IndexedDBArchiveCache` for browsers, `InMemoryArchiveCache` for
+  Cloudflare Workers / Node test runs / explicit-opt-out callers.
+  Same `ArchiveCache` interface; the auto-selector
+  `defaultArchiveCache()` picks based on whether
+  `typeof indexedDB !== "undefined"`.
+- **URL-keyed storage** — for hash-pinned archives served by the
+  Phase 2.2 hosted Worker (`?content_hash=…`), the URL is already a
+  synonym for the bytes. For unpinned URLs a 1-hour default TTL
+  keeps the cache correct against author updates; pass `Infinity`
+  to disable expiration entirely.
+- **Quota / IndexedDB failures degrade silently** — caching is a
+  perf optimization, not a correctness requirement. A `put()` that
+  hits the browser's per-origin quota silently drops; the next
+  `get()` returns `null` and the load goes through fetch normally.
+- **`loadArchive(url, { cache })`** is the integration point.
+  Default behavior auto-selects; pass an explicit
+  `InMemoryArchiveCache()` to opt into in-process caching only;
+  pass `cache: null` to opt out entirely; pass a shared instance to
+  share cache state across multiple viewers on the same page.
+
+Tests: 10 new vitest cases at `archive-cache.test.ts`. Cover put +
+get round-trip, miss on absent key, TTL expiration, delete + clear,
+`Infinity` TTL disabling expiration, environment auto-selection
+(Node falls back to InMemory), and a real fetch-stub integration
+test that proves second `loadArchive(url)` skips the network. Total
+viewer tests now: **117** (38 sanitizer + 46 directives + 13 math +
+10 references + 10 cache). All pass; tsc --noEmit clean.
+
 ### Added — Phase 2.1 viewer: `::include` archive-aware resolution (2026-04-24)
 
 `::include[target=path]` directives now resolve against the open
