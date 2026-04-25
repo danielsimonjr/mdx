@@ -196,6 +196,57 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Added — Phase 2.3b.6.2: Main-process sharp encoder (2026-04-24)
+
+`editor-desktop/src/main/variant-encoder.ts` ships the encoder
+side of variant generation — the natural pair to today's planner
+(2.3b.6). Lives in the main process because the renderer is
+sandboxed and `sharp` is a native binding to libvips with
+platform-specific binaries.
+
+`sharp` is in `optionalDependencies` so CI doesn't drag libvips
+into every test run. `loadSharp()` lazy-requires the module and
+returns `null` when missing (catches both `MODULE_NOT_FOUND` and
+the bindings.gyp / libvips load errors that show up on platforms
+sharp's prebuilds don't cover). `encodeVariants` then resolves
+with `{ ok: false, reason: 'sharp-not-installed' }` so the
+editor can show a clear "install sharp to enable variant
+generation" message rather than crash.
+
+The encoder pipeline per entry:
+
+```
+sharp(sourceBytes)
+  .resize({ width: maxWidth, withoutEnlargement: true })  // skipped if maxWidth null
+  .<format>({ quality })                                   // webp or avif
+  .toBuffer({ resolveWithObject: true })                   // bytes + width + height
+```
+
+`withoutEnlargement: true` ensures we never up-scale a small
+source to the preset's `maxWidth` — that produces blurry output
+with no quality benefit.
+
+Per-entry failures are collected into `result.errors` rather
+than thrown, so one corrupt source doesn't sink a multi-image
+encode. Missing-source entries (renderer's plan references a
+path not in the bytes map) are flagged the same way.
+
+`manifestVariantsProjection(results, plan)` turns encoder output
+into manifest §17.2 entries — sorted alphabetically by path for
+stable content-hashing across saves.
+
+10 vitest cases inject a stub `SharpModule` to exercise pipeline
+assembly, the resize-skip case, error collection, missing-source
+handling, manifest projection, and the not-installed gate. End-
+to-end "does sharp actually produce a valid AVIF?" is a Phase
+2.3a.6 Playwright responsibility.
+
+Net editor-desktop tests: 282 → 292.
+
+Still open (Phase 2.3b.6.3 follow-up): IPC wiring (renderer →
+main plan handoff → writeback), "Generate variants" toolbar
+button.
+
 ### Added — Phase 2.3b.1 (kernel layer): Pyodide integration scaffolding (2026-04-24)
 
 `editor-desktop/src/renderer/python-kernel.ts` ships the

@@ -22,7 +22,8 @@
   },
   "optionalDependencies": {
     "electron": "^31.0.0",
-    "electron-updater": "^6.3.0"
+    "electron-updater": "^6.3.0",
+    "sharp": "^0.33.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
@@ -31,7 +32,7 @@
     "vite": "^5.4.19",
     "vitest": "^2.1.9"
   },
-  "comment-optional-deps": "electron + electron-updater are optional so CI can validate the editor's testable core (archive-io.ts + tests) without pulling ~200 MB of Electron platform binaries on every build. Local devs: npm install --include=optional once. Phase 2.3a.6 (release engineering) will wire a separate electron-builder job that DOES install them.",
+  "comment-optional-deps": "electron + electron-updater + sharp are optional so CI can validate the editor's testable core (archive-io.ts + tests) without pulling ~200 MB of Electron platform binaries OR libvips on every build. Local devs: npm install --include=optional once. Phase 2.3a.6 (release engineering) will wire a separate electron-builder job that DOES install them. The variant-encoder gracefully degrades to 'sharp not installed' when missing.",
   "engines": {
     "node": ">=20"
   }

@@ -7,6 +7,7 @@
   "include": [
     "src/main/archive-io.ts",
     "src/main/ipynb-import.ts",
+    "src/main/variant-encoder.ts",
     "src/preload/types.ts",
     "src/renderer/index.ts",
     "src/renderer/editor-pane.ts",

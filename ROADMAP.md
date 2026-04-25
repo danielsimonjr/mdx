@@ -711,17 +711,32 @@ is independent — sequence by user demand, not by checklist order.
       computes the canonical target path
       (`<stem>.<width>w.<format>` for sized; `<stem>.<format>` for
       full-size).
-- [ ] Encoder execution — main-process worker that consumes the
-      plan and runs `sharp` (or `@squoosh/lib`) per entry.
-      Deferred to Phase 2.3b.6.2 follow-up; needs platform binary
-      decision (sharp's prebuilt binaries vs. WASM-only).
-- [ ] Populate `manifest.assets.images[].variants[]` per spec
-      §17.2 once the encoder runs. Phase 2.3b.6.2 follow-up.
+- [x] **Encoder** in
+      `editor-desktop/src/main/variant-encoder.ts`. Lazy-loads
+      `sharp` from `optionalDependencies` via `loadSharp()`;
+      returns `{ ok: false, reason: 'sharp-not-installed' }` when
+      missing so the editor can show a clear install hint rather
+      than crash. `encodeVariants(input, sharpModule?)` consumes
+      the planner output, drives the per-entry pipeline (resize
+      with `withoutEnlargement: true` to avoid up-scaling small
+      sources, then webp / avif at the preset's quality), and
+      collects per-entry failures without halting the run. Tests
+      use an injected stub `SharpModule` so libvips isn't required
+      in CI. Decision: sharp's prebuilt binaries (the
+      @squoosh/lib WASM alternative is unmaintained as of 2024).
+- [x] **Manifest §17.2 projection** via
+      `manifestVariantsProjection(results, plan)` — turns encoder
+      output into `[{path, format, width, height, size_bytes}]`
+      entries sorted alphabetically by path for stable
+      content-hashing.
+- [ ] IPC wiring + "Generate variants" button (renderer → main
+      process plan handoff → writeback into AssetStore +
+      manifest). Phase 2.3b.6.3 follow-up.
 - [x] Configurable quality presets per image kind via the
       `presets` parameter to `planVariants`.
 
-  **Depends on:** 2.3a.3 (asset sidebar). Planner shipped
-  2026-04-24; encoder execution gated on platform-binary decision.
+  **Depends on:** 2.3a.3 (asset sidebar). Planner + encoder
+  shipped 2026-04-24; only IPC wiring + UI button left.
 
 #### 2.3b.7 Non-core directive picker pack
 
