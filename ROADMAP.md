@@ -1221,11 +1221,19 @@ normal completion flow.
       round-trip now preserves the labeled-directive identity
       (kind + id) the prior comment flagged as lossy. 15/15
       import-epub tests still pass.
-- [ ] **Browser-extension reproducible-build bundler**
-      (`browser-extension/REPRODUCIBLE_BUILD.md:70`). Bundling
-      the viewer into the extension's `viewer/` directory should
-      be wired through CI; currently a manual step. Phase 2.5
-      follow-up.
+- [x] **Browser-extension reproducible-build bundler** — done
+      2026-04-25. New `browser-extension/build.js` walks
+      `manifest.json` + the five packaged dirs, sorts entries by
+      archive path, pins header timestamps to 1980-01-01, fixes
+      `external_attr` to 0644. Two builds produce byte-identical
+      output. New `test/build.test.js` (3 cases) asserts
+      determinism + exclusion of `test/` and OS metadata files +
+      presence of every required directory. Wired into the
+      `validate-browser-extension` CI job: builds twice + diffs the
+      SHAs. AMO reviewers can verify the published artifact by
+      SHA-256 against this script. Replaces the old
+      `zip -X`-based recipe in `REPRODUCIBLE_BUILD.md`, which was
+      non-deterministic across NTFS / ext4.
 - [ ] **Rust binding blake3 implementation**
       (`bindings/rust/src/lib.rs:804` returns
       `"blake3 (spec'd but deferred in this binding)"`). The

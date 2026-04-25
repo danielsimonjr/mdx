@@ -8,6 +8,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 4.6.8: Browser-extension deterministic bundler (2026-04-25)
+
+Closes the `REPRODUCIBLE_BUILD.md:70` "bundler not wired" note.
+The browser extension now ships through a deterministic Node
+bundler producing byte-identical output across CI host OSes.
+
+`browser-extension/build.js`:
+
+- Walks `manifest.json` + the five packaged dirs (`background`,
+  `content`, `popup`, `viewer`, `icons`).
+- Excludes `test/` + host-specific metadata files (`.DS_Store`,
+  `Thumbs.db`, `desktop.ini`).
+- Sorts entries by archive path; pins every header timestamp to
+  1980-01-01; fixes `external_attr` to `0644`.
+
+The old `zip -X` recipe is host-portable in name but not in
+practice — Windows `zip -X` still emits different
+`external_attr` bytes than Linux `zip -X` because each reflects
+source-filesystem permissions. The Node bundler produces
+byte-identical output across all three CI host OSes. AMO
+reviewers verify by SHA-256, so this matters.
+
+3 new `test/build.test.js` cases pin the determinism invariant,
+the exclusion list, and the required-directory list.
+`validate-browser-extension` CI job builds twice and diffs the
+SHAs.
+
 ### Added — Phase 4.6.8: EPUB import/export symmetric rule (2026-04-25)
 
 Round-trip MDZ → EPUB → MDZ now preserves labeled-directive

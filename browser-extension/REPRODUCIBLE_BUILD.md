@@ -12,35 +12,42 @@ the `<mdz-viewer>` web component (which needs a tsc compile pass).
 
 ---
 
-## Current state (Phase 2.5 — pre-bundle)
+## Current state (Phase 4.6.8 — deterministic Node bundler)
 
 The shipped extension is **plain JS** with no compile / minify /
-bundle step. Reproducing it is a `zip` invocation:
+bundle step. Reproducing it goes through the in-repo Node bundler
+at `browser-extension/build.js`:
 
 ```bash
 # From the repository root
-cd browser-extension
-zip -r -X ../mdz-viewer-extension-0.1.0.zip \
-    manifest.json \
-    background/ \
-    content/ \
-    popup/ \
-    viewer/ \
-    icons/ \
-    -x "test/*"
+node browser-extension/build.js --print-sha256
 ```
 
-The flags above:
+Output: `mdz-viewer-extension-<version>.zip` in the repo root,
+plus the SHA-256 printed to stdout. That SHA MUST match the
+SHA-256 of the AMO-uploaded artifact.
 
-- `-r` — recurse into directories.
-- `-X` — strip extra file attributes (filesystem-specific bits like
-  Windows ACLs, macOS extended attributes) that would make the
-  archive non-deterministic across host OSes.
-- `-x "test/*"` — exclude the test directory from the published
-  package.
+The bundler walks `manifest.json` + the five packaged dirs
+(`background`, `content`, `popup`, `viewer`, `icons`), excludes
+`test/` and host-specific metadata files (`.DS_Store`, `Thumbs.db`,
+`desktop.ini`), sorts entries by archive path, and pins every
+entry's header timestamp to 1980-01-01 (earliest legal ZIP date)
+so the byte stream is stable across runs and host OSes.
 
-Output: `mdz-viewer-extension-0.1.0.zip`. SHA-256 of this file MUST
-match the SHA-256 of the AMO-uploaded artifact.
+CI runs the bundler twice on every push and asserts the two
+SHA-256s match (`build determinism` test in
+`browser-extension/test/build.test.js` plus a CI-level diff).
+Non-determinism is a release blocker.
+
+### Why a Node bundler instead of `zip -X`
+
+The earlier recipe relied on Info-ZIP's `zip -X` to strip
+host-specific attributes, but `zip -X` on Windows still emits
+different bytes than on Linux because the ZIP `external_attr`
+field reflects source filesystem permissions (NTFS vs. ext4).
+The Node bundler sets a fixed `external_attr` (0644) and a fixed
+timestamp, producing byte-identical output across all three CI
+host OSes.
 
 ## Build environment
 
