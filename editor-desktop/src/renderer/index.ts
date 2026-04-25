@@ -43,7 +43,7 @@ import {
   type Annotation,
 } from "./annotations.js";
 import { renderAnnotationSidebar, summarizeAnnotations } from "./annotations-render.js";
-import { enumerateLocales } from "./locales.js";
+import { enumerateLocales, planAddLocale } from "./locales.js";
 import { buildSyncScrollState, mapWithFallback } from "./sync-scroll.js";
 
 declare global {
@@ -253,50 +253,58 @@ function loadLocaleState(entries: ReadonlyMap<string, Uint8Array>): void {
 function openLocaleModal(): void {
   if (!pane || !session) return;
   const localeEntries = enumerateLocales(session.manifest);
-  if (localeEntries.length < 2) {
-    titleEl.textContent = "Document has no sibling locales — declare in manifest.content.locales.";
-    return;
-  }
   const primary = localeEntries.find((e) => e.primary) ?? localeEntries[0];
+  const hasSiblings = localeEntries.length >= 2;
   const dialog = document.createElement("dialog");
   dialog.className = "locale-modal";
   dialog.innerHTML = `
     <div class="locale-modal-header">
-      <h3 style="margin:0;font-size:1rem;">Compare locales (read-only)</h3>
+      <h3 style="margin:0;font-size:1rem;">Compare &amp; edit locales</h3>
       <div class="diff-modal-controls">
         <select aria-label="Sibling locale"></select>
+        <button type="button" class="add-locale-btn" title="Add a new sibling locale">+ Add locale</button>
+        <button type="button" class="save-locale-btn" title="Save right-pane edits to the archive's locale file">Save locale</button>
         <button type="button" class="cancel-btn">Close</button>
       </div>
     </div>
     <div class="locale-modal-body">
       <div class="locale-pane left-pane"></div>
-      <div class="locale-pane right-pane"></div>
+      <textarea class="locale-pane right-pane" spellcheck="false" aria-label="Sibling locale source"></textarea>
     </div>
   `;
   const select = dialog.querySelector("select") as HTMLSelectElement;
-  for (const e of localeEntries) {
-    if (e.language === primary.language) continue;
-    const opt = document.createElement("option");
-    opt.value = e.language;
-    opt.textContent = e.language;
-    select.appendChild(opt);
-  }
+  const populateSelect = (): void => {
+    select.innerHTML = "";
+    for (const e of localeEntries) {
+      if (e.language === primary.language) continue;
+      const opt = document.createElement("option");
+      opt.value = e.language;
+      opt.textContent = e.language;
+      select.appendChild(opt);
+    }
+  };
+  populateSelect();
   const leftPane = dialog.querySelector(".left-pane") as HTMLDivElement;
-  const rightPane = dialog.querySelector(".right-pane") as HTMLDivElement;
+  const rightPane = dialog.querySelector(".right-pane") as HTMLTextAreaElement;
   const cancelBtn = dialog.querySelector(".cancel-btn") as HTMLButtonElement;
+  const addLocaleBtn = dialog.querySelector(".add-locale-btn") as HTMLButtonElement;
+  const saveLocaleBtn = dialog.querySelector(".save-locale-btn") as HTMLButtonElement;
+  if (!hasSiblings) {
+    rightPane.value = "";
+    rightPane.placeholder = "(no sibling locale yet — click \"+ Add locale\" to create one)";
+  }
 
   let syncing = false;
   const refresh = (): void => {
     const leftText = pane!.getContent();
-    const rightText = localeFileText.get(select.value) ?? "(locale file not in archive)";
-    leftPane.innerHTML = `<h4>${primary.language} (current draft)</h4>` + escapeHtmlSimple(leftText);
-    rightPane.innerHTML = `<h4>${select.value} (saved)</h4>` + escapeHtmlSimple(rightText);
+    const rightText = select.value ? localeFileText.get(select.value) ?? "" : "";
+    leftPane.innerHTML = `<h4>${escapeHtmlSimple(primary.language)} (current draft)</h4>` + escapeHtmlSimple(leftText);
+    rightPane.value = rightText;
+    saveLocaleBtn.disabled = !select.value;
     const state = buildSyncScrollState(leftText, rightText);
-    // Reset scroll positions.
     leftPane.scrollTop = 0;
     rightPane.scrollTop = 0;
-    // Approximate line height — used to convert pixel scroll → line.
-    const lineHeight = 1.5 * 13.6; // px (font-size 0.85rem ≈ 13.6px × line-height 1.5)
+    const lineHeight = 1.5 * 13.6;
     const scrollHandler = (source: "left" | "right"): (() => void) => () => {
       if (syncing) { syncing = false; return; }
       syncing = true;
@@ -309,8 +317,47 @@ function openLocaleModal(): void {
     leftPane.addEventListener("scroll", scrollHandler("left"));
     rightPane.addEventListener("scroll", scrollHandler("right"));
   };
+
   select.addEventListener("change", refresh);
   cancelBtn.addEventListener("click", () => { dialog.close(); dialog.remove(); });
+
+  saveLocaleBtn.addEventListener("click", () => {
+    if (!session || !select.value) return;
+    // Update the in-memory locale text. saveFlow picks it up from the
+    // assetStore's writeback path on the next save.
+    localeFileText.set(select.value, rightPane.value);
+    setModified(true);
+    titleEl.textContent = `Locale ${select.value} edited (save the document to persist).`;
+  });
+
+  addLocaleBtn.addEventListener("click", () => {
+    if (!session) return;
+    const tag = window.prompt("New locale BCP-47 tag (e.g. es-ES):", "");
+    if (!tag) return;
+    if (localeEntries.some((e) => e.language === tag)) {
+      titleEl.textContent = `Locale ${tag} already declared.`;
+      return;
+    }
+    try {
+      const { manifest: patched, newPath } = planAddLocale(session.manifest, tag);
+      session.manifest = patched;
+      // Seed the new locale's file text with the primary draft so the
+      // user can edit it down — same as the spec's "pre-populated
+      // from the current pane" rule.
+      const primaryText = pane!.getContent();
+      localeFileText.set(tag, primaryText);
+      // Update enumeration so the dropdown picks it up.
+      localeEntries.push({ language: tag, path: newPath, primary: false });
+      populateSelect();
+      select.value = tag;
+      setModified(true);
+      titleEl.textContent = `Added locale ${tag} → ${newPath} (save to persist).`;
+      refresh();
+    } catch (e) {
+      titleEl.textContent = `Add-locale failed: ${(e as Error).message}`;
+    }
+  });
+
   document.body.appendChild(dialog);
   dialog.showModal();
   refresh();
@@ -666,10 +713,22 @@ async function saveFlow(): Promise<void> {
     assets: assetStore.manifestProjection(),
     ...(pythonKernel ? { kernels: mergeKernelDeclaration(session.manifest) } : {}),
   };
+  // Phase 2.3b.5.3: tunnel locale-file edits through the assets
+  // tuple. The IPC handler treats each [path, bytes] pair the same
+  // — non-asset paths get written verbatim into the archive, which
+  // is exactly what we want for `document.<lang>.md` siblings.
+  const localeAssets: Array<[string, Uint8Array]> = [];
+  for (const localeEntry of enumerateLocales(session.manifest)) {
+    if (localeEntry.primary) continue;
+    const localeText = localeFileText.get(localeEntry.language);
+    if (localeText !== undefined) {
+      localeAssets.push([localeEntry.path, new TextEncoder().encode(localeText)]);
+    }
+  }
   const result = await window.editorApi.saveToPath(session.path, {
     manifest: manifestCopy,
     content,
-    assets: Array.from(assetStore.toEntriesMap().entries()),
+    assets: [...assetStore.toEntriesMap().entries(), ...localeAssets],
   });
   if (!result.ok) {
     titleEl.textContent = `Save failed: ${result.error}`;

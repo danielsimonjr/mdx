@@ -792,11 +792,21 @@ is independent — sequence by user demand, not by checklist order.
       mapping helpers (`paragraphAtLine`, `mapLineLeftToRight`,
       `mapLineRightToLeft`, `proportionalMap`, `mapWithFallback`,
       `buildSyncScrollState`).
-- [ ] **Read-write secondary CodeMirror pane** + "Add locale"
-      command. Phase 2.3b.5.3 follow-up — the read-only modal
-      validates the alignment + sync-scroll plumbing first; the
-      full editing surface needs CodeMirror state-effects work
-      that's larger than this chunk.
+- [x] **Read-write sibling-locale pane + Add-locale command** —
+      done 2026-04-25. The compare-locales modal's right pane is
+      now a `<textarea>` (instead of a read-only `<div>`) with
+      sync-scroll preserved. New "Save locale" button stages the
+      edit into `localeFileText`; saveFlow tunnels the staged
+      bytes through the IPC handler's `assets` tuple
+      (non-asset paths write verbatim into the archive, which is
+      exactly what `document.<lang>.md` siblings need). New "+ Add
+      locale" button prompts for a BCP-47 tag, calls
+      `planAddLocale` from Phase 2.3b.5's data layer, seeds the
+      new locale's text from the primary draft, and updates the
+      dropdown. Full CodeMirror surface for the secondary pane
+      stays as a future polish item — the textarea is editable
+      enough for v1 translation work, and avoids the
+      state-effects complexity that was the original blocker.
 
   **Depends on:** 2.3a.2.
 

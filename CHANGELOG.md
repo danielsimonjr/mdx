@@ -8,6 +8,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 2.3b.5.3: read-write sibling-locale + Add-locale (2026-04-25)
+
+The compare-locales modal is now read-write, plus there's a
+new "+ Add locale" command for spawning a sibling locale.
+
+Three changes:
+
+- **Right pane upgraded** from `<div>` to `<textarea>` with
+  sync-scroll preserved. Edits stage into the in-memory
+  `localeFileText` map; the document's modified indicator
+  flips on so the user remembers to save.
+- **"Save locale" button** in the modal commits the textarea
+  edit into the same map.
+- **"+ Add locale" button** prompts for a BCP-47 tag, calls
+  `planAddLocale` from Phase 2.3b.5's data layer (which
+  produces a deep-cloned manifest patched with the new locale
+  + the conventional `document.<lang>.md` path), seeds the
+  new locale's text from the primary draft, and updates the
+  dropdown. Same locale tag declined politely if already
+  present.
+
+`saveFlow` extended to tunnel the staged locale bytes through
+the IPC handler's `assets` tuple. The handler treats
+`[path, bytes]` pairs as verbatim archive entries — fine for
+asset paths, fine for `document.<lang>.md` siblings.
+
+Full CodeMirror surface for the secondary pane remains
+deferred — the textarea is editable enough for v1 translation
+work without dragging in CodeMirror state-effects complexity.
+
+376/376 editor-desktop tests still pass.
+
 ### Added — Phase 2.3b.1.3: per-cell Run buttons (2026-04-25)
 
 The preview pane now shows a ▶ Run button on every Python
