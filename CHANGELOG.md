@@ -8,6 +8,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 2.3a.7: Playwright integration test scaffold (2026-04-25)
+
+Lands the e2e test surface that the rest of the editor's shipped
+features have been documenting as "exercised by Phase 2.3a.7
+Playwright when those land." Scaffold-only — Phase 2.3a.7.1 will
+build the fixture archive that unblocks the `.skip` stubs.
+
+New files in `editor-desktop/`:
+
+- `playwright.config.ts` — single Electron project (no browser
+  projects), one worker (Electron sessions hold global filesystem
+  locks), 30 s timeout to cover Windows cold-start.
+- `e2e/fixtures/electron-app.ts` — Playwright fixture that
+  launches the production-built editor via `_electron.launch`,
+  yields the first window page, probes for the built main bundle
+  (`dist/main/main.js`) and skips cleanly when missing. Also
+  waits on `body[data-mdz-ready='1']` so specs see a fully-mounted
+  renderer.
+- `e2e/smoke.spec.ts` — always-on baseline. Asserts the window
+  title matches `MDZ Editor` and `window.editorApi` exposes
+  exactly the 8-method contextBridge surface (snapshot test
+  catches accidental capability leaks AND accidental removals).
+- `e2e/open-save-roundtrip.spec.ts` — `.skip`-marked stub for
+  the open → mutate → save → reopen flow.
+- `e2e/picker-modals.spec.ts` — `.skip`-marked stubs for the 9
+  directive pickers (`::cell` / `::include` / `::fig` / `::eq` /
+  `::tab` / `::cite` / `::video` / `::audio` / `::model` /
+  `::embed` / `::data`).
+- `e2e/compare-modals.spec.ts` — `.skip`-marked stubs for
+  Compare-versions (Phase 2.3b.3) and Compare-locales
+  (Phase 2.3b.5).
+- `e2e/cell-runner.spec.ts` — `.skip`-marked stubs for per-cell
+  ▶ Run (Phase 2.3b.1.3) and Pyodide CDN load (Phase 2.3b.1.1–2).
+
+Renderer change to support deterministic test waits:
+
+- `editor-desktop/src/renderer/index.ts` sets
+  `document.body.dataset.mdzReady = "1"` once the bootstrap
+  module finishes wiring all event listeners. The fixture waits
+  on `body[data-mdz-ready='1']` (10 s budget, falls back to
+  `domcontentloaded` if the marker isn't reached — protects
+  against pre-marker test runs against older builds).
+
+Package wiring:
+
+- `@playwright/test ^1.47.0` added to `optionalDependencies`
+  alongside `electron` (the e2e suite needs both — neither is
+  required for the existing CI typecheck + vitest jobs). The
+  `comment-optional-deps` field documents the same.
+- New script: `npm run test:e2e` invokes `playwright test`
+  against the `e2e/` directory.
+
+CI policy:
+
+- The e2e suite is **not** added to CI in this phase. Running
+  Electron + Playwright headfully requires installing the
+  ~200 MB Electron platform binary that's currently optional;
+  Phase 2.3a.7.1 (which also lands the fixture archive that
+  unblocks the skipped specs) will gate the decision on
+  whether to add a separate CI job that opts into the install.
+- Editor README's Scripts section gains an "End-to-end suite"
+  subsection documenting the local invocation
+  (`npm install --include=optional && npm run build && npm run test:e2e`).
+- `.gitignore` excludes `editor-desktop/test-results/`,
+  `editor-desktop/playwright-report/`, and
+  `editor-desktop/playwright/.cache/`.
+
+Co-shipping fix:
+
+- `tests/roadmap/check_cited_paths.py` now skips paths
+  containing `dist/` segments. Build-artifact references in
+  ROADMAP narrative prose (`dist/index.js`, `dist/mdz-viewer.js`,
+  `dist/index.d.ts`) are documentation, not pointers — they're
+  gitignored package outputs that CI's `validate-viewer-build`
+  job is what actually asserts emit. The cited-paths gate
+  re-runs at 0/0 drift after this change (was 3/163).
+
 ### Added — Phase 4.6.9: per-asset content_hash verification (2026-04-25)
 
 Closes the deferred half of Phase 3.2 integrity fixtures. `mdz

@@ -811,3 +811,5 @@ window.editorApi.onMenu("import-ipynb", () => {
     titleEl.textContent = `Import error: ${(e as Error).message}`;
   });
 });
+
+document.body.dataset.mdzReady = "1";

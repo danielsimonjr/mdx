@@ -107,6 +107,12 @@ def extract_shipped_paths(roadmap_text: str) -> list[tuple[str, int]]:
             # aren't single paths.
             if any(c in p for c in "*<{}"):
                 continue
+            # Drop build-artifact references (gitignored dist/ output
+            # from packages). These paths are descriptive, not
+            # pointers — the package builds them on demand and CI's
+            # validate-viewer-build job is what asserts they emit.
+            if p.startswith("dist/") or "/dist/" in p:
+                continue
             out.append((p, line_no))
     return out
 

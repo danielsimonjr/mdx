@@ -9,6 +9,7 @@
     "dev": "vite",
     "build": "tsc -p tsconfig.main.json && vite build",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "typecheck:core": "tsc --noEmit -p tsconfig.test.json",
     "dist": "npm run build && electron-builder --config electron-builder.yml",
     "dist:unsigned": "npm run build && electron-builder --config electron-builder.yml -c.mac.identity=null -c.win.signingHashAlgorithms=null"
@@ -25,7 +26,8 @@
   "optionalDependencies": {
     "electron": "^31.0.0",
     "electron-updater": "^6.3.0",
-    "sharp": "^0.33.0"
+    "sharp": "^0.33.0",
+    "@playwright/test": "^1.47.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
@@ -35,7 +37,7 @@
     "vite": "^5.4.19",
     "vitest": "^2.1.9"
   },
-  "comment-optional-deps": "electron + electron-updater + sharp are optional so CI can validate the editor's testable core (archive-io.ts + tests) without pulling ~200 MB of Electron platform binaries OR libvips on every build. Local devs: npm install --include=optional once. Phase 2.3a.6 (release engineering) will wire a separate electron-builder job that DOES install them. The variant-encoder gracefully degrades to 'sharp not installed' when missing.",
+  "comment-optional-deps": "electron + electron-updater + sharp + @playwright/test are optional so CI can validate the editor's testable core (archive-io.ts + tests) without pulling ~200 MB of Electron platform binaries OR libvips on every build. Local devs: npm install --include=optional once. Phase 2.3a.6 (release engineering) will wire a separate electron-builder job that DOES install them. The variant-encoder gracefully degrades to 'sharp not installed' when missing. The Phase 2.3a.7 e2e suite (npm run test:e2e) requires Electron + Playwright; it skips cleanly when either is absent.",
   "engines": {
     "node": ">=20"
   }

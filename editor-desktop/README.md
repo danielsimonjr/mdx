@@ -33,10 +33,31 @@ npm install --include=optional
 
 ```bash
 npm run test           # vitest — pure archive-io
+npm run test:e2e       # Playwright + Electron (requires --include=optional + npm run build)
 npm run typecheck:core # tsc on the testable subset
 npm run dev            # vite + electron (requires --include=optional)
 npm run build          # tsc main + preload, vite build renderer
 ```
+
+### End-to-end suite (Phase 2.3a.7)
+
+Specs live in `e2e/` and drive the production build of the editor via
+Playwright's `_electron` API. The suite is not part of CI today —
+it requires the Electron platform binary that's currently in
+`optionalDependencies`. Local invocation:
+
+```bash
+npm install --include=optional
+npm run build
+npm run test:e2e
+```
+
+`e2e/smoke.spec.ts` is the always-on baseline (window mounts +
+`window.editorApi` surface check). The remaining specs
+(`open-save-roundtrip`, `picker-modals`, `compare-modals`,
+`cell-runner`) are `.skip`-marked stubs — they ship checked in so the
+test surface is reviewable, and Phase 2.3a.7.1 lands the fixture
+archive that unblocks them.
 
 ## Acceptance for Phase 2.3a.1
 

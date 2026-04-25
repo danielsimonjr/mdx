@@ -280,7 +280,7 @@ maintainer, double it.
 |-----------|-------|-------------|----------------|
 | 2.1 viewer | **partial** | sanitizer + directives (cross-refs / citations / bibliography / `::cell` / `::output` / `::include`, 50 tests with i18n labels), CSL-JSON references, KaTeX math, IndexedDB cache, **delta-snapshots-v1 reader** (24 tests), `tsconfig.build.json` for single-file ESM emit. 145/145 viewer tests pass. | full keyboard a11y pass, npm publish, demo site, fragment-aware `::include` |
 | 2.2 hosted | **code-ready, not deployed** | full Cloudflare Worker (32 tests) + `wrangler.toml [assets]` block pointing at `../mdz-viewer/dist` + `VIEWER_ASSETS` binding so `/viewer.js` serves the real bundle | `wrangler deploy` to `view.mdz-format.org` (external action), per-archive cover-image extraction |
-| 2.3a editor MVP | **feature-complete (unsigned releases)** | 2.3a.1–6 all shipped: shell, source pane, asset sidebar, .ipynb import, picker pack, `electron-builder.yml` + 3-platform CI matrix + auto-update feed. Pipeline produces unsigned installers today and auto-signs when cert secrets arrive in CI. | Cert/notarization secrets (external accounts), real icon artwork, Phase 2.3a.7 Playwright integration tests |
+| 2.3a editor MVP | **feature-complete + e2e scaffold** | 2.3a.1–6 all shipped: shell, source pane, asset sidebar, .ipynb import, picker pack, `electron-builder.yml` + 3-platform CI matrix + auto-update feed. Pipeline produces unsigned installers today and auto-signs when cert secrets arrive in CI. 2.3a.7 Playwright scaffold landed (`editor-desktop/e2e/` with electron-launch fixture, smoke baseline + 4 `.skip`-marked stubs ready for fixture-archive landing in 2.3a.7.1). | Cert/notarization secrets (external accounts), real icon artwork, fixture archive for 2.3a.7.1 unskip |
 | 2.3b editor Pro | **all 7 sub-phases shipped end-to-end** | 2.3b.1 Pyodide (kernel layer + UI + CSP + `kernels.python.runtime` save + per-cell Run buttons) / 2.3b.2 a11y checker / 2.3b.3 block-diff algorithm + Compare-versions modal / 2.3b.4 annotation data layer + sidebar UI / 2.3b.5 locale data layer + read-write Compare-locales modal + Add-locale command / 2.3b.6 variant planner + sharp encoder + Generate-variants IPC + UI / 2.3b.7.1–5 non-core picker pack. **376/376 editor-desktop tests pass.** | Annotation creation flows (need IPC for UUID + sig integration), `--role=public\|editor` flag |
 | 2.4 EPUB bridge | **shipped** | `mdz export-epub` (yazl-based, deterministic, EPUB OCF §4.3-correct) + `mdz import-epub` (15 tests); fidelity matrix doc; round-trip CI gate; symmetric `::fig`/`::eq`/`::tab` directive round-trip | Per-chapter spine preservation |
 | 2.5 browser ext | **code-ready, hardened, deterministic build** | MV3 manifest, scripts, 16 tests (13 manifest + 3 build-determinism), reproducible Node bundler at `browser-extension/build.js`, CI 2x-build SHA-256 diff, placeholder icons | Real icon artwork, AMO / Chrome / Edge / Brave submissions, browser-driven smoke tests |
@@ -1391,15 +1391,23 @@ the drift this session found."
 
 **D. Test infrastructure + verification**
 
-- [ ] **Phase 2.3a.7 Playwright integration scaffold.** Many
-      shipped features are documented as "exercised by Phase
-      2.3a.7 Playwright when those land" — DOM modals (Compare-
-      versions, Compare-locales, directive pickers), per-cell
-      Run-button injection, sync-scroll, the open/save flow
-      end-to-end, and the Pyodide CDN load. Set up
-      `editor-desktop/playwright.config.ts`, electron-launch
-      fixture, baseline tests for the four picker modals + diff
-      modal + per-cell Run + open/save round-trip.
+- [x] **Phase 2.3a.7 Playwright integration scaffold** — done
+      2026-04-25. Scaffold landed at `editor-desktop/e2e/` with
+      `editor-desktop/playwright.config.ts` (single Electron
+      project, one worker, 30s timeout) and an electron-launch
+      fixture (`e2e/fixtures/electron-app.ts`) that probes for
+      the built main bundle and skips cleanly when Electron isn't
+      installed. `e2e/smoke.spec.ts` is the always-on baseline
+      (window mounts + `window.editorApi` 8-method surface
+      check). The remaining specs ship `.skip`-marked so the
+      test surface is reviewable: `open-save-roundtrip.spec.ts`,
+      `picker-modals.spec.ts` (9 directives), `compare-modals.spec.ts`
+      (versions + locales), `cell-runner.spec.ts` (per-cell ▶ +
+      Pyodide CDN). Renderer sets `body[data-mdz-ready='1']` once
+      bootstrap completes so the fixture can wait deterministically.
+      `@playwright/test` is in `optionalDependencies`; CI keeps the
+      existing typecheck + vitest validation. Phase 2.3a.7.1 will
+      build the fixture archive that unblocks the `.skip` stubs.
 - [x] **Verify viewer build pipeline emits `dist/index.js`
       end-to-end** — done 2026-04-25. New `validate-viewer-build`
       CI job runs `npm run build -w @mdz-format/viewer` + asserts

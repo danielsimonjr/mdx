@@ -21,6 +21,11 @@ Thumbs.db
 # Playwright MCP artifacts
 .playwright-mcp/
 
+# Playwright artifacts (Phase 2.3a.7 editor-desktop e2e)
+editor-desktop/test-results/
+editor-desktop/playwright-report/
+editor-desktop/playwright/.cache/
+
 # Python
 __pycache__/
 *.pyc
