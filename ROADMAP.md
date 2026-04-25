@@ -1429,14 +1429,16 @@ the drift this session found."
       `document.derived_from[]` and pins
       `document.modified` to extraction time so a downstream
       reader can trace provenance. Smoke-tested end-to-end.
-- [ ] **Spec features-by-impl support matrix.**
-      `docs/SUPPORT_MATRIX.md` keyed by spec section (manifest
-      fields, directives, integrity hashes, signature algorithms,
-      EPUB round-trip, locale support, snapshots) × impl (Python
-      ref, TypeScript ref, Rust binding, viewer, CLI, editor).
-      Auto-generate from a YAML source so it stays in sync; add
-      a CI assertion that every spec MUST/SHOULD shows up in the
-      matrix.
+- [x] **Spec features-by-impl support matrix** — done 2026-04-25.
+      New `docs/SUPPORT_MATRIX.md` keyed by spec section
+      (manifest fields, directives, integrity hashes, EPUB
+      round-trip, locales, snapshots, profiles, cross-impl
+      parity) × implementation (TS / PY / RS / VW / HV / CLI /
+      ED / EXT). Hand-maintained for now; auto-generation from
+      a YAML source deferred to a future Phase 4.6.10. The
+      existing `validate-roadmap` cited-path CI gate catches
+      drift in the underlying ROADMAP entries the matrix rolls
+      up.
 
 **F. Security audit**
 

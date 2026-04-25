@@ -8,6 +8,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 4.6.9: features-by-impl support matrix doc (2026-04-25)
+
+`docs/SUPPORT_MATRIX.md` is the new single-source-of-truth for
+"which implementation supports which spec feature." Reviewers,
+integrators, and downstream tool authors can consult it instead
+of grepping eight different package READMEs.
+
+Keyed by spec section × implementation:
+
+- **Sections:** manifest fields (§3), directives (§6), integrity
+  hash algorithms (§16), EPUB round-trip (§12), locale support
+  (§6.4 + §9), snapshots (`delta-snapshots-v1`), profiles (§7),
+  cross-impl parity tests.
+- **Implementations:** TS / PY / RS / VW / HV / CLI / ED / EXT
+  (eight short codes documented in the legend).
+- **Cells:** ✅ / 🟡 / ❌ / — with a known-caveats column for
+  partial-support cases (e.g., Rust binding reads but doesn't
+  type-expose certain fields; viewer surfaces signatures but
+  doesn't cryptographically verify in the browser).
+
+Hand-maintained for now. Auto-generation from a YAML source is
+deferred to a future Phase 4.6.10 — the existing
+`validate-roadmap` cited-path CI gate already catches drift in
+the underlying ROADMAP entries the matrix rolls up. A "How to
+update this matrix" section at the bottom documents the
+contract: same PR as the implementation change.
+
 ### Added — Phase 4.6.9: mdz snapshot export subcommand (2026-04-25)
 
 Rounds out the `create|view|list` trio shipped in Phase 4.5.2
