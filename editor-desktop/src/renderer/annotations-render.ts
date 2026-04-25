@@ -97,16 +97,33 @@ function renderBody(annotation: Annotation): string {
 }
 
 /** Render a single thread (one root + its replies) recursively. */
+/**
+ * Render a single thread (one root + its replies) recursively.
+ *
+ * Action buttons (Phase 2.3b.4.3):
+ *   - Every annotation gets a `data-annotation-action="reply"` button.
+ *     The button is unstyled here; CSS in `index.html` decorates it.
+ *     Clicks are caught by `index.ts` event-delegation on
+ *     `annotationListEl`.
+ *   - Replies (`motivation === "replying"`) don't get a Reply button —
+ *     the spec keeps reply chains flat (one level deep) by convention.
+ */
 export function renderAnnotationThread(
   node: AnnotationThreadNode,
   warnings: ReadonlyArray<TrustWarning>,
 ): string {
   const a = node.annotation;
   const role = escapeHtml(a.role);
+  const isReply = a.motivation === "replying";
+  const actions = isReply
+    ? ""
+    : `<div class="annotation-actions">` +
+      `<button type="button" data-annotation-action="reply" aria-label="Reply to this annotation">Reply</button>` +
+      `</div>`;
   const replies = node.replies.length > 0
     ? `<div class="annotation-replies">${node.replies.map((r) => renderAnnotationThread(r, warnings)).join("")}</div>`
     : "";
-  return `<article class="annotation annotation-${role}" data-annotation-id="${escapeHtml(a.id)}">${renderHeader(a, warnings)}${renderBody(a)}${replies}</article>`;
+  return `<article class="annotation annotation-${role}" data-annotation-id="${escapeHtml(a.id)}">${renderHeader(a, warnings)}${renderBody(a)}${actions}${replies}</article>`;
 }
 
 /** Render every thread in the sidebar's main panel. */

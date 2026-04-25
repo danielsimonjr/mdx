@@ -243,6 +243,114 @@ export interface TrustWarning {
   reason: string;
 }
 
+// ---------------------------------------------------------------------------
+// Creation
+// ---------------------------------------------------------------------------
+
+/** Viewer role; gates which annotations the renderer surfaces. */
+export type ViewerRole = "public" | "editor";
+
+/**
+ * The default `@context` URL the W3C Web Annotation Data Model
+ * recommends. Applied when `createAnnotation` is called without an
+ * explicit override; readers from other systems use it to pick up
+ * the standard JSON-LD context.
+ */
+export const DEFAULT_ANNOTATION_CONTEXT = "http://www.w3.org/ns/anno.jsonld";
+
+export interface CreateAnnotationOptions {
+  role: AnnotationRole;
+  motivation: Motivation;
+  /** Either a text-quote selector reference or another annotation's id (a reply). */
+  target: AnnotationTarget | string;
+  body?: Annotation["body"];
+  creator?: AnnotationCreator;
+  /** Inject a deterministic UUID for tests; production calls omit this. */
+  uuid?: () => string;
+  /** Inject a deterministic clock for tests; production calls omit this. */
+  now?: () => Date;
+}
+
+function defaultUuid(): string {
+  // Prefer the standard Web Crypto API; fall back to a manual v4 only
+  // if `crypto.randomUUID` isn't available (older Electron builds).
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  // RFC 4122 v4 fallback. 16 random bytes, set version + variant bits.
+  const bytes = new Uint8Array(16);
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+/**
+ * Build a fresh Annotation with id + timestamp populated. Returns the
+ * annotation and the archive-relative path it should be written to.
+ * Persistence (writing the JSON to the archive's entry map) is the
+ * caller's responsibility — this function is pure.
+ *
+ * Spec invariants enforced here:
+ *   - `id` becomes the archive-relative path `annotations/<uuid>.json`.
+ *   - `created` is ISO-8601 UTC, second-precision (matches existing
+ *     manifest timestamps).
+ *   - `@context` defaults to the W3C URL unless overridden via body.
+ *
+ * Signing is NOT performed here. Phase 2.3b.4.3 keeps the persistence
+ * unsigned; cryptographic signing lands in a follow-up PR with the
+ * key-management UX needed to make it usable.
+ */
+export function createAnnotation(opts: CreateAnnotationOptions): {
+  annotation: Annotation;
+  path: string;
+} {
+  const uuid = (opts.uuid ?? defaultUuid)();
+  const path = `annotations/${uuid}.json`;
+  const created = (opts.now ?? (() => new Date()))().toISOString().replace(/\.\d{3}/, "");
+  const annotation: Annotation = {
+    "@context": DEFAULT_ANNOTATION_CONTEXT,
+    id: path,
+    type: "Annotation",
+    role: opts.role,
+    motivation: opts.motivation,
+    body: opts.body,
+    target: opts.target,
+    creator: opts.creator,
+    created,
+  };
+  return { annotation, path };
+}
+
+/**
+ * Drop annotations a `public` viewer must not see. Per spec:
+ *
+ *   - `review-confidential-comment` motivations are editor-only —
+ *     never surface to public viewers regardless of role.
+ *   - `editor` role + any `review-*` motivation is in-progress
+ *     editorial deliberation; public viewers see only the eventual
+ *     decision (`review-accept` / `review-reject`).
+ *
+ * Returns a NEW array; the input is left untouched. Replies whose
+ * parent has been dropped become roots.
+ */
+export function filterAnnotationsForRole(
+  annotations: ReadonlyArray<Annotation>,
+  viewerRole: ViewerRole,
+): Annotation[] {
+  if (viewerRole === "editor") return [...annotations];
+  return annotations.filter((a) => {
+    if (a.motivation === "review-confidential-comment") return false;
+    if (a.role === "editor" && a.motivation === "review-request-changes") return false;
+    return true;
+  });
+}
+
 /**
  * Surface signature-requirement violations so the UI can render a
  * trust badge. Per spec:

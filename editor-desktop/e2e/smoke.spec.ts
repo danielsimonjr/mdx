@@ -30,12 +30,14 @@ test.describe("editor smoke", () => {
     // leaks (extra exposed methods) and accidental removals.
     expect(surface).toEqual([
       "encodeVariants",
+      "getRole",
       "importIpynb",
       "onMenu",
       "openFromPath",
       "pickIpynb",
       "pickOpen",
       "pickSave",
+      "saveAnnotation",
       "saveToPath",
     ]);
   });

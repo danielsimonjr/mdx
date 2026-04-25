@@ -281,7 +281,7 @@ maintainer, double it.
 | 2.1 viewer | **partial** | sanitizer + directives (cross-refs / citations / bibliography / `::cell` / `::output` / `::include`, 50 tests with i18n labels), CSL-JSON references, KaTeX math, IndexedDB cache, **delta-snapshots-v1 reader** (24 tests), `tsconfig.build.json` for single-file ESM emit. 145/145 viewer tests pass. | full keyboard a11y pass, npm publish, demo site, fragment-aware `::include` |
 | 2.2 hosted | **code-ready, not deployed** | full Cloudflare Worker (32 tests) + `wrangler.toml [assets]` block pointing at `../mdz-viewer/dist` + `VIEWER_ASSETS` binding so `/viewer.js` serves the real bundle | `wrangler deploy` to `view.mdz-format.org` (external action), per-archive cover-image extraction |
 | 2.3a editor MVP | **feature-complete + e2e scaffold + open/save round-trip e2e** | 2.3a.1–6 all shipped: shell, source pane, asset sidebar, .ipynb import, picker pack, `electron-builder.yml` + 3-platform CI matrix + auto-update feed. Pipeline produces unsigned installers today and auto-signs when cert secrets arrive in CI. 2.3a.7 Playwright scaffold landed (`editor-desktop/e2e/` with electron-launch fixture + smoke baseline). 2.3a.7.1 deterministic fixture archive `sample.mdz` (3.5 KB, byte-identical across rebuilds, manifest + 2 locales + 2-snapshot chain + 1 image asset with verified content_hash) checked in alongside `build-fixtures.mjs` builder; `e2e/open-save-roundtrip.spec.ts` unskipped and exercises the full openFromPath → mutate → saveToPath → reopen path through the contextBridge. | Cert/notarization secrets (external accounts), real icon artwork, fixture-driven unskips for picker / compare / cell-runner stubs (need `data-test-id` selectors first) |
-| 2.3b editor Pro | **all 7 sub-phases shipped end-to-end** | 2.3b.1 Pyodide (kernel layer + UI + CSP + `kernels.python.runtime` save + per-cell Run buttons) / 2.3b.2 a11y checker / 2.3b.3 block-diff algorithm + Compare-versions modal / 2.3b.4 annotation data layer + sidebar UI / 2.3b.5 locale data layer + read-write Compare-locales modal + Add-locale command / 2.3b.6 variant planner + sharp encoder + Generate-variants IPC + UI / 2.3b.7.1–5 non-core picker pack. **376/376 editor-desktop tests pass.** | Annotation creation flows (need IPC for UUID + sig integration), `--role=public\|editor` flag |
+| 2.3b editor Pro | **all 7 sub-phases shipped + reply-creation + role flag** | 2.3b.1 Pyodide (kernel layer + UI + CSP + `kernels.python.runtime` save + per-cell Run buttons) / 2.3b.2 a11y checker / 2.3b.3 block-diff algorithm + Compare-versions modal / 2.3b.4 annotation data layer + sidebar UI / 2.3b.4.3 reply-creation flow (IPC `annotations:save` + `--role=public\|editor` flag + Reply button) / 2.3b.5 locale data layer + read-write Compare-locales modal + Add-locale command / 2.3b.6 variant planner + sharp encoder + Generate-variants IPC + UI / 2.3b.7.1–5 non-core picker pack. **394/394 editor-desktop tests pass.** | Comment / accept / reject creation flows (need text-selection UX), cryptographic signing (key-management UX) |
 | 2.4 EPUB bridge | **shipped** | `mdz export-epub` (yazl-based, deterministic, EPUB OCF §4.3-correct) + `mdz import-epub` (15 tests); fidelity matrix doc; round-trip CI gate; symmetric `::fig`/`::eq`/`::tab` directive round-trip | Per-chapter spine preservation |
 | 2.5 browser ext | **code-ready, hardened, deterministic build** | MV3 manifest, scripts, 16 tests (13 manifest + 3 build-determinism), reproducible Node bundler at `browser-extension/build.js`, CI 2x-build SHA-256 diff, placeholder icons | Real icon artwork, AMO / Chrome / Edge / Brave submissions, browser-driven smoke tests |
 
@@ -762,13 +762,44 @@ is independent — sequence by user demand, not by checklist order.
       tab pair; the Annotations panel surfaces every annotation
       from `annotations/*.json` with a per-thread thread count in
       the badge. 13 vitest cases.
-- [ ] Comment / reply / accept / reject creation flows.
-      Phase 2.3b.4.3 follow-up — needs IPC for UUID generation +
-      signature integration (those are the not-yet-shipped pieces).
-- [ ] `--role=public|editor` flag for confidential-comment
-      visibility per spec (deferred — gating on a UI flag is not a
-      security boundary; the public archive should simply not
-      carry confidential comments per the spec's recommendation).
+- [x] **Reply creation flow** — done 2026-04-25 (Phase 2.3b.4.3).
+      `createAnnotation()` factory in
+      `editor-desktop/src/renderer/annotations.ts`: builds a fresh
+      Annotation with crypto.randomUUID-derived id (path
+      `annotations/<uuid>.json`), ISO-second timestamp, and the W3C
+      JSON-LD `@context`. New IPC channel `annotations:save` in
+      `editor-desktop/src/main/main.ts` persists via the existing
+      pure `saveArchive` (filters canonical entries to avoid
+      collision); preload exposes
+      `window.editorApi.saveAnnotation(archivePath, path, json)`.
+      Renderer wires a Reply button (`data-annotation-action="reply"`)
+      on every root annotation; clicks delegate from `index.ts`,
+      prompt for body text, call createAnnotation, persist via IPC,
+      refresh panel. Reply chains stay flat (replies don't get their
+      own Reply button). 9 new vitest cases (28 total in
+      `annotations.test.ts` + 2 added to `annotations-render.test.ts`,
+      394/394 editor-desktop suite). Comment / accept / reject
+      creation flows are deferred — they need text-selection UX
+      (target-quote selectors) that's a 2.3b.4.4 follow-up.
+- [x] **`--role=public|editor` flag** — done 2026-04-25
+      (Phase 2.3b.4.3). Main process parses `--role=<v>` from
+      `process.argv` (`parseLaunchRole` in
+      `editor-desktop/src/main/main.ts`), defaults to `editor`.
+      `editorApi.getRole()` exposes it to the renderer; index.ts
+      caches it once and passes through `filterAnnotationsForRole`
+      before every panel refresh. Per spec: public viewers do not
+      see `review-confidential-comment` motivations or
+      in-progress `editor`-role `review-request-changes`. UI flag
+      is a usability layer, not a security boundary — public
+      archives still must not carry confidential comments per the
+      spec's recommendation.
+- [ ] **Cryptographic signing of annotations** (Phase 2.3b.4.4
+      follow-up). Reply persistence currently writes unsigned
+      annotations; spec requires editor-decision motivations to
+      carry an ed25519 signature in
+      `security/signatures.json`. Hard stop on this PR: signing
+      requires key-management UX (where does the user's signing
+      key live? OS keychain? generated locally? imported?).
 
   **Depends on:** 2.3a.2 + signature integration.
   **NOT a real-time collaboration feature.** Asynchronous threaded

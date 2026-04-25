@@ -86,4 +86,25 @@ export interface EditorApi {
     event: "open" | "save" | "save-as" | "import-ipynb",
     handler: () => void,
   ): () => void;
+  /**
+   * Return the viewer role the editor was launched with. Defaults to
+   * `editor`; the public mode is opt-in via the `--role=public` CLI
+   * argument. Public mode hides editor-only annotations
+   * (`review-confidential-comment`, in-progress
+   * `review-request-changes`) per the peer-review spec.
+   */
+  getRole(): Promise<"public" | "editor">;
+  /**
+   * Persist a fresh annotation into the currently-open archive.
+   * Phase 2.3b.4.3: annotation creation flow. The renderer builds the
+   * Annotation via `createAnnotation()` and hands the JSON +
+   * destination path here. Main writes it as a fresh entry alongside
+   * the archive's other annotation files. Cryptographic signing is a
+   * Phase 2.3b.4.4 follow-up — this surface stays signature-naive.
+   */
+  saveAnnotation(
+    archivePath: string,
+    annotationPath: string,
+    annotationJson: string,
+  ): Promise<{ ok: true } | { ok: false; error: string }>;
 }

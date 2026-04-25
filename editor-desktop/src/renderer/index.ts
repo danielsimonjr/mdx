@@ -40,7 +40,10 @@ import {
   loadAnnotations,
   buildThreads,
   findTrustWarnings,
+  filterAnnotationsForRole,
+  createAnnotation,
   type Annotation,
+  type ViewerRole,
 } from "./annotations.js";
 import { renderAnnotationSidebar, summarizeAnnotations } from "./annotations-render.js";
 import { enumerateLocales, planAddLocale } from "./locales.js";
@@ -121,8 +124,22 @@ function activateSidebarTab(which: "assets" | "annotations"): void {
 tabAssets.addEventListener("click", () => activateSidebarTab("assets"));
 tabAnnotations.addEventListener("click", () => activateSidebarTab("annotations"));
 
+/**
+ * Viewer role from `--role=public|editor`. Resolved on first
+ * archive load and held for the session; the editor doesn't
+ * support hot-swapping mid-session.
+ */
+let viewerRole: ViewerRole = "editor";
+window.editorApi.getRole().then((r) => {
+  viewerRole = r;
+}).catch(() => undefined);
+
 function refreshAnnotationsPanel(): void {
-  if (annotations.length === 0) {
+  // Apply --role filter before rendering. Public viewers don't see
+  // confidential editor comments or in-progress
+  // request-changes (per spec/directives/peer-review-annotations.md).
+  const visible = filterAnnotationsForRole(annotations, viewerRole);
+  if (visible.length === 0) {
     annotationListEl.innerHTML = `<p class="annotation-empty">No annotations.</p>`;
     annotationCountEl.textContent = "0";
     return;
@@ -131,8 +148,8 @@ function refreshAnnotationsPanel(): void {
   // which means every signed-required annotation surfaces as a warning.
   // Phase 3 signature integration will replace this with the real
   // signed-creator id set from `security/signatures.json`.
-  const warnings = findTrustWarnings(annotations, new Set());
-  const threads = buildThreads(annotations);
+  const warnings = findTrustWarnings(visible, new Set());
+  const threads = buildThreads(visible);
   annotationListEl.innerHTML = renderAnnotationSidebar(threads, warnings);
   annotationCountEl.textContent = String(threads.length);
   // Update the title-bar mini-summary too, so users see whether
@@ -142,6 +159,44 @@ function refreshAnnotationsPanel(): void {
     tabAnnotations.title = summary;
   }
 }
+
+/**
+ * Reply-button click handler. Phase 2.3b.4.3 minimal flow: prompt
+ * the user for body text, call createAnnotation, persist via IPC,
+ * refresh the panel. The "Add comment" target-selecting flow (which
+ * needs editor-pane text-selection awareness) is a 2.3b.4.4
+ * follow-up; for now Reply is the only creation surface.
+ */
+annotationListEl.addEventListener("click", async (e) => {
+  const target = e.target as HTMLElement;
+  if (!target.matches("button[data-annotation-action='reply']")) return;
+  const parentArticle = target.closest<HTMLElement>("[data-annotation-id]");
+  const parentId = parentArticle?.dataset.annotationId;
+  if (!parentId) return;
+  if (!session) return;
+  const body = window.prompt("Reply text:", "");
+  if (!body || !body.trim()) return;
+  const role = viewerRole === "public" ? "reader" : "reviewer";
+  const { annotation, path } = createAnnotation({
+    role,
+    motivation: "replying",
+    target: parentId,
+    body: { type: "TextualBody", value: body, format: "text/plain" },
+  });
+  const result = await window.editorApi.saveAnnotation(
+    session.path,
+    path,
+    JSON.stringify(annotation, null, 2),
+  );
+  if (!result.ok) {
+    window.alert(`Failed to save reply: ${result.error}`);
+    return;
+  }
+  // Persist locally so the panel reflects immediately without a full
+  // archive re-open. The next save/open will re-load from disk.
+  annotations = [...annotations, annotation];
+  refreshAnnotationsPanel();
+});
 
 function loadAnnotationsState(entries: ReadonlyMap<string, Uint8Array>): void {
   const result = loadAnnotations(entries);

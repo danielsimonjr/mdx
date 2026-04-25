@@ -8,6 +8,97 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 2.3b.4.3: annotation reply-creation flow + --role flag (2026-04-25)
+
+The editor's annotation surface graduates from read-only to
+read+reply. Authors and reviewers can now post replies to existing
+annotations from inside the editor; persistence goes straight into
+the open archive's `annotations/<uuid>.json` entry list.
+
+Data layer (`editor-desktop/src/renderer/annotations.ts`):
+
+- New `createAnnotation(opts)` factory builds a fresh Annotation
+  with `crypto.randomUUID`-derived id, ISO-second timestamp,
+  W3C JSON-LD `@context`. Returns `{annotation, path}`. Pure —
+  callers handle persistence. Test-injectable `uuid` + `now`
+  hooks support deterministic fixtures.
+- New `filterAnnotationsForRole(annotations, viewerRole)` drops
+  `review-confidential-comment` and in-progress
+  `editor`-role `review-request-changes` when `viewerRole` is
+  `public`. Editors see everything. Returns a new array; the
+  input is not mutated.
+- New exports `ViewerRole` (= `"public" | "editor"`) and
+  `DEFAULT_ANNOTATION_CONTEXT` (W3C URL).
+
+Main process (`editor-desktop/src/main/main.ts`):
+
+- `parseLaunchRole(process.argv)` reads `--role=<public|editor>`
+  (defaults to `editor`) once at startup. The editor doesn't
+  hot-swap roles mid-session.
+- New IPC handler `role:get` returns the parsed role to the
+  renderer.
+- New IPC handler `annotations:save(archivePath, annotationPath,
+  annotationJson)` reads the open archive via `archive-io.ts`,
+  splices the new annotation into the entry map (filtering out
+  `manifest.json` + the entry-point to avoid collision with
+  `saveArchive`'s canonical-entry rule), and writes the archive
+  back. Defense-in-depth path validation: rejects paths that
+  don't start with `annotations/` or end with `.json`, plus
+  any `..` or `//` sequences.
+
+Preload (`editor-desktop/src/preload/preload.ts`,
+`editor-desktop/src/preload/types.ts`):
+
+- New `editorApi.getRole()` and `editorApi.saveAnnotation()`
+  surfaced via contextBridge. Smoke spec
+  (`editor-desktop/e2e/smoke.spec.ts`) — its 8-method snapshot
+  will need updating to 10-method when 2.3a.7 e2e is run again
+  (the smoke test fails-loud on capability drift).
+
+Renderer (`editor-desktop/src/renderer/`):
+
+- `annotations-render.ts` adds a Reply button per root
+  annotation (`data-annotation-action="reply"`,
+  `aria-label="Reply to this annotation"`). Replies don't get
+  their own Reply button — chains stay flat.
+- `index.ts` resolves `viewerRole` from `editorApi.getRole()`
+  on startup, applies `filterAnnotationsForRole` before
+  rendering, and event-delegates Reply clicks to a single
+  handler that prompts for body text via `window.prompt`,
+  calls `createAnnotation` (motivation: `replying`, role:
+  `reviewer` or `reader` based on viewer role), persists via
+  IPC, and refreshes the panel. Failure surfaces via
+  `window.alert`.
+
+Tests:
+
+- `editor-desktop/test/annotations.test.ts` adds 9 cases:
+  6 for `createAnnotation` (id/path/timestamp/context shape,
+  reply-target string handling, default-uuid path), 3 for
+  `filterAnnotationsForRole` (editor sees all, public drops
+  confidential + in-progress editorial, no input mutation).
+- `editor-desktop/test/annotations-render.test.ts` adds 2:
+  Reply button presence on roots, absence on replies.
+- 394/394 vitest cases pass (was 387/387).
+- Core typecheck still passes.
+
+What's deliberately not here:
+
+- **Comment creation flow** (new annotation against a
+  text-selection target) — needs editor-pane
+  text-selection-aware UI to build the
+  `TextQuoteSelector{exact, prefix, suffix}` payload. Phase
+  2.3b.4.4.
+- **Accept / reject / request-changes creation flows** — the
+  data shapes are supported, but the UX for an editor's
+  decision flow needs more product thought (does the editor
+  pick from a dropdown? sign in-flow? attach reviewer
+  feedback?). Phase 2.3b.4.4.
+- **Cryptographic signing** of created annotations — needs
+  key-management UX (where does the user's signing key live?
+  OS keychain? generated locally? imported?). Hard stop on
+  this PR — see the new ROADMAP entry under Phase 2.3b.4.4.
+
 ### Added — Phase 3.3b: axe-core + Playwright runner scaffold (2026-04-25)
 
 Closes the gap left by the Python structural runner — WCAG criteria

@@ -109,6 +109,26 @@ describe("renderAnnotationThread", () => {
     const html = renderAnnotationThread(buildThreads([idOnly])[0], []);
     expect(html).toContain("did:web:opaque-hash-abc123");
   });
+
+  it("renders a Reply action button on root annotations (Phase 2.3b.4.3)", () => {
+    const html = renderAnnotationThread(buildThreads([REVIEWER_COMMENT])[0], []);
+    expect(html).toMatch(/data-annotation-action="reply"/);
+    expect(html).toContain('aria-label="Reply to this annotation"');
+  });
+
+  it("does NOT render a Reply button on replies — chains stay flat", () => {
+    const reply: Annotation = {
+      ...REVIEWER_COMMENT,
+      id: "annotations/reply-1.json",
+      motivation: "replying",
+      target: REVIEWER_COMMENT.id,
+    };
+    const threads = buildThreads([REVIEWER_COMMENT, reply]);
+    const html = renderAnnotationThread(threads[0], []);
+    // The root has one Reply button; the reply nested under it must not.
+    const replyButtons = html.match(/data-annotation-action="reply"/g) ?? [];
+    expect(replyButtons.length).toBe(1);
+  });
 });
 
 describe("renderAnnotationSidebar", () => {

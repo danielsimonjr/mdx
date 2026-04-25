@@ -70,6 +70,21 @@ const nodeFs: FsLike = {
   exists: async (path) => existsSync(path),
 };
 
+/**
+ * Viewer role parsed from `--role=<public|editor>` (defaults to
+ * `editor`). Public mode hides editor-only annotations per
+ * `spec/directives/peer-review-annotations.md`.
+ */
+function parseLaunchRole(argv: ReadonlyArray<string>): "public" | "editor" {
+  for (const arg of argv) {
+    const m = /^--role=(public|editor)$/.exec(arg);
+    if (m) return m[1] as "public" | "editor";
+  }
+  return "editor";
+}
+
+const launchRole = parseLaunchRole(process.argv);
+
 let mainWindow: import("electron").BrowserWindow | null = null;
 
 function createWindow(): void {
@@ -181,6 +196,60 @@ ipcMain.handle("ipynb:import", async (_e, ipynbPath: string) => {
     return { ok: false, error: (e as Error).message };
   }
 });
+
+ipcMain.handle("role:get", async () => launchRole);
+
+/**
+ * Persist a fresh annotation into the currently-open archive
+ * (Phase 2.3b.4.3). Reads the archive's current bytes, splices in
+ * the new annotation entry, and writes the archive back. Uses
+ * `archive-io.ts`'s pure save helper so the same write path that
+ * the rest of the editor exercises also gates new annotations
+ * (deterministic ordering, manifest checksum recompute, etc.).
+ *
+ * Signing is NOT performed here. A future Phase 2.3b.4.4 follow-up
+ * adds the ed25519 step + `security/signatures.json` patch.
+ */
+ipcMain.handle(
+  "annotations:save",
+  async (_e, archivePath: string, annotationPath: string, annotationJson: string) => {
+    try {
+      if (!annotationPath.startsWith("annotations/") || !annotationPath.endsWith(".json")) {
+        return { ok: false, error: `unsafe annotation path: ${annotationPath}` };
+      }
+      // Defense-in-depth: the renderer constructs both paths but main
+      // is the authority — reject anything trying to escape the
+      // annotations/ directory or write a non-JSON file.
+      if (annotationPath.includes("..") || annotationPath.includes("//")) {
+        return { ok: false, error: `path traversal blocked: ${annotationPath}` };
+      }
+      const opened = await openArchive(archivePath, nodeFs);
+      // saveArchive treats `manifest.json` + the entry_point as
+      // canonical — any other entry passed via `assets` would collide.
+      // Project the entry map down to non-canonical files only.
+      const entryPoint =
+        ((opened.manifest.content as { entry_point?: unknown })?.entry_point as string) ||
+        "document.md";
+      const assets = new Map<string, Uint8Array>();
+      for (const [p, bytes] of opened.entries) {
+        if (p === "manifest.json" || p === entryPoint) continue;
+        assets.set(p, bytes);
+      }
+      assets.set(annotationPath, new TextEncoder().encode(annotationJson));
+      await saveArchive(
+        archivePath,
+        { manifest: opened.manifest, content: opened.content, assets },
+        nodeFs,
+      );
+      return { ok: true };
+    } catch (e) {
+      if (e instanceof ArchiveOpenError || e instanceof ArchiveSaveError) {
+        return { ok: false, error: e.message };
+      }
+      throw e;
+    }
+  },
+);
 
 ipcMain.handle("dialog:saveFile", async (_e, defaultName?: string) => {
   if (!mainWindow) return null;

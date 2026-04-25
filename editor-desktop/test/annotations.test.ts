@@ -13,6 +13,9 @@ import {
   loadAnnotations,
   buildThreads,
   findTrustWarnings,
+  createAnnotation,
+  filterAnnotationsForRole,
+  DEFAULT_ANNOTATION_CONTEXT,
   type Annotation,
 } from "../src/renderer/annotations.js";
 
@@ -266,5 +269,95 @@ describe("findTrustWarnings", () => {
     const editorComment: Annotation = { ...editorAccept, motivation: "commenting" };
     const warnings = findTrustWarnings([editorComment], new Set());
     expect(warnings.find((w) => w.severity === "error")).toBeUndefined();
+  });
+});
+
+describe("createAnnotation", () => {
+  const FIXED_UUID = "00000000-0000-4000-8000-000000000abc";
+  const FIXED_DATE = new Date("2026-04-25T12:34:56.789Z");
+
+  it("populates id, path, type, @context, and ISO-second timestamp", () => {
+    const { annotation, path } = createAnnotation({
+      role: "reviewer",
+      motivation: "commenting",
+      target: { source: "document.md", selector: { type: "TextQuoteSelector", exact: "abc" } },
+      body: { type: "TextualBody", value: "needs review", format: "text/plain" },
+      uuid: () => FIXED_UUID,
+      now: () => FIXED_DATE,
+    });
+    expect(path).toBe(`annotations/${FIXED_UUID}.json`);
+    expect(annotation.id).toBe(path);
+    expect(annotation.type).toBe("Annotation");
+    expect(annotation["@context"]).toBe(DEFAULT_ANNOTATION_CONTEXT);
+    // Spec timestamp format: ISO-8601 second precision (no millis).
+    expect(annotation.created).toBe("2026-04-25T12:34:56Z");
+  });
+
+  it("supports reply targets (string referencing parent annotation id)", () => {
+    const parent = createAnnotation({
+      role: "reviewer",
+      motivation: "commenting",
+      target: { source: "document.md" },
+      uuid: () => "00000000-0000-4000-8000-000000000aaa",
+      now: () => FIXED_DATE,
+    });
+    const reply = createAnnotation({
+      role: "author",
+      motivation: "replying",
+      target: parent.annotation.id,
+      body: { type: "TextualBody", value: "fixed in v2" },
+      uuid: () => "00000000-0000-4000-8000-000000000bbb",
+      now: () => FIXED_DATE,
+    });
+    expect(reply.annotation.target).toBe("annotations/00000000-0000-4000-8000-000000000aaa.json");
+  });
+});
+
+describe("filterAnnotationsForRole", () => {
+  const editorConfidential: Annotation = {
+    id: "annotations/ec.json",
+    type: "Annotation",
+    role: "editor",
+    motivation: "review-confidential-comment",
+    target: { source: "document.md" },
+  };
+  const editorRequestChanges: Annotation = {
+    id: "annotations/erc.json",
+    type: "Annotation",
+    role: "editor",
+    motivation: "review-request-changes",
+    target: { source: "document.md" },
+  };
+  const editorAccept: Annotation = {
+    id: "annotations/ea.json",
+    type: "Annotation",
+    role: "editor",
+    motivation: "review-accept",
+    target: { source: "document.md" },
+  };
+  const reviewerComment: Annotation = {
+    id: "annotations/rc.json",
+    type: "Annotation",
+    role: "reviewer",
+    motivation: "commenting",
+    target: { source: "document.md" },
+  };
+
+  const all = [editorConfidential, editorRequestChanges, editorAccept, reviewerComment];
+
+  it("editor role sees everything", () => {
+    expect(filterAnnotationsForRole(all, "editor")).toHaveLength(4);
+  });
+
+  it("public role drops confidential + in-progress editorial deliberation", () => {
+    const visible = filterAnnotationsForRole(all, "public");
+    const ids = visible.map((a) => a.id).sort();
+    expect(ids).toEqual(["annotations/ea.json", "annotations/rc.json"]);
+  });
+
+  it("does not mutate the input array", () => {
+    const before = all.length;
+    filterAnnotationsForRole(all, "public");
+    expect(all.length).toBe(before);
   });
 });

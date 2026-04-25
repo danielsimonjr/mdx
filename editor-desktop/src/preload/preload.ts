@@ -34,6 +34,11 @@ const api: EditorApi = {
     ipcRenderer.on(channel, listener);
     return () => ipcRenderer.removeListener(channel, listener);
   },
+  getRole: async () => ipcRenderer.invoke("role:get") as Promise<"public" | "editor">,
+  saveAnnotation: async (archivePath, annotationPath, annotationJson) =>
+    ipcRenderer.invoke("annotations:save", archivePath, annotationPath, annotationJson) as ReturnType<
+      EditorApi["saveAnnotation"]
+    >,
 };
 
 contextBridge.exposeInMainWorld("editorApi", api);
