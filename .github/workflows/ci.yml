@@ -33,6 +33,13 @@ jobs:
         # ships.
         run: python tests/roadmap/check_cited_paths.py
 
+      - name: Assert Status-snapshot heading is fresh (Phase 4.6.9)
+        # Compares the date in `### Status snapshot (YYYY-MM-DD)`
+        # against the latest commit on ROADMAP.md. >30 days fails.
+        # Forces the snapshot table to track reality without
+        # demanding an update on every unrelated commit.
+        run: python tests/roadmap/check_snapshot_freshness.py
+
   validate-typescript:
     name: Validate TypeScript
     runs-on: ubuntu-latest

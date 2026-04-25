@@ -8,6 +8,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 4.6.9: Status-snapshot freshness CI gate (2026-04-25)
+
+`tests/roadmap/check_snapshot_freshness.py` complements the
+cited-path gate. Parses the `### Status snapshot (YYYY-MM-DD)`
+heading and compares against the latest commit timestamp on
+`ROADMAP.md` (`git log -1 --format=%aI`). Default threshold 30
+days; configurable via `--max-days`. Fails CI with a pointer to
+update both the heading and the table contents.
+
+The 30-day window is intentional — the snapshot is a manually-
+maintained summary, and forcing a rewrite on every unrelated
+commit would create noise. 30 days lets a maintainer batch-up
+small status changes; anything older almost certainly means the
+snapshot has drifted from reality (which is the bug this gate
+catches).
+
+Reference timestamp comes from `git log` when available, else
+wall-clock — so CI uses the right signal (last commit on
+ROADMAP.md) and local runs work without a git history. Wired
+into the `validate-roadmap` CI job alongside the cited-path
+check.
+
 ### Added — Phase 4.6.9: ROADMAP cited-path CI gate (2026-04-25)
 
 `tests/roadmap/check_cited_paths.py` is a standing CI gate

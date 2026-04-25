@@ -1308,11 +1308,14 @@ the drift this session found."
       like `mdx_format.ts` that the doc cites bare). Wired into a
       new `validate-roadmap` CI job that runs before everything
       else. Currently 128 citations checked, 0 drifted.
-- [ ] **Status-snapshot date freshness.** Assert the
-      `### Status snapshot (YYYY-MM-DD)` heading is within N days
-      of the `git log -1 --format=%ad` for ROADMAP.md. Catches
-      staleness without forcing a rewrite on every unrelated
-      commit.
+- [x] **Status-snapshot date freshness** — done 2026-04-25.
+      `tests/roadmap/check_snapshot_freshness.py` parses the
+      `### Status snapshot (YYYY-MM-DD)` heading and compares
+      against `git log -1 --format=%aI -- ROADMAP.md`. Default
+      threshold 30 days (configurable via `--max-days`); >30 days
+      fails with a pointer to update both the heading and the
+      table contents. Wired into `validate-roadmap` CI alongside
+      the cited-path check.
 - [ ] **CHANGELOG line-length: drop `continue-on-error: true`.**
       The markdown lint step still has the shield in place. Phase
       4.6 wrapped the worst offenders; address the 2–3 remaining
