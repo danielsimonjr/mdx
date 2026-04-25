@@ -8,6 +8,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Phase 4.6.9: retire pre-Phase-2.3 demos to legacy/ (2026-04-25)
+
+Three pre-Phase-2 demo trees moved under `legacy/`:
+
+- `editor/` (WYSIWYG single-file demo) → `legacy/editor/`
+- `viewer/` (read-only viewer demo) → `legacy/viewer/`
+- `chrome-extension/` (legacy Chrome-only ext) → `legacy/chrome-extension/`
+
+All three are superseded by Phase 2 production code:
+
+| Legacy | Replaced by |
+|---|---|
+| `legacy/editor/` | `editor-desktop/` Electron editor (Phase 2.3) |
+| `legacy/viewer/` | `packages/mdz-viewer/` web component (2.1) + `packages/mdz-viewer-hosted/` Cloudflare Worker (2.2) |
+| `legacy/chrome-extension/` | `browser-extension/` MV3 cross-browser ext (2.5) |
+
+New `legacy/README.md` documents the migration table, explains
+why the directories are kept (history preservation, doc
+cross-references, implementation reference), and lays out
+explicit rules: don't import from `legacy/`, don't add features
+there, don't run CI against it. Final deletion scheduled with
+Phase 0.1's `/mdx/**` → `/mdz/**` directory rename.
+
+`CLAUDE.md`, `README.md`, and `docs/security/CSP.md`
+cross-references updated to point at the new paths. Production
+entry-point pointers added: `npm run dev -w
+@mdz-format/editor-desktop` for the editor, `<mdz-viewer>` web
+component for the viewer.
+
 ### Changed — Phase 4.6.9: hoist adm-zip to workspace root (2026-04-25)
 
 Three cross-package test runners

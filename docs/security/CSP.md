@@ -177,8 +177,8 @@ whose role the viewer's trust policy accepts.
 ## Migration guidance for existing viewers
 
 The Chrome extension and hosted Worker shipped with CSP from 0.1.0; the
-legacy `viewer/index.html` single-file HTML demo does not. Phase 3 retires
-that demo in favor of the web-component + hosted-service path.
+legacy `legacy/viewer/index.html` single-file HTML demo does not. Phase 3
+retires that demo in favor of the web-component + hosted-service path.
 
 If you maintain a third-party viewer:
 

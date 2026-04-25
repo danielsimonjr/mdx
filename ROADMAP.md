@@ -1335,11 +1335,15 @@ the drift this session found."
       explicit per-extension rules for source / data files and
       `binary` for image / archive / font types. Lockfiles marked
       `linguist-generated=true` so review tools collapse them.
-- [ ] **Retire pre-Phase-2.3 demo files.** `editor/index.html`
-      (WYSIWYG demo), `viewer/index.html` (read-only demo), and
-      `chrome-extension/` (legacy Chrome-only ext) are all
-      superseded by the Phase 2 production code. Move under
-      `legacy/` with a clear README or delete entirely.
+- [x] **Retire pre-Phase-2.3 demo files** — done 2026-04-25.
+      `editor/`, `viewer/`, `chrome-extension/` moved under
+      `legacy/` with a `legacy/README.md` documenting what each
+      replaces (`editor-desktop/`, `packages/mdz-viewer/`,
+      `browser-extension/`) and explicit "do not import from
+      legacy" / "do not add features here" rules.
+      `CLAUDE.md`, `README.md`, and `docs/security/CSP.md`
+      cross-references updated. Final removal scheduled with
+      Phase 0.1 directory rename.
 
 **C. Code consolidation**
 

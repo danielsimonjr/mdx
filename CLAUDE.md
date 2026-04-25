@@ -106,9 +106,10 @@ mdx/                                    # (directory name deferred-rename)
 ├── browser-extension/                              # Phase 2.5 WebExtensions
 │   ├── manifest.json
 │   ├── background/ content/ popup/ viewer/ icons/
-├── editor/index.html                               # WYSIWYG demo (pre-Phase 2.3)
-├── viewer/index.html                               # read-only demo (pre-Phase 2.1)
-├── chrome-extension/                               # legacy Chrome-only ext
+├── legacy/                                         # Pre-Phase-2 demos retained for reference (not actively maintained)
+│   ├── editor/index.html                          # WYSIWYG demo — replaced by editor-desktop/
+│   ├── viewer/index.html                          # read-only demo — replaced by packages/mdz-viewer/
+│   └── chrome-extension/                          # legacy Chrome-only ext — replaced by browser-extension/
 ├── tree-sitter-mdz/                                # alpha grammar
 ├── examples/
 │   ├── example-document.mdx                        # v1.x basic
@@ -217,10 +218,14 @@ tsc implementations/typescript/mdx_format.ts --target es2020 --module esnext
 
 ### Testing
 - Use CLI: `node cli/src/index.js view examples/example-document.mdx`
-- Open `editor/index.html` to edit MDX documents with WYSIWYG interface
-- Open `viewer/index.html` for read-only viewing
+- Run the production editor: `npm run dev -w @mdz-format/editor-desktop`
+- Render an archive in the production viewer: import `@mdz-format/viewer`
+  and pass the archive blob to `<mdz-viewer>` (see Phase 2.1 docs)
 - Generate examples with Python script and verify structure
 - Open `.mdx` files with any ZIP utility to inspect contents
+- Pre-Phase-2 demos (`legacy/editor/`, `legacy/viewer/`,
+  `legacy/chrome-extension/`) still open in any browser but are not
+  the supported entry points for new work.
 
 ### CI Validation
 The GitHub Actions workflow (`.github/workflows/ci.yml`) runs 16 jobs:
@@ -323,37 +328,18 @@ Node.js command-line tool using Commander.js and Inquirer.js.
 
 **Build:** Uses `pkg` to create standalone executables for Windows/Mac/Linux
 
-### Web Editor
+### Web Editor (legacy)
 
-Single-file browser-based WYSIWYG editor (`editor/index.html`).
+The single-file browser-based WYSIWYG demo lives at
+`legacy/editor/index.html`. Replaced by the Phase 2.3 Electron
+editor at `editor-desktop/`. See `legacy/README.md` for the
+full migration table.
 
-**Features:**
-- Three view modes: Visual (WYSIWYG), Markdown (source), Split View
-- Formatting toolbar with all standard formatting options
-- Asset sidebar with drag-drop upload and file browser
-- Document outline navigation (clickable headings)
-- Direct open/save of MDX files via browser File API
+### Chrome Extension (legacy)
 
-**Dependencies (CDN):** JSZip, Marked, Highlight.js, Turndown, Font Awesome
-
-**Key Functions:**
-- `openDocument(file)` - Loads MDX, parses manifest, extracts assets
-- `saveDocument()` - Converts HTML to Markdown, builds ZIP, downloads
-- `updateAssetReferences()` - Replaces asset paths with blob URLs (with MIME types)
-- `getMimeType(path)` - Returns correct MIME type for blob creation
-
-### Chrome Extension
-
-Native Chrome extension for viewing MDX files directly in the browser without a server.
-
-**Setup:**
-```bash
-cd chrome-extension
-node setup.js              # Download dependencies
-# Load unpacked extension via chrome://extensions
-```
-
-**Features:** Document outline navigation, export to HTML/Markdown/JSON, syntax highlighting
+The Chrome-only extension at `legacy/chrome-extension/` predates
+the Phase 2.5 cross-browser MV3 extension at `browser-extension/`.
+See `legacy/README.md`.
 
 ## Key Standards
 

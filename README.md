@@ -169,12 +169,14 @@ mdx/
 ├── cli/                           # Command-line tool
 │   ├── src/                      # CLI source code
 │   └── dist/                     # Built executables
-├── editor/                        # Web-based WYSIWYG editor
-│   └── index.html
-├── viewer/                        # Web-based MDX viewer
-│   └── index.html
-├── chrome-extension/              # Chrome browser extension
-│   └── manifest.json
+├── editor-desktop/                # Electron production editor (Phase 2.3)
+├── packages/mdz-viewer/           # <mdz-viewer> web component (Phase 2.1)
+├── packages/mdz-viewer-hosted/    # Cloudflare Worker for view.mdz-format.org (Phase 2.2)
+├── browser-extension/             # MV3 cross-browser extension (Phase 2.5)
+├── legacy/                        # pre-Phase-2 demos retained for reference
+│   ├── editor/                    # WYSIWYG demo (replaced by editor-desktop/)
+│   ├── viewer/                    # read-only viewer demo (replaced by packages/mdz-viewer/)
+│   └── chrome-extension/          # Chrome-only ext (replaced by browser-extension/)
 ├── examples/                      # Example MDX documents
 │   ├── example-document.mdx       # Basic example
 │   ├── alignment-basic.mdx        # v1.1 alignment examples
@@ -303,18 +305,22 @@ A lightweight, browser-based WYSIWYG editor similar to Word. No installation req
 
 **Usage:**
 ```bash
-cd editor
+cd legacy/editor
 python -m http.server 8080
 # Open http://localhost:8080 in your browser
 ```
 
-Or simply open `editor/index.html` in any modern browser.
+Or simply open `legacy/editor/index.html` in any modern browser.
 
-See [editor/README.md](editor/README.md) for full documentation.
+See [legacy/editor/README.md](legacy/editor/README.md) for full documentation.
+
+> **Note:** The Phase 2.3 production editor at `editor-desktop/` is the
+> supported entry point for new work. The legacy single-file demo above
+> is retained for reference; see `legacy/README.md`.
 
 ### Web Viewer
 
-A read-only viewer for MDX documents. Open `viewer/index.html` in a browser.
+A read-only viewer for MDX documents. Open `legacy/viewer/index.html` in a browser. The Phase 2.1 production viewer is at `packages/mdz-viewer/` (`<mdz-viewer>` web component).
 
 **Features:**
 - Drag-and-drop file loading
