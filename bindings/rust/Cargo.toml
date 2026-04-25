@@ -26,6 +26,10 @@ thiserror = "1.0"
 # a downstream that disables default-features truly sheds these deps.
 sha2 = { version = "0.10", optional = true }
 hex = { version = "0.4", optional = true }
+# blake3 is the v2.0 spec's third accepted content-hash algorithm
+# (alongside sha256 + sha512). No_std support has been stable for
+# several releases; gated under the same `verify` feature.
+blake3 = { version = "1.5", optional = true, default-features = false }
 
 [dev-dependencies]
 # Test-only: example generation + roundtrip fixtures.
@@ -39,9 +43,10 @@ zip = { version = "2.2", default-features = false, features = ["deflate"] }
 # and available in tests regardless of which feature set is active.
 sha2 = "0.10"
 hex = "0.4"
+blake3 = { version = "1.5", default-features = false }
 
 [features]
 default = ["verify"]
 # Integrity + content_hash + signature-chain checks. Gates both the
 # methods and their crypto dependencies.
-verify = ["dep:sha2", "dep:hex"]
+verify = ["dep:sha2", "dep:hex", "dep:blake3"]

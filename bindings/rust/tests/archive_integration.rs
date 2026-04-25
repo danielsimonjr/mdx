@@ -277,13 +277,45 @@ fn verify_integrity_rejects_manifest_checksum_mismatch() {
 
 #[cfg(feature = "verify")]
 #[test]
-fn verify_content_id_rejects_unsupported_blake3() {
+fn verify_content_id_accepts_correct_blake3_hash() {
+    // blake3 is the v2.0 spec's third accepted hash algorithm
+    // (sha256 / sha512 / blake3). The Rust binding now implements
+    // it (Phase 4.6.8). Compute the correct hash for the stub
+    // document.md the test helper installs and assert verify
+    // succeeds.
+    let body = b"# hi"; // matches zip_with_manifest's document.md
+    let expected = hex::encode(blake3::hash(body).as_bytes());
+    let manifest = format!(
+        r#"{{
+      "mdx_version": "2.0.0",
+      "document": {{
+        "id": "00000000-0000-0000-0000-000000000030",
+        "title": "blake3",
+        "content_id": "blake3:{}",
+        "created": "2026-01-01T00:00:00Z",
+        "modified": "2026-01-01T00:00:00Z"
+      }},
+      "content": {{"entry_point": "document.md"}}
+    }}"#,
+        expected
+    );
+    let archive = Archive::open(&zip_with_manifest(&manifest)).unwrap();
+    archive
+        .verify_content_id()
+        .expect("blake3 content_id should verify cleanly");
+}
+
+#[cfg(feature = "verify")]
+#[test]
+fn verify_content_id_rejects_wrong_blake3_hash() {
+    // Same shape as the success test, but with an all-zeros hash
+    // that won't match any real content. Verifier MUST reject.
     let manifest = r#"{
       "mdx_version": "2.0.0",
       "document": {
-        "id": "00000000-0000-0000-0000-000000000030",
-        "title": "blake3",
-        "content_id": "blake3:deadbeef",
+        "id": "00000000-0000-0000-0000-000000000031",
+        "title": "blake3 mismatch",
+        "content_id": "blake3:0000000000000000000000000000000000000000000000000000000000000000",
         "created": "2026-01-01T00:00:00Z",
         "modified": "2026-01-01T00:00:00Z"
       },
@@ -291,10 +323,10 @@ fn verify_content_id_rejects_unsupported_blake3() {
     }"#;
     let archive = Archive::open(&zip_with_manifest(manifest)).unwrap();
     match archive.verify_content_id() {
-        Err(Error::Integrity(IntegrityError::UnsupportedAlgorithm(msg))) => {
-            assert!(msg.contains("blake3"), "got: {}", msg);
+        Err(Error::Integrity(IntegrityError::Mismatch { kind, .. })) => {
+            assert_eq!(kind, "content_id", "wrong mismatch kind: {}", kind);
         }
-        other => panic!("expected blake3 unsupported, got {:?}", other),
+        other => panic!("expected blake3 hash mismatch, got {:?}", other),
     }
 }
 

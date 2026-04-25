@@ -8,6 +8,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 4.6.8: Rust binding blake3 (2026-04-25)
+
+Closes the `bindings/rust/src/lib.rs:804` "blake3 (spec'd but
+deferred in this binding)" stub. The Rust binding now supports
+all three v2.0 spec content-hash algorithms — `sha256`,
+`sha512`, **and `blake3`**.
+
+`Cargo.toml` adds `blake3 1.5` as an optional dep gated under
+the `verify` feature alongside the existing `sha2` + `hex`,
+with `default-features = false` so it stays no_std compatible
+for downstreams that need it. Dev-deps mirror the same version
+so integration tests can compute expected hashes.
+
+`hash_bytes("blake3", bytes)` in `src/lib.rs` invokes
+`blake3::hash(bytes)` and emits the 256-bit (32-byte) default
+output as hex — same shape callers already handle for `sha256`
+output.
+
+The pre-existing
+`verify_content_id_rejects_unsupported_blake3` integration test
+was inverted (it had been pinning the deferred-error path):
+
+- `verify_content_id_accepts_correct_blake3_hash` — computes
+  the correct blake3 hash for the test fixture's stub
+  `document.md`, asserts `verify_content_id()` succeeds.
+- `verify_content_id_rejects_wrong_blake3_hash` — declares an
+  all-zeros content_id, asserts the verifier hits
+  `IntegrityError::Mismatch { kind: "content_id", … }`.
+
+README updated to drop the "deferred" caveat.
+
 ### Added — Phase 4.6.8: Browser-extension deterministic bundler (2026-04-25)
 
 Closes the `REPRODUCIBLE_BUILD.md:70` "bundler not wired" note.

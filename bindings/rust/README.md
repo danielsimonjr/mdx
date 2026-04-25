@@ -69,9 +69,11 @@ integrate with `tracing` or `log` on the caller side.
   `size=1` header cannot bypass the ceiling.
 - **Path traversal:** rejects the whole archive if any entry has `..`,
   absolute path, drive letter, or NUL byte. No silent strip.
-- **Hash verification:** only `sha256` and `sha512` are implemented;
-  `blake3` (spec'd but deferred) returns a clear error rather than
-  silently falling back.
+- **Hash verification:** all three v2.0 spec algorithms supported —
+  `sha256`, `sha512`, and `blake3` (256-bit default output, hex-
+  encoded). All three gated behind the `verify` feature so a
+  downstream with `default-features = false` truly sheds the crypto
+  deps.
 - **No unsafe code:** `#![deny(unsafe_code)]`.
 
 ## What this crate is NOT

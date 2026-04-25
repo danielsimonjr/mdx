@@ -1234,13 +1234,21 @@ normal completion flow.
       SHA-256 against this script. Replaces the old
       `zip -X`-based recipe in `REPRODUCIBLE_BUILD.md`, which was
       non-deterministic across NTFS / ext4.
-- [ ] **Rust binding blake3 implementation**
-      (`bindings/rust/src/lib.rs:804` returns
-      `"blake3 (spec'd but deferred in this binding)"`). The
-      spec calls for blake3 as an alternative content-hash
-      algorithm; the Rust binding currently returns a clear
-      error rather than computing it. Implement once the
-      `blake3` crate's no_std story stabilizes (it has).
+- [x] **Rust binding blake3 implementation** — done 2026-04-25.
+      `bindings/rust/Cargo.toml` adds `blake3 1.5` to the
+      `verify` feature alongside `sha2` + `hex`
+      (`default-features = false` for no_std compat).
+      `hash_bytes("blake3", bytes)` now computes the 256-bit
+      default-output blake3 hash and emits it as hex, matching
+      the sha256 output shape. The pre-existing
+      `verify_content_id_rejects_unsupported_blake3` integration
+      test was inverted: now
+      `verify_content_id_accepts_correct_blake3_hash` asserts a
+      correctly-computed blake3 content_id verifies cleanly,
+      plus a sibling `verify_content_id_rejects_wrong_blake3_hash`
+      asserts an incorrect hash hits the
+      `IntegrityError::Mismatch` path. README updated to drop the
+      "deferred" caveat.
 
 ---
 

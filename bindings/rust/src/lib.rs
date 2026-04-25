@@ -800,10 +800,14 @@ fn hash_bytes(algo: &str, bytes: &[u8]) -> Result<String, Error> {
             hasher.update(bytes);
             Ok(hex::encode(hasher.finalize()))
         }
-        "blake3" => Err(IntegrityError::UnsupportedAlgorithm(
-            "blake3 (spec'd but deferred in this binding)".into(),
-        )
-        .into()),
+        "blake3" => {
+            // blake3 returns a 32-byte hash by default; spec accepts
+            // both the default 256-bit and a longer XOF output. We
+            // emit the 256-bit variant — bytes -> 64-char hex — to
+            // match the sha256 output shape callers already handle.
+            let hash = blake3::hash(bytes);
+            Ok(hex::encode(hash.as_bytes()))
+        }
         other => Err(IntegrityError::UnsupportedAlgorithm(other.to_string()).into()),
     }
 }
