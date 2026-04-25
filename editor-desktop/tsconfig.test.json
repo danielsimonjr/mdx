@@ -6,6 +6,7 @@
   "comment": "tsconfig.test.json excludes the Electron-specific main.ts + preload.ts files. They depend on `import 'electron'` which is in optionalDependencies and may not be installed in CI. Build-time + dev-time tooling (npm run build, npm run dev) uses tsconfig.main.json which DOES include them and DOES require Electron present.",
   "include": [
     "src/main/archive-io.ts",
+    "src/main/ipynb-import.ts",
     "src/preload/types.ts",
     "src/renderer/index.ts",
     "src/renderer/editor-pane.ts",

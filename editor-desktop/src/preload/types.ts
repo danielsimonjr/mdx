@@ -37,9 +37,20 @@ export interface EditorApi {
   ): Promise<{ ok: true } | { ok: false; error: string }>;
   pickOpen(): Promise<string | null>;
   pickSave(defaultName?: string): Promise<string | null>;
+  pickIpynb(): Promise<string | null>;
+  /**
+   * Convert an `.ipynb` to an `.mdz` via the existing CLI. Resolves
+   * with the path of the produced archive on success.
+   */
+  importIpynb(
+    ipynbPath: string,
+  ): Promise<{ ok: true; mdzPath: string } | { ok: false; error: string }>;
   /**
    * Subscribe to a menu event from main. Returns an unsubscribe
    * function.
    */
-  onMenu(event: "open" | "save" | "save-as", handler: () => void): () => void;
+  onMenu(
+    event: "open" | "save" | "save-as" | "import-ipynb",
+    handler: () => void,
+  ): () => void;
 }

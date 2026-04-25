@@ -280,7 +280,7 @@ maintainer, double it.
 |-----------|-------|-------------|----------------|
 | 2.1 viewer | **partial** | sanitizer (38 tests), directives (cross-refs / citations / bibliography / `::cell` / `::output` / `::include`, 46 tests), CSL-JSON references (10 tests), KaTeX math (13 tests), **IndexedDB cache** (10 tests). 117/117 viewer tests pass. | full keyboard a11y, npm publish, demo site, fragment-aware `::include` |
 | 2.2 hosted | **code-ready, not deployed** | full Cloudflare Worker with strict CSP, content-hash cache pinning, OG / Twitter card meta, sanitized canonical URLs, 32 worker tests | `wrangler deploy` to view.mdz-format.org (external action), per-archive cover-image extraction |
-| 2.3a editor MVP | **partial** | **2.3a.1** shell foundation + **2.3a.2** source editor + live preview. Pure archive-io (11 tests) + editor-pane helpers (12 tests, debounce + mode-class). CodeMirror 6 + `@mdz-format/viewer` reuse, mode toggle, save flow. | 2.3a.3 asset sidebar, 2.3a.4 ipynb import, 2.3a.5 picker pack, 2.3a.6 release engineering |
+| 2.3a editor MVP | **partial** | **2.3a.1** shell foundation + **2.3a.2** source editor + live preview + **2.3a.4** .ipynb import wiring. archive-io (11 tests), editor-pane helpers (12 tests), ipynb-import bridge (7 tests, injectable runner). CodeMirror 6 + `@mdz-format/viewer` reuse, mode toggle, save flow, File → Import Jupyter notebook menu. | 2.3a.3 asset sidebar, 2.3a.5 picker pack, 2.3a.6 release engineering |
 | 2.3b editor Pro | **chunked, not started** | (none — see 2.3b.1 through 2.3b.7 below) | All sub-phases |
 | 2.4 EPUB bridge | **shipped** | `mdz export-epub` (existing) + `mdz import-epub` (new, 15 tests, fidelity matrix doc); round-trip CI gate | Symmetric `::fig` round-trip on the export side (tracked); per-chapter spine preservation |
 | 2.5 browser ext | **code-ready, hardened** | MV3 manifest, content + service-worker + popup + viewer scripts, 13 manifest-validation tests, reproducible-build doc, placeholder icons | Real icon artwork, bundled `<mdz-viewer>`, AMO / Chrome Web Store / Edge / Brave submissions |
@@ -451,19 +451,29 @@ end-to-end and export it to a journal as JATS-XML.
   `manifest.assets.images[]` entry with a correct `content_hash`,
   visible in `mdz info` after save.
 
-#### 2.3a.4 `.ipynb` import flow
+#### 2.3a.4 `.ipynb` import flow — **shipped**
 
-- [ ] "File → Import → Jupyter notebook" menu item invokes the
-      existing `cli/src/commands/import-ipynb.js` via main-process
-      shell-out (NOT in-renderer because it spawns child processes
-      for kernel inspection).
-- [ ] Imported MDZ opens in the editor immediately for further
-      authoring.
+- [x] "File → Import Jupyter notebook…" menu item wired through the
+      preload `editorApi.pickIpynb()` + `editorApi.importIpynb()`
+      bridges. Renderer waits for the import to settle, then opens
+      the produced `.mdz` directly.
+- [x] Bridge module at `editor-desktop/src/main/ipynb-import.ts`
+      spawns the existing `cli/src/commands/import-ipynb.js` as a
+      child process (NOT in-renderer; the CLI calls
+      `process.exit()` on unhappy paths and would kill the editor
+      if loaded in-process).
+- [x] `IpynbRunner` is injectable so unit tests can stand in a fake
+      spawner and assert behavior without forking real Node
+      processes (suite stays under 100 ms).
+- [x] `runIpynbImport` resolves with the produced `.mdz` path on
+      success; throws with stderr surfaced on non-zero exit; throws
+      with a clear message on spawn failure.
 
   **Depends on:** 2.3a.1.
-  **Acceptance:** a representative `.ipynb` from the
-  `tools/corpus-fetcher` test corpus imports to a syntactically
-  valid `.mdz` that opens in the editor without errors.
+  **Acceptance:** met to the extent CI can verify (7 vitest cases
+  on the bridge + the existing `cli/test/import-ipynb.test.js`
+  round-trip from Phase 4.3). End-to-end "right-click `.ipynb` →
+  `.mdz` opens in editor" path is Phase 2.3a.6 Playwright work.
 
 #### 2.3a.5 Visual-authoring picker pack — `::cell`, `::include`, `::fig`, `::cite`
 

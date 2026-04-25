@@ -196,6 +196,45 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Added — Phase 2.3a.4: .ipynb import wiring (2026-04-24)
+
+The editor's File menu gains "Import Jupyter notebook…", routing
+through the existing `cli/src/commands/import-ipynb.js` converter
+shipped in Phase 2.4.
+
+- **Subprocess-isolated bridge** at `editor-desktop/src/main/ipynb-
+  import.ts`. The CLI calls `process.exit()` on unhappy paths;
+  loading it in-process would kill the editor. Bridge spawns it
+  via `node:child_process` instead.
+- **Injectable `IpynbRunner`** so unit tests can stand in a fake
+  spawner and assert behavior without forking real Node
+  processes. The suite stays under 100 ms; the production
+  `defaultRunner` is the only path that touches `child_process`.
+- **`runIpynbImport(ipynbPath)`** returns the produced `.mdz` path
+  on success; throws with stderr surfaced on non-zero exit; throws
+  with a clear "failed to spawn" message on ENOENT.
+- **Renderer flow** (`importIpynbFlow` in `index.ts`): pick `.ipynb`
+  → call `editorApi.importIpynb` → on success, immediately
+  `openFromPath` the resulting `.mdz` so the user lands in an
+  editable session without an extra click. Errors render in the
+  title area (toast UI lands with the picker pack in 2.3a.5).
+- **`EditorApi`** gains `pickIpynb()` + `importIpynb()` plus an
+  `import-ipynb` menu event channel.
+
+Tests at `test/ipynb-import.test.ts` (7 vitest cases): expected
+output path computation; CLI path resolution from a compiled main
+URL; success-path resolution; non-zero exit with stderr surfaced;
+spawn-error rejection; argv passed verbatim to the runner.
+
+`resolveCliPath` test uses `pathToFileURL(process.cwd() + …)`
+instead of a hand-rolled `file:///repo/…` literal — the latter
+throws on Windows because Node's WHATWG-URL parser requires
+absolute paths to start with a drive letter.
+
+Total editor-desktop tests: **30** (11 archive-io + 12 editor-pane
++ 7 ipynb-import). All pass; tsc --noEmit -p tsconfig.test.json
+clean.
+
 ### Added — Phase 2.3a.2: Source editor + live preview (2026-04-24)
 
 The editor shell from 2.3a.1 gains a real editing surface. CodeMirror

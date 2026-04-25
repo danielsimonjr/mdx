@@ -135,9 +135,43 @@ for (const [m, btn] of Object.entries(modeButtons)) {
   });
 }
 
+async function importIpynbFlow(): Promise<void> {
+  const ipynbPath = await window.editorApi.pickIpynb();
+  if (!ipynbPath) return;
+  titleEl.textContent = "Importing notebook…";
+  const result = await window.editorApi.importIpynb(ipynbPath);
+  if (!result.ok) {
+    titleEl.textContent = `Import failed: ${result.error}`;
+    titleEl.classList.add("empty");
+    return;
+  }
+  // Successful import — open the produced .mdz directly.
+  const opened = await window.editorApi.openFromPath(result.mdzPath);
+  if (!opened.ok) {
+    titleEl.textContent = `Imported but couldn't reopen: ${opened.error}`;
+    return;
+  }
+  const manifest = opened.archive.manifest as { document?: { title?: string } };
+  titleEl.textContent = manifest.document?.title ?? "(untitled)";
+  titleEl.classList.remove("empty");
+  pathEl.textContent = opened.archive.path;
+  session = {
+    path: opened.archive.path,
+    manifest: opened.archive.manifest,
+    baseline: opened.archive.content,
+  };
+  setModified(false);
+  await ensurePane(opened.archive.content);
+}
+
 window.editorApi.onMenu("open", () => {
   openFlow().catch(() => undefined);
 });
 window.editorApi.onMenu("save", () => {
   saveFlow().catch(() => undefined);
+});
+window.editorApi.onMenu("import-ipynb", () => {
+  importIpynbFlow().catch((e) => {
+    titleEl.textContent = `Import error: ${(e as Error).message}`;
+  });
 });

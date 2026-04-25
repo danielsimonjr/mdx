@@ -23,6 +23,9 @@ const api: EditorApi = {
   pickOpen: async () => ipcRenderer.invoke("dialog:openFile") as Promise<string | null>,
   pickSave: async (defaultName) =>
     ipcRenderer.invoke("dialog:saveFile", defaultName) as Promise<string | null>,
+  pickIpynb: async () => ipcRenderer.invoke("dialog:openIpynb") as Promise<string | null>,
+  importIpynb: async (ipynbPath) =>
+    ipcRenderer.invoke("ipynb:import", ipynbPath) as ReturnType<EditorApi["importIpynb"]>,
   onMenu: (event, handler) => {
     const channel = `menu:${event}`;
     const listener = () => handler();

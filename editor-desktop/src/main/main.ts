@@ -31,6 +31,7 @@ import {
   ArchiveSaveError,
   type FsLike,
 } from "./archive-io.js";
+import { runIpynbImport } from "./ipynb-import.js";
 
 // Electron is in optionalDependencies; require lazily so the module
 // can be imported by typecheck even when electron isn't installed.
@@ -132,6 +133,25 @@ ipcMain.handle("dialog:openFile", async () => {
   return result.canceled ? null : result.filePaths[0];
 });
 
+ipcMain.handle("dialog:openIpynb", async () => {
+  if (!mainWindow) return null;
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: "Import Jupyter notebook as MDZ",
+    filters: [{ name: "Jupyter notebooks", extensions: ["ipynb"] }],
+    properties: ["openFile"],
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
+
+ipcMain.handle("ipynb:import", async (_e, ipynbPath: string) => {
+  try {
+    const mdzPath = await runIpynbImport(ipynbPath);
+    return { ok: true, mdzPath };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+});
+
 ipcMain.handle("dialog:saveFile", async (_e, defaultName?: string) => {
   if (!mainWindow) return null;
   const result = await dialog.showSaveDialog(mainWindow, {
@@ -165,6 +185,11 @@ function buildMenu(): import("electron").Menu {
           label: "Save As…",
           accelerator: "CmdOrCtrl+Shift+S",
           click: () => mainWindow?.webContents.send("menu:save-as"),
+        },
+        { type: "separator" },
+        {
+          label: "Import Jupyter notebook…",
+          click: () => mainWindow?.webContents.send("menu:import-ipynb"),
         },
         { type: "separator" },
         { role: "quit" },
