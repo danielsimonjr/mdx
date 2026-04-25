@@ -27,6 +27,13 @@ import { checkMarkdown, summarize, type A11yViolation } from "./accessibility-ch
 import { runVariantFlow, summarizeFlow, type VariantEncoderCallback } from "./variant-flow.js";
 import { extractPythonCells, runCells, insertOutputs } from "./cell-runner.js";
 import { loadPyodideKernel, type PythonKernel } from "./python-kernel.js";
+import { tokenizeBlocks, diffBlocks } from "./block-diff.js";
+import { renderBlockOps, renderDiffStats } from "./diff-render.js";
+import {
+  parseSnapshotIndex,
+  reconstructVersionSync,
+  type SnapshotIndex,
+} from "@mdz-format/viewer";
 
 declare global {
   interface Window {
@@ -75,6 +82,15 @@ const a11yStatusEl = document.getElementById("a11y-status")!;
 const a11yPanelEl = document.getElementById("a11y-panel")!;
 const generateVariantsBtn = document.getElementById("generate-variants-btn") as HTMLButtonElement;
 const runCellsBtn = document.getElementById("run-cells-btn") as HTMLButtonElement;
+const diffBtn = document.getElementById("diff-btn") as HTMLButtonElement;
+
+/**
+ * Track the open archive's parsed snapshot index + raw entry text
+ * so the Compare-versions modal can reconstruct any saved version
+ * without going back through the file system.
+ */
+let snapshotIndex: SnapshotIndex | null = null;
+const snapshotEntryText = new Map<string, string>();
 
 const dropzone = document.getElementById("asset-dropzone") as HTMLDivElement;
 const assetListEl = document.getElementById("asset-list") as HTMLUListElement;
@@ -154,7 +170,93 @@ function setPickersEnabled(enabled: boolean): void {
   for (const btn of Object.values(pickerButtons)) btn.disabled = !enabled;
   generateVariantsBtn.disabled = !enabled;
   runCellsBtn.disabled = !enabled;
+  diffBtn.disabled = !enabled;
 }
+
+/**
+ * Load `history/snapshots/index.json` + every snapshot file from
+ * the archive's entry map into module state. Called on every open.
+ * No-ops gracefully if the extension isn't declared.
+ */
+function loadSnapshotState(entries: ReadonlyMap<string, Uint8Array>): void {
+  snapshotIndex = null;
+  snapshotEntryText.clear();
+  const indexBytes = entries.get("history/snapshots/index.json");
+  if (!indexBytes) return;
+  try {
+    snapshotIndex = parseSnapshotIndex(new TextDecoder().decode(indexBytes));
+  } catch {
+    // Malformed index — leave snapshotIndex null. The diff button
+    // surfaces the parse error when clicked.
+    return;
+  }
+  for (const [path, bytes] of entries) {
+    if (path.startsWith("history/snapshots/base/") || path.startsWith("history/snapshots/deltas/")) {
+      snapshotEntryText.set(path, new TextDecoder().decode(bytes));
+    }
+  }
+}
+
+function listSnapshotVersions(): string[] {
+  if (!snapshotIndex) return [];
+  const out: string[] = [];
+  for (const chain of snapshotIndex.chains) {
+    out.push(chain.base_version);
+    for (const d of chain.deltas) out.push(d.version);
+  }
+  return out;
+}
+
+function openDiffModal(): void {
+  if (!pane) return;
+  const versions = listSnapshotVersions();
+  if (versions.length === 0) {
+    titleEl.textContent = "No saved snapshots — use `mdz snapshot create` to seed history.";
+    return;
+  }
+  const dialog = document.createElement("dialog");
+  dialog.className = "diff-modal";
+  dialog.innerHTML = `
+    <div class="diff-modal-header">
+      <h3>Compare current draft vs.</h3>
+      <div class="diff-modal-controls">
+        <select aria-label="Snapshot version"></select>
+        <button type="button" class="cancel-btn">Close</button>
+      </div>
+    </div>
+    <div class="diff-modal-body"></div>
+  `;
+  const select = dialog.querySelector("select") as HTMLSelectElement;
+  for (const v of versions) {
+    const opt = document.createElement("option");
+    opt.value = v;
+    opt.textContent = v;
+    select.appendChild(opt);
+  }
+  const body = dialog.querySelector(".diff-modal-body") as HTMLDivElement;
+  const cancelBtn = dialog.querySelector(".cancel-btn") as HTMLButtonElement;
+  const refresh = (): void => {
+    if (!pane || !snapshotIndex) return;
+    try {
+      const oldText = reconstructVersionSync(snapshotIndex, select.value, snapshotEntryText);
+      const newText = pane.getContent();
+      const ops = diffBlocks(tokenizeBlocks(oldText), tokenizeBlocks(newText));
+      body.innerHTML = renderDiffStats(ops) + renderBlockOps(ops);
+    } catch (e) {
+      body.innerHTML = `<p class="empty">Reconstruction failed: ${(e as Error).message}</p>`;
+    }
+  };
+  select.addEventListener("change", refresh);
+  cancelBtn.addEventListener("click", () => {
+    dialog.close();
+    dialog.remove();
+  });
+  document.body.appendChild(dialog);
+  dialog.showModal();
+  refresh();
+}
+
+diffBtn.addEventListener("click", openDiffModal);
 
 /**
  * Pyodide kernel handle. Lazy: we only download the ~10 MB WASM
@@ -373,6 +475,7 @@ async function openFlow(): Promise<void> {
   // entries only, so we read it straight from the archive map.
   const refsBytes = result.archive.entries.get("references.json");
   referencesJson = refsBytes ? new TextDecoder().decode(refsBytes) : null;
+  loadSnapshotState(result.archive.entries);
   await ensurePane(result.archive.content);
   setPickersEnabled(true);
   refreshA11y(result.archive.content);
@@ -452,6 +555,7 @@ async function importIpynbFlow(): Promise<void> {
   renderAssetList();
   const refsBytes = opened.archive.entries.get("references.json");
   referencesJson = refsBytes ? new TextDecoder().decode(refsBytes) : null;
+  loadSnapshotState(opened.archive.entries);
   await ensurePane(opened.archive.content);
   setPickersEnabled(true);
   refreshA11y(opened.archive.content);

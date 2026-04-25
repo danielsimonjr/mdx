@@ -24,6 +24,7 @@
     "src/renderer/python-kernel.ts",
     "src/renderer/variant-flow.ts",
     "src/renderer/cell-runner.ts",
+    "src/renderer/diff-render.ts",
     "test/**/*.ts"
   ],
   "exclude": [

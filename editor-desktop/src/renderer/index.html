@@ -108,6 +108,36 @@
       .directive-toolbar button:hover:not([disabled]) { background: #1e3a8a; color: #dbeafe; border-color: #60a5fa; }
     }
 
+    /* Block-diff pane (Phase 2.3b.3.2) */
+    .block-diff { font-family: ui-monospace, monospace; font-size: 0.85rem; line-height: 1.4; }
+    .block-diff .block { border-left: 3px solid transparent; padding: 0.5rem 0.75rem; margin: 0.5rem 0; }
+    .block-diff .block-equal { border-color: #ddd; opacity: 0.55; }
+    .block-diff .block-added { border-color: #15803d; background: #ecfdf5; }
+    .block-diff .block-removed { border-color: #b91c1c; background: #fef2f2; }
+    .block-diff .block-modified { border-color: #b45309; background: #fffbeb; }
+    .block-diff .block-label { margin: 0 0 0.35rem; font-size: 0.78rem; color: #555; font-weight: 600; }
+    .block-diff pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
+    .block-diff .line-diff .line { padding: 0 0.25rem; }
+    .block-diff .line-removed { background: #fee2e2; color: #7f1d1d; }
+    .block-diff .line-added { background: #dcfce7; color: #14532d; }
+    .block-diff-empty { color: #888; padding: 1rem; text-align: center; }
+    .diff-stats { font-family: ui-monospace, monospace; font-size: 0.85rem; padding: 0.4rem 0.75rem; border-bottom: 1px solid #ddd; background: #f9fafb; }
+    @media (prefers-color-scheme: dark) {
+      .block-diff .block-equal { border-color: #333; }
+      .block-diff .block-added { background: #052e1a; }
+      .block-diff .block-removed { background: #2d0a0a; }
+      .block-diff .block-modified { background: #2a1c00; }
+      .block-diff .line-removed { background: #4b1414; color: #fecaca; }
+      .block-diff .line-added { background: #14361f; color: #bbf7d0; }
+      .diff-stats { background: #0a0a0a; border-color: #333; }
+    }
+    .diff-modal { width: min(960px, 95vw); max-height: 85vh; padding: 0; overflow: hidden; display: flex; flex-direction: column; border: 1px solid #ccc; border-radius: 6px; }
+    .diff-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; border-bottom: 1px solid #ddd; gap: 0.5rem; }
+    .diff-modal-header h3 { margin: 0; font-size: 1rem; }
+    .diff-modal-body { overflow-y: auto; padding: 0.5rem 0.75rem; flex: 1; }
+    .diff-modal-controls { display: flex; gap: 0.5rem; align-items: center; }
+    .diff-modal-controls select { padding: 0.25rem 0.5rem; }
+
     /* Directive modal */
     .directive-modal { border: 1px solid #ccc; border-radius: 6px; padding: 1.25rem; min-width: 360px; max-width: 90vw; }
     .directive-modal::backdrop { background: rgba(0, 0, 0, 0.4); }
@@ -157,6 +187,7 @@
     </div>
     <button id="generate-variants-btn" type="button" disabled title="Generate AVIF/WebP variants for staged images">Generate variants</button>
     <button id="run-cells-btn" type="button" disabled title="Execute every Python ::cell and insert ::output blocks">Run Python cells</button>
+    <button id="diff-btn" type="button" disabled title="Compare current document against a saved snapshot">Compare versions</button>
     <div class="mode-toggle" role="group" aria-label="View mode">
       <button id="mode-source" aria-pressed="false">Source</button>
       <button id="mode-split" aria-pressed="true">Split</button>

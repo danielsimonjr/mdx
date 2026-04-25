@@ -8,6 +8,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 2.3b.3.2: Diff-pane UI (2026-04-25)
+
+The "Compare versions" toolbar button now opens a modal that
+diffs the current buffer against any saved snapshot in the
+archive's `history/snapshots/` chain. Two pieces:
+
+- **Pure HTML renderer**
+  (`editor-desktop/src/renderer/diff-render.ts`) —
+  `renderBlockOps(ops)` returns a strict-CSP HTML string with
+  stable class hooks: `block-equal`, `block-added`,
+  `block-removed`, `block-modified`, plus `line-added` /
+  `line-removed` / `line-equal` for the inline line-diff inside
+  modified blocks. `renderDiffStats(ops)` returns the
+  unified-stat header (`+12 / -3 / ~5 / =42`). All untrusted
+  manuscript text passes through `escapeHtml` before
+  interpolation; tests verify a `<script>` payload in the
+  source emits literal `&lt;script&gt;`. Heading blocks render
+  their friendly text label, labeled directives render
+  `::fig (id=overview)`, others get `kind — line N`.
+- **Compare-versions modal** in `index.ts`.
+  `loadSnapshotState(entries)` parses
+  `history/snapshots/index.json` and stages every base / delta
+  text into a `Map<string, string>` on archive open;
+  `openDiffModal()` builds a `<dialog>` with a snapshot dropdown,
+  reconstructs the selected version via
+  `reconstructVersionSync` (Phase 4.5 reader), runs `diffBlocks`
+  + `tokenizeBlocks` (Phase 2.3b.3 algorithm), and renders the
+  HTML via the diff renderer. Reconstruction failures (malformed
+  patches, circular chains) surface in the modal body rather
+  than crashing the dialog.
+
+The diff CSS is colour-coded per common-diff convention (green
+adds, red removes, yellow modified) with dark-mode counterparts.
+Block-equal entries render at 55 % opacity so the eye lands on
+changes first.
+
+11 new vitest cases in `test/diff-render.test.ts` cover the HTML
+output, escape pass, every op-class hook, friendly-label
+rendering, and the empty-state placeholder.
+
+Net editor-desktop tests: 327 → 338.
+
 ### Added — Phase 2.3b.1.2: Pyodide UI + CSP relaxation (2026-04-25)
 
 The editor can now actually execute Python cells. Three pieces:

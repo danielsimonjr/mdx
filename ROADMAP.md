@@ -661,10 +661,18 @@ is independent — sequence by user demand, not by checklist order.
 - [x] **Line-level fall-back diff** (`diffLines`) for inside
       `modified` blocks. Plain LCS — fast on the short text spans
       that appear inside a single block.
-- [ ] Compare current draft against any version in
-      `history/snapshots/` (UI integration). Algorithm is shipped
-      and tested; the diff-pane component that consumes it is a
-      Phase 2.3b.3.2 follow-up.
+- [x] **Compare-versions modal** wired in `index.ts`. Drives
+      the algorithm against every version in the open archive's
+      `history/snapshots/index.json`. Pure HTML renderer
+      (`diff-render.ts` — `renderBlockOps`, `renderBlockOp`,
+      `renderDiffStats`) converts `BlockOp[]` → strict-CSP HTML
+      with stable class hooks (`block-equal`, `block-added`,
+      `block-removed`, `block-modified`, `line-added`,
+      `line-removed`, `line-equal`). Heading and labeled-directive
+      blocks render friendly labels (heading text, `::fig` +
+      `id=overview`); other kinds get kind + start-line. HTML is
+      escaped through a small `escapeHtml` pass so untrusted
+      manuscript text can't inject markup. 11 vitest cases.
 - [x] **Round-trip with `delta-snapshots-v1` (read side):** Phase
       4.5 reference impl shipped 2026-04-24 in
       `packages/mdz-viewer/src/snapshots.ts` — `parseIndex`,
