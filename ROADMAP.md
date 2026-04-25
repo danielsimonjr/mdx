@@ -281,7 +281,7 @@ maintainer, double it.
 | 2.1 viewer | **partial** | sanitizer (38 tests), directives (cross-refs / citations / bibliography / `::cell` / `::output` / `::include`, 46 tests), CSL-JSON references (10 tests), KaTeX math (13 tests), **IndexedDB cache** (10 tests). 117/117 viewer tests pass. | full keyboard a11y, npm publish, demo site, fragment-aware `::include` |
 | 2.2 hosted | **code-ready, not deployed** | full Cloudflare Worker with strict CSP, content-hash cache pinning, OG / Twitter card meta, sanitized canonical URLs, 32 worker tests | `wrangler deploy` to view.mdz-format.org (external action), per-archive cover-image extraction |
 | 2.3a editor MVP | **partial** | **2.3a.1** shell + **2.3a.2** editor+preview + **2.3a.3** asset sidebar + **2.3a.4** .ipynb import + **2.3a.5.0** insertion engine + **2.3a.5.1–4** picker pack. 113 vitest cases (11 archive-io + 12 editor-pane + 7 ipynb-import + 32 asset-store + 19 directive-insert + 32 directive-pickers). Toolbar buttons for `::cell`, `::include`, `::fig`/`::eq`/`::tab`, `::cite`; `<dialog>`-based modal scaffolding; CSL-JSON bibliography lookup; document-scan id-collision check; archive-entry membership check for include targets. | 2.3a.6 release engineering (signed installers — partly external) |
-| 2.3b editor Pro | **partial** | **2.3b.2** a11y checker (37 cases) + **2.3b.3** block-diff algorithm (25 cases) + **2.3b.4** annotation data layer (23 cases) + **2.3b.5** locale-enum + paragraph alignment (19 cases) + **2.3b.7.1–5** non-core picker pack (34 cases). 5 of 7 sub-phases land their data/algorithm layer; UI surfaces deferred to per-feature `*.2` follow-ups. | 2.3b.1 Pyodide kernel (1MB+ WASM), 2.3b.6 image variants (sharp/libvips binary), `*.2` UI surfaces |
+| 2.3b editor Pro | **partial** | **2.3b.2** a11y checker (37 cases) + **2.3b.3** block-diff algorithm (25 cases) + **2.3b.4** annotation data layer (23 cases) + **2.3b.5** locale-enum + paragraph alignment (19 cases) + **2.3b.6** variant planner (13 cases) + **2.3b.7.1–5** non-core picker pack (34 cases). 6 of 7 sub-phases land their data/algorithm layer; UI surfaces + native-binary-dependent execution deferred to per-feature `*.2` follow-ups. | 2.3b.1 Pyodide kernel (1MB+ WASM), 2.3b.6.2 sharp encoder, `*.2` UI surfaces |
 | 2.4 EPUB bridge | **shipped** | `mdz export-epub` (existing) + `mdz import-epub` (new, 15 tests, fidelity matrix doc); round-trip CI gate | Symmetric `::fig` round-trip on the export side (tracked); per-chapter spine preservation |
 | 2.5 browser ext | **code-ready, hardened** | MV3 manifest, content + service-worker + popup + viewer scripts, 13 manifest-validation tests, reproducible-build doc, placeholder icons | Real icon artwork, bundled `<mdz-viewer>`, AMO / Chrome Web Store / Edge / Brave submissions |
 
@@ -673,14 +673,30 @@ is independent — sequence by user demand, not by checklist order.
 
 #### 2.3b.6 AVIF / WebP variant generation
 
-- [ ] On image add: spawn the main-process `sharp` (or
-      `@squoosh/lib`) to produce AVIF + WebP siblings.
+- [x] **Variant planner** in
+      `editor-desktop/src/renderer/variant-planner.ts`.
+      `planVariants(sources, presets?)` returns one
+      `VariantPlanEntry` per `(source, preset)` the encoder must
+      produce; honours per-kind preset configs (figure / icon /
+      hero / inline have different quality + max-width defaults
+      per `DEFAULT_PRESETS`); skips already-existing variants
+      (idempotent re-runs); skips unencodable sources (SVG,
+      animated GIFs flagged via `skip: true`); won't write a
+      variant onto the source path. `variantPath(source, preset)`
+      computes the canonical target path
+      (`<stem>.<width>w.<format>` for sized; `<stem>.<format>` for
+      full-size).
+- [ ] Encoder execution — main-process worker that consumes the
+      plan and runs `sharp` (or `@squoosh/lib`) per entry.
+      Deferred to Phase 2.3b.6.2 follow-up; needs platform binary
+      decision (sharp's prebuilt binaries vs. WASM-only).
 - [ ] Populate `manifest.assets.images[].variants[]` per spec
-      §17.2.
-- [ ] Configurable quality presets per image kind
-      (figure / icon / hero).
+      §17.2 once the encoder runs. Phase 2.3b.6.2 follow-up.
+- [x] Configurable quality presets per image kind via the
+      `presets` parameter to `planVariants`.
 
-  **Depends on:** 2.3a.3 (asset sidebar).
+  **Depends on:** 2.3a.3 (asset sidebar). Planner shipped
+  2026-04-24; encoder execution gated on platform-binary decision.
 
 #### 2.3b.7 Non-core directive picker pack
 

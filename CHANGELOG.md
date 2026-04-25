@@ -196,6 +196,44 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Added — Phase 2.3b.6 (planner): Image-variant generation planner (2026-04-24)
+
+`editor-desktop/src/renderer/variant-planner.ts` ships the
+planning side of AVIF/WebP variant generation. The actual encoder
+needs sharp/libvips (a native binary) and the renderer is
+sandboxed, so encoding will live in the main process; the planner
+is pure and decides *what* to encode without doing the encoding.
+
+Three exports:
+
+- `planVariants(sources, presets?)` — returns one
+  `VariantPlanEntry` per `(source, preset)` pair the encoder must
+  produce. Handles four skip cases: explicit `skip: true` flag,
+  unencodable MIME types (`image/svg+xml`, etc.), already-present
+  variants in the archive (idempotent re-runs), and
+  self-referential targets (a webp source that would write itself).
+- `variantPath(source, preset)` — canonical target path computation:
+  `<stem>.<maxWidth>w.<format>` for size-bound variants;
+  `<stem>.<format>` for full-size. Width tag goes between basename
+  and extension so `*.webp` globs still match.
+- `summarizePlan(plan)` — `{ webp, avif }` counts for a status-bar
+  widget.
+
+`DEFAULT_PRESETS` ships per-kind presets for figure (webp 1600w +
+avif 1600w at q85/q65), icon (webp 256w q90), hero (webp 2400w +
+avif 2400w at q80/q60), and inline (webp 1200w q85). Custom
+preset overrides via the second `planVariants` argument.
+
+13 vitest cases — every skip branch, custom preset override,
+multi-source / multi-kind expansion, and the variantPath edge
+cases (no extension, full-size, sized).
+
+Encoder execution + manifest `variants[]` population deferred to
+Phase 2.3b.6.2 follow-up; that's gated on the platform-binary
+decision (sharp prebuilts vs. WASM-only @squoosh).
+
+Net editor-desktop tests: 251 → 264.
+
 ### Added — Phase 2.3b.5 (data layer): Multi-locale helpers (2026-04-24)
 
 `editor-desktop/src/renderer/locales.ts` ships the data layer
