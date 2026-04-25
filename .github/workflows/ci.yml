@@ -507,12 +507,16 @@ jobs:
       - name: Build extension zip + verify reproducibility (Phase 4.6.8)
         # Builds the .zip, then re-builds it; SHA-256 of both runs MUST
         # match. AMO reviewers verify the published artifact by SHA, so
-        # non-determinism is a release blocker.
+        # non-determinism is a release blocker. We extract just the
+        # `sha256 …` line — the `built` line includes the output path,
+        # which differs by design between the two runs.
         run: |
-          node browser-extension/build.js --output /tmp/build-a.zip --print-sha256 > /tmp/sha-a.txt
-          node browser-extension/build.js --output /tmp/build-b.zip --print-sha256 > /tmp/sha-b.txt
+          node browser-extension/build.js --output /tmp/build-a.zip --print-sha256 \
+            | awk '/^sha256/ {print $2}' > /tmp/sha-a.txt
+          node browser-extension/build.js --output /tmp/build-b.zip --print-sha256 \
+            | awk '/^sha256/ {print $2}' > /tmp/sha-b.txt
           diff /tmp/sha-a.txt /tmp/sha-b.txt
-          echo "Reproducible-build SHA-256 verified."
+          echo "Reproducible-build SHA-256 verified: $(cat /tmp/sha-a.txt)"
 
       - name: Verify reproducible-build doc reflects current state
         # Smoke check: REPRODUCIBLE_BUILD.md must mention manifest.json
