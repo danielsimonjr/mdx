@@ -1168,11 +1168,17 @@ sections didn't yet track. Discovered by a `grep` for
 in code comments. Listed here so they round-trip through the
 normal completion flow.
 
-- [ ] **`examples/scientific-paper/` example papers directory**
-      (`docs/for-authors/SUBMITTING.md:250` flags as a Phase 0
-      deliverable). Concrete demo MDZ archives — minimal,
-      reviewer-round-trip, multi-locale — that authors can clone
-      as a starting point.
+- [x] **`examples/scientific-paper/` example papers directory**
+      — done 2026-04-25. Source-tree skeleton at
+      `examples/scientific-paper/source/` with `manifest.json`,
+      IMRaD-structured `document.md` (Abstract / Introduction /
+      Methods with a Python `::cell` / Results with `::fig`
+      `::eq` `::tab` cross-refs / Discussion / Acknowledgements /
+      `::bibliography`), CSL-JSON `references.json` with two
+      entries, and a tiny `assets/data/series.csv` the example
+      cell consumes. Validates against the
+      `scientific-paper-v1` profile. Plus a top-level README
+      explaining how to bundle into a `.mdz` and validate.
 - [ ] **Viewer-hosted bundled-viewer wiring**
       (`packages/mdz-viewer-hosted/src/worker.ts:323` "TODO:
       replace with bundled viewer once `npm run build` in

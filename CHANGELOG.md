@@ -8,6 +8,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 4.6.8: examples/scientific-paper/ (2026-04-25)
+
+Concrete demo MDZ source-tree at
+`examples/scientific-paper/source/` that authors can clone as a
+starting template. Closes the Phase 0 deliverable that
+`docs/for-authors/SUBMITTING.md:250` flagged as TBD.
+
+The skeleton validates against the `scientific-paper-v1`
+profile:
+
+- IMRaD-structured `document.md` — Abstract, Introduction,
+  Methods (with a Python `::cell` that re-computes the headline
+  statistic at view time), Results (with `::fig` / `::eq` /
+  `::tab` labeled directives + `::ref` cross-refs), Discussion,
+  Acknowledgements, `::bibliography`.
+- `manifest.json` declares the `scientific-paper-v1` profile,
+  one author with `did:web` + ORCID, the four required manifest
+  fields, and a placeholder `manifest_checksum` that a signing
+  pass replaces.
+- `references.json` is CSL-JSON with two entries — one
+  self-referencing the spec, one illustrative external work.
+- `assets/data/series.csv` is a 28-byte three-row dataset the
+  example cell consumes.
+
+Top-level `README.md` walks through bundling into a `.mdz` and
+validating against the profile.
+
 ### Added — Phase 3.2: Archive-level integrity fixtures (2026-04-25)
 
 `tests/conformance/integrity/` now hosts archive-level

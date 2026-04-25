@@ -1,0 +1,47 @@
+{
+  "mdx_version": "2.0.0",
+  "document": {
+    "id": "11111111-2222-4333-8444-555555555555",
+    "title": "An Example Scientific Paper in MDZ Format",
+    "subtitle": "A minimal skeleton demonstrating the scientific-paper-v1 profile",
+    "language": "en-US",
+    "created": "2026-01-15T09:00:00Z",
+    "modified": "2026-04-25T00:00:00Z",
+    "license": "CC-BY-4.0",
+    "keywords": ["mdz", "scientific paper", "open access", "reproducible research"],
+    "authors": [
+      {
+        "name": "Jane Researcher",
+        "did": "did:web:example.edu/users/jane-researcher",
+        "orcid": "0000-0000-0000-0000",
+        "affiliation": "Example University",
+        "role": "corresponding_author"
+      }
+    ],
+    "profiles": ["scientific-paper-v1"],
+    "accessibility": {
+      "features": ["alternativeText", "structuralNavigation", "readingOrder"],
+      "wcag_level": "AA"
+    }
+  },
+  "content": { "entry_point": "document.md" },
+  "references": { "path": "references.json", "format": "csl-json" },
+  "assets": {
+    "data": [
+      {
+        "path": "assets/data/series.csv",
+        "mime_type": "text/csv",
+        "size_bytes": 28
+      }
+    ]
+  },
+  "kernels": {
+    "python": { "runtime": "pyodide", "version": "0.26.4" }
+  },
+  "security": {
+    "integrity": {
+      "manifest_checksum": "sha256:placeholder-fill-via-mdz-create-or-mdz-sign"
+    },
+    "signatures": []
+  }
+}

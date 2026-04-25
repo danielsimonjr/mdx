@@ -1,0 +1,23 @@
+[
+  {
+    "id": "anthropic2026",
+    "type": "article-journal",
+    "title": "MDZ Format Specification, Version 2.0",
+    "author": [{ "family": "MDZ Format Authors" }],
+    "issued": { "date-parts": [[2026]] },
+    "URL": "https://mdz-format.org/spec/"
+  },
+  {
+    "id": "smith2020",
+    "type": "article-journal",
+    "title": "An illustrative reference",
+    "author": [
+      { "family": "Smith", "given": "A." },
+      { "family": "Jones", "given": "B." }
+    ],
+    "issued": { "date-parts": [[2020]] },
+    "container-title": "Journal of Examples",
+    "volume": "1",
+    "page": "1-10"
+  }
+]
