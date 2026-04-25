@@ -281,7 +281,7 @@ maintainer, double it.
 | 2.1 viewer | **partial** | sanitizer (38 tests), directives (cross-refs / citations / bibliography / `::cell` / `::output` / `::include`, 46 tests), CSL-JSON references (10 tests), KaTeX math (13 tests), **IndexedDB cache** (10 tests). 117/117 viewer tests pass. | full keyboard a11y, npm publish, demo site, fragment-aware `::include` |
 | 2.2 hosted | **code-ready, not deployed** | full Cloudflare Worker with strict CSP, content-hash cache pinning, OG / Twitter card meta, sanitized canonical URLs, 32 worker tests | `wrangler deploy` to view.mdz-format.org (external action), per-archive cover-image extraction |
 | 2.3a editor MVP | **partial** | **2.3a.1** shell + **2.3a.2** editor+preview + **2.3a.3** asset sidebar + **2.3a.4** .ipynb import + **2.3a.5.0** insertion engine + **2.3a.5.1–4** picker pack. 113 vitest cases (11 archive-io + 12 editor-pane + 7 ipynb-import + 32 asset-store + 19 directive-insert + 32 directive-pickers). Toolbar buttons for `::cell`, `::include`, `::fig`/`::eq`/`::tab`, `::cite`; `<dialog>`-based modal scaffolding; CSL-JSON bibliography lookup; document-scan id-collision check; archive-entry membership check for include targets. | 2.3a.6 release engineering (signed installers — partly external) |
-| 2.3b editor Pro | **partial** | **2.3b.2** in-editor accessibility checker (37 vitest cases; Python parity across 23 fixtures) + **2.3b.7.1–5** non-core picker pack (`::video` / `::audio` / `::model` / `::embed` / `::data` — 11 builder cases + 23 validator cases). | 2.3b.1 Pyodide kernel, 2.3b.3 block-level diff, 2.3b.4 review annotations, 2.3b.5 multi-locale, 2.3b.6 image variants |
+| 2.3b editor Pro | **partial** | **2.3b.2** a11y checker (37 cases) + **2.3b.7.1–5** non-core picker pack (34 cases) + **2.3b.3** block-level + line-level diff algorithm (25 cases — UI integration deferred). | 2.3b.1 Pyodide kernel, 2.3b.3.2 diff UI, 2.3b.4 review annotations, 2.3b.5 multi-locale, 2.3b.6 image variants |
 | 2.4 EPUB bridge | **shipped** | `mdz export-epub` (existing) + `mdz import-epub` (new, 15 tests, fidelity matrix doc); round-trip CI gate | Symmetric `::fig` round-trip on the export side (tracked); per-chapter spine preservation |
 | 2.5 browser ext | **code-ready, hardened** | MV3 manifest, content + service-worker + popup + viewer scripts, 13 manifest-validation tests, reproducible-build doc, placeholder icons | Real icon artwork, bundled `<mdz-viewer>`, AMO / Chrome Web Store / Edge / Brave submissions |
 
@@ -584,15 +584,29 @@ is independent — sequence by user demand, not by checklist order.
 
 #### 2.3b.3 Block-level diff view
 
+- [x] **Block tokenizer + LCS-based diff** in
+      `editor-desktop/src/renderer/block-diff.ts`. Treats
+      paragraphs, headings, fenced code blocks, container
+      directives (`:::name…:::`), single-line directives (`::name`),
+      lists, blockquotes, and HRs as atomic block units. Diff op
+      stream is `equal`/`added`/`removed`/`modified` — the
+      `modified` op fires when two blocks share an identity key
+      (heading text, directive `id=` attribute) but their bodies
+      differ, so the UI can render an inner line-level diff.
+- [x] **Line-level fall-back diff** (`diffLines`) for inside
+      `modified` blocks. Plain LCS — fast on the short text spans
+      that appear inside a single block.
 - [ ] Compare current draft against any version in
-      `history/snapshots/`.
-- [ ] Block-level diff (paragraph / heading / cell / output as
-      atomic units) with line-level fall-back inside changed blocks.
+      `history/snapshots/` (UI integration). Algorithm is shipped
+      and tested; the diff-pane component that consumes it is a
+      Phase 2.3b.3.2 follow-up.
 - [ ] Round-trip with the Phase 4.5 `delta-snapshots-v1` extension
-      so diffs and patches use the same algorithm.
+      so diffs and patches use the same algorithm. Blocked on the
+      Phase 4.5 spec → impl gap (currently spec only); when 4.5
+      ships, the block keys produced here are the patch identifiers.
 
   **Depends on:** 2.3a.2 + Phase 4.5 implementation (currently
-  spec only).
+  spec only). Algorithm shipped 2026-04-24; UI surface deferred.
 
 #### 2.3b.4 Peer-review annotation layer
 

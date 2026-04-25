@@ -196,6 +196,45 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Added — Phase 2.3b.3 (algorithm): Block-level + line-level diff (2026-04-24)
+
+`editor-desktop/src/renderer/block-diff.ts` ships the diff
+algorithm that the Phase 2.3b.3 diff-pane UI will sit on. Three
+exports:
+
+- `tokenizeBlocks(source)` — splits markdown into atomic blocks:
+  paragraphs, headings, fenced code blocks, container directives
+  (`:::name…:::`), single-line directives (`::name`), lists,
+  blockquotes, and horizontal rules. Each block has a stable
+  identity `key` — heading depth + text for headings, directive
+  name + `id=` for labeled directives, full text for everything
+  else.
+- `diffBlocks(left, right)` — LCS over block keys; emits an op
+  stream of `equal`/`added`/`removed`/`modified`. The `modified`
+  op fires when two blocks share an identity key but their bodies
+  differ (e.g. a `::fig{id=overview}` whose body was rewritten),
+  so the UI can render a per-block inner diff.
+- `diffLines(leftText, rightText)` — plain LCS line diff for the
+  inside of `modified` blocks.
+
+The container-directive tokenizer found a real bug while writing
+the tests: the `:::name` opener doesn't match the single-`::`
+directive regex (the capture group requires a letter immediately
+after `::`, but `:::name` starts with three colons), so the
+tokenizer needed a separate `CONTAINER_OPEN_RE` pass that runs
+before the leaf-directive check. Container nesting is tracked by
+depth-counting `:::` opens vs. closes so inner directives don't
+prematurely close the outer container.
+
+UI integration (the actual diff pane that compares the open
+buffer against `history/snapshots/`) is deferred to a Phase
+2.3b.3.2 follow-up. The algorithm + 25 vitest cases + a stable
+block-key scheme are shipped; the round-trip with the Phase 4.5
+`delta-snapshots-v1` extension stays blocked on Phase 4.5
+shipping (currently spec-only).
+
+Net editor-desktop tests: 184 → 209.
+
 ### Added — Phase 2.3b.7.1–5: Non-core directive picker pack (2026-04-24)
 
 Five new toolbar buttons round out the editor's directive support:
