@@ -308,10 +308,29 @@ Deliverables:
 
 ### 2.2 Hosted render-any-MDZ service
 
-- [ ] Deploy `view.mdz-format.org?url=<archive-url>` — free, no-auth, CORS-friendly
-- [ ] Serverless rendering (Cloudflare Workers / Vercel Edge)
-- [ ] Cache via CDN with content-hash keys (stable URLs for immutable archives)
-- [ ] Generate social-share preview cards (OG image from first page / cover)
+- [ ] Deploy `view.mdz-format.org?url=<archive-url>` — code is
+      production-ready at `packages/mdz-viewer-hosted/src/worker.ts`;
+      external action (`wrangler deploy` + DNS) needed to go live.
+- [x] Serverless rendering — Cloudflare Worker code ships with strict
+      CSP (Trusted Types required, no `unsafe-eval`, `object-src
+      'none'`), Permissions-Policy disabling FLoC + sensors,
+      Referrer-Policy `strict-origin-when-cross-origin`, HTTPS-only
+      archive URLs (control characters and dangerous schemes refused
+      upfront), CORS preflight, /healthz endpoint, /robots.txt with
+      embed disallow. 32 vitest cases cover routing + security
+      headers + URL safety + cache behavior + OG meta sanitization.
+- [x] CDN cache with content-hash keys — `cacheControlFor(url)` emits
+      `max-age=31536000, immutable` when `?content_hash=` is present,
+      `max-age=300, stale-while-revalidate=86400` otherwise. `Vary:
+      Accept` on every HTML response so a future JSON variant doesn't
+      collide.
+- [x] Social-share preview meta — full OG / Twitter card meta on
+      every page. Description varies for landing vs archive-rendering
+      pages. `og:url` uses a sanitized canonical URL that drops
+      refused-input query params (won't echo `javascript:` payloads
+      into search-engine indexes / social preview snapshots).
+      Per-archive cover-image extraction (preview-time fetch + parse
+      manifest) is a Phase 2.2 follow-up.
 
 Goal: anyone can put `.mdz` in GitHub and share a rendering link. Removes the
 "no users because no viewer" chicken-and-egg.

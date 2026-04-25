@@ -79,9 +79,9 @@ export default {
     switch (url.pathname) {
       case "/":
       case "/index.html":
-        return html(renderIndexPage(url));
+        return html(renderIndexPage(url), 200, url);
       case "/embed.html":
-        return html(renderEmbedPage(url));
+        return html(renderEmbedPage(url), 200, url);
       case "/robots.txt":
         return text(
           [
@@ -105,18 +105,38 @@ export default {
 // Response helpers
 // ---------------------------------------------------------------------------
 
-function html(body: string, status = 200): Response {
+/**
+ * Cache duration tiers — content-hash-pinned URLs may be cached
+ * forever (the URL itself encodes the bytes so the response can
+ * never go stale). Unpinned archive-URL pages get a short TTL so
+ * authors who replace the archive at the same URL see updates
+ * within ~5 minutes.
+ */
+export function cacheControlFor(url: URL): string {
+  // The optional `content_hash` query param signals "this URL is
+  // pinned to specific bytes; the page rendering cannot change for
+  // this URL". Allow Cloudflare's edge to cache for a year.
+  if (url.searchParams.has("content_hash")) {
+    return "public, max-age=31536000, immutable";
+  }
+  return "public, max-age=300, stale-while-revalidate=86400";
+}
+
+export function html(body: string, status = 200, url: URL | null = null): Response {
   return new Response(body, {
     status,
     headers: {
       ...COMMON_HEADERS,
       "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": "public, max-age=300, stale-while-revalidate=86400",
+      "Cache-Control": url ? cacheControlFor(url) : "public, max-age=300, stale-while-revalidate=86400",
+      // Vary on Accept so a future JSON variant of the same URL
+      // doesn't share a cache slot with the HTML.
+      "Vary": "Accept",
     },
   });
 }
 
-function text(body: string, status = 200, contentType = "text/plain; charset=utf-8"): Response {
+export function text(body: string, status = 200, contentType = "text/plain; charset=utf-8"): Response {
   return new Response(body, {
     status,
     headers: {
@@ -130,6 +150,20 @@ function text(body: string, status = 200, contentType = "text/plain; charset=utf
 // Pages
 // ---------------------------------------------------------------------------
 
+/**
+ * Build a canonical URL that drops any refused-by-isSafeUrl `?url=`
+ * query so we never echo attacker-controlled `javascript:` / `file:`
+ * payloads in `<link rel="canonical">` or `<meta property="og:url">`
+ * — those tags survive in caches, search-engine indexes, and social
+ * preview snapshots.
+ */
+function canonicalUrl(url: URL, safeArchiveUrl: string | null): string {
+  if (safeArchiveUrl) return url.toString();
+  // The `url` param is either absent or refused; emit a canonical
+  // pointing at the bare path with no query.
+  return `${url.origin}${url.pathname}`;
+}
+
 function renderIndexPage(url: URL): string {
   const archiveUrl = url.searchParams.get("url");
   // Only accept http(s) URLs — disallow `javascript:`, `file:`, `data:` etc.
@@ -139,9 +173,11 @@ function renderIndexPage(url: URL): string {
 
   return baseShell({
     title: safeUrl
-      ? `Viewing ${escapeHtml(safeUrl)}`
+      ? `Viewing ${safeUrl}`
       : "MDZ Viewer — drop an archive to render",
     body: safeUrl ? renderViewerBody(safeUrl) : renderLandingBody(),
+    archiveUrl: safeUrl,
+    canonical: canonicalUrl(url, safeUrl),
   });
 }
 
@@ -152,12 +188,15 @@ function renderEmbedPage(url: URL): string {
     return baseShell({
       title: "MDZ Embed",
       body: '<p style="padding:1rem;color:#666">Pass ?url=https://... to embed an MDZ archive.</p>',
+      canonical: canonicalUrl(url, null),
     });
   }
   // Embed page omits header/footer chrome — intended to be <iframe>'d.
   return baseShell({
     title: "MDZ Embed",
     body: `<mdz-viewer src="${escapeHtml(safeUrl)}" theme="auto"></mdz-viewer>`,
+    archiveUrl: safeUrl,
+    canonical: canonicalUrl(url, safeUrl),
   });
 }
 
@@ -211,13 +250,44 @@ function renderViewerBody(archiveUrl: string): string {
   <mdz-viewer src="${escapeHtml(archiveUrl)}" theme="auto"></mdz-viewer>`;
 }
 
-function baseShell({ title, body }: { title: string; body: string }): string {
+interface ShellOptions {
+  title: string;
+  body: string;
+  /** Archive URL the page is rendering, if any. Used for OG / Twitter
+   *  card meta so a paste into Slack/Twitter/etc. shows useful preview. */
+  archiveUrl?: string | null;
+  /** Canonical URL for this page (the request URL). */
+  canonical?: string | null;
+}
+
+function baseShell(opts: ShellOptions): string {
+  const { title, body, archiveUrl, canonical } = opts;
+  const description = archiveUrl
+    ? `View MDZ archive ${archiveUrl} — rendered live in your browser, no download required.`
+    : "Render MDZ (Markdown Zipped Container) archives in the browser. Free, stateless, open-source.";
+  // OG / Twitter card meta — covers the "shareable URL" Phase 2.2
+  // deliverable. Image is a static SVG hosted alongside the worker;
+  // a per-archive cover-image extraction is a follow-up that requires
+  // fetching + parsing the manifest at preview time.
+  const ogMeta = [
+    `<meta property="og:type" content="article"/>`,
+    `<meta property="og:title" content="${escapeHtml(title)}"/>`,
+    `<meta property="og:description" content="${escapeHtml(description)}"/>`,
+    `<meta property="og:site_name" content="MDZ Viewer"/>`,
+    canonical ? `<meta property="og:url" content="${escapeHtml(canonical)}"/>` : "",
+    `<meta name="twitter:card" content="summary"/>`,
+    `<meta name="twitter:title" content="${escapeHtml(title)}"/>`,
+    `<meta name="twitter:description" content="${escapeHtml(description)}"/>`,
+  ].filter(Boolean).join("\n  ");
+  const canonicalLink = canonical ? `<link rel="canonical" href="${escapeHtml(canonical)}"/>` : "";
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <meta name="description" content="Render MDZ (Markdown Zipped Container) archives in the browser. Free, stateless, open-source."/>
+  <meta name="description" content="${escapeHtml(description)}"/>
+  ${ogMeta}
+  ${canonicalLink}
   <title>${escapeHtml(title)}</title>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; margin: 0; color: #1a1a1a; }
@@ -266,7 +336,7 @@ ${body}
 // Safety helpers
 // ---------------------------------------------------------------------------
 
-function isSafeUrl(raw: string | null): raw is string {
+export function isSafeUrl(raw: string | null): raw is string {
   if (!raw) return false;
   // Reject strings with raw control characters — `new URL()` accepts
   // some (e.g., leading whitespace, which it trims silently), and
@@ -286,7 +356,7 @@ function isSafeUrl(raw: string | null): raw is string {
   return parsed.protocol === "https:";
 }
 
-function escapeHtml(s: string): string {
+export function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

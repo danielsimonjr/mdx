@@ -196,6 +196,46 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Added — Phase 2.2 hosted service polish (2026-04-24)
+
+The Cloudflare Worker fronting `view.mdz-format.org` (code at
+`packages/mdz-viewer-hosted/src/worker.ts`) gains:
+
+- **Content-hash cache pinning**: `cacheControlFor(url)` returns
+  `max-age=31536000, immutable` when the request URL carries
+  `?content_hash=…` (the URL itself encodes the bytes; the response
+  cannot go stale). Without the param, falls back to
+  `max-age=300, stale-while-revalidate=86400`. Cuts CDN cost for
+  papers that pin their content_hash in citation URLs.
+- **OG / Twitter card meta** on every page: `og:type`, `og:title`,
+  `og:description`, `og:site_name`, `og:url`, `twitter:card`,
+  `twitter:title`, `twitter:description`. Description varies for
+  landing vs archive-rendering pages. A paste into Slack / Twitter
+  / LinkedIn now produces a useful preview snippet.
+- **Sanitized canonical URLs** — `og:url` and `<link rel="canonical">`
+  use a sanitized canonical that drops refused-input query params,
+  so a malicious `?url=javascript:…` link never echoes into
+  search-engine indexes or social preview snapshots.
+- **`Vary: Accept` header** on every HTML response so a future JSON
+  variant of the same URL doesn't share a cache slot with the HTML.
+- **Test coverage** — `packages/mdz-viewer-hosted/src/worker.test.ts`
+  with 32 vitest cases. Targets the Worker's `fetch` handler
+  directly via `globalThis.Request` / `Response` (no Miniflare
+  needed). Covers: helper functions (isSafeUrl, escapeHtml,
+  cacheControlFor), HTTP routing (/, /embed.html, /robots.txt,
+  /healthz, 404), method handling (OPTIONS preflight, POST
+  rejection), security headers (CSP, COOP, X-Content-Type-Options,
+  Referrer-Policy, Permissions-Policy, Vary), URL safety
+  (javascript:/data:/file:/vbscript:/about: + control chars
+  rejected), cache headers (short TTL vs immutable), OG meta tag
+  presence + escape behavior.
+- **CI**: `Phase 2/3 Tests` job runs the new vitest suite under the
+  hosted-worker package alongside the existing typecheck.
+
+Deployment to `view.mdz-format.org` itself is an external action
+(`wrangler deploy` + DNS); the code is production-ready and
+test-covered, just not yet live.
+
 ### Added — Phase 2.5 browser-extension hardening (2026-04-24)
 
 The browser extension's manifest + scripts now have CI validation

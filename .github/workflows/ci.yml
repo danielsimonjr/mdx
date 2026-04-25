@@ -290,6 +290,11 @@ jobs:
           cd packages/mdz-viewer-hosted
           npx tsc --noEmit
 
+      - name: Run hosted worker tests (Phase 2.2)
+        run: |
+          cd packages/mdz-viewer-hosted
+          npx vitest run
+
       - name: Run accessibility structural checks
         run: python tests/accessibility/run_accessibility.py
 
