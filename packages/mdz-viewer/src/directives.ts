@@ -57,6 +57,36 @@ const LABEL_PREFIX: Record<LabeledKind, string> = {
 };
 
 /**
+ * Block-level matchers that span multiple lines. These run BEFORE
+ * the line-by-line pass so a `::cell{...}` directive can swallow
+ * its trailing fenced code block as a single unit.
+ *
+ * Pattern shape (per spec/grammar/mdz-directives.abnf):
+ *   ::cell{<attrs>}
+ *
+ *   ```<lang>
+ *   <source>
+ *   ```
+ *
+ * The blank line between the marker and the fence is REQUIRED — the
+ * spec uses it to disambiguate `::cell{...}` followed immediately by
+ * a fence (which is a reader's mistake — the fence belongs to the
+ * cell) from `::cell{...}` followed by prose (a stand-alone marker).
+ *
+ * `[\s\S]` rather than `.` so the body matches across newlines without
+ * needing the `s` flag.
+ */
+const CELL_BLOCK = /^::cell\{([^}]*)\}[ \t]*\r?\n\r?\n[ \t]*```([a-zA-Z0-9_-]*)[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*```[ \t]*$/gm;
+const OUTPUT_BLOCK_FENCED = /^::output\{([^}]*)\}[ \t]*\r?\n\r?\n[ \t]*```([a-zA-Z0-9_-]*)[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*```[ \t]*$/gm;
+/**
+ * `::output{type=image src=path}` standalone form — no fenced body
+ * because the output is a referenced asset, not inline text. Used for
+ * cell outputs that produced an image (matplotlib `display_data`,
+ * Jupyter image MIME bundle).
+ */
+const OUTPUT_IMAGE_LINE = /^::output\{((?:[^}]*\b(?:type)\s*=\s*["']?(?:image|figure))[^}]*)\}[ \t]*$/gm;
+
+/**
  * Block-level matchers run on whole-line patterns. Each matches a
  * directive marker that opens or stands alone on its own line.
  *
@@ -128,16 +158,38 @@ function parseId(body: string): string | null {
 
 /**
  * Public API: transform MDZ directive markdown to HTML-flavored markdown.
+ *
+ * Two-stage pipeline:
+ *   1. **Multi-line block substitutions.** `::cell{}` + fenced source
+ *      and `::output{}` + fenced body are matched as multi-line regex
+ *      patterns and replaced with HTML islands BEFORE the line walker
+ *      runs. Image-output (`::output{type=image src=...}` standalone
+ *      line) also lands here. These run first because they consume
+ *      multiple lines of source as a unit.
+ *   2. **Line-by-line transform.** Block-level whole-line directives
+ *      (`::fig{}` / `::eq{}` / `::tab{}` / `::bibliography`) and
+ *      inline directives (`::ref` / `::cite`) walked line-by-line.
  */
 export function processDirectives(md: string, opts: DirectiveOptions): string {
   const { labels, citationOrder } = collect(md);
   const style = opts.citationStyle ?? "chicago-author-date";
 
-  // Pass 2 — line-by-line transform. Block directives (`::fig{}`,
+  // Stage 1 — multi-line block substitutions for cells + outputs.
+  let staged = md.replace(CELL_BLOCK, (_, attrs, lang, source) =>
+    renderCellBlock(attrs, lang, source),
+  );
+  staged = staged.replace(OUTPUT_BLOCK_FENCED, (_, attrs, lang, body) =>
+    renderOutputBlock(attrs, lang, body),
+  );
+  staged = staged.replace(OUTPUT_IMAGE_LINE, (_, attrs) =>
+    renderOutputImage(attrs),
+  );
+
+  // Stage 2 — line-by-line. Block directives (`::fig{}`,
   // `::bibliography`) replace whole lines. Inline directives (`::ref`,
   // `::cite`) are global-replaced inside each line.
   const out: string[] = [];
-  for (const line of md.split("\n")) {
+  for (const line of staged.split("\n")) {
     const figMatch = FIG_LINE.exec(line);
     if (figMatch) {
       out.push(renderLabeledOpener(figMatch[1] as LabeledKind, figMatch[2], labels));
@@ -249,5 +301,110 @@ function renderBibliography(
     return `<section class="mdz-bibliography mdz-bibliography-empty" aria-label="Bibliography (no citations found in document)"></section>`;
   }
   return `<section class="mdz-bibliography" aria-label="Bibliography"><ol class="mdz-bib-list">${items.join("")}</ol></section>`;
+}
+
+// ---------------------------------------------------------------------------
+// ::cell + ::output renderers
+// ---------------------------------------------------------------------------
+
+/**
+ * Pull common attributes from a directive body. Matches the small
+ * subset the renderer actually surfaces — id / language / kernel /
+ * execution_count for cells, type / src / mime for outputs. Anything
+ * else is silently ignored at this layer (not a bug — extension
+ * attributes live in `manifest.custom` per spec).
+ */
+function pickAttr(body: string, name: string): string | null {
+  const re = new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([\\w./:-]+))`, "i");
+  const m = re.exec(body);
+  if (!m) return null;
+  return m[1] ?? m[2] ?? m[3] ?? null;
+}
+
+/**
+ * Build the class-token suffix that surfaces a directive attribute on
+ * the rendered element. The sanitizer doesn't allow `data-*` so class
+ * names carry the metadata downstream consumers (CSS, screen readers
+ * via aria-label, future client-side cell-execution hooks) can read.
+ *
+ * Class tokens are `mdz-<directive>-<attr>-<value-slug>`; the slug is
+ * a defensive subset of `[a-z0-9-]` so a malformed attribute value
+ * cannot escape into other class tokens.
+ */
+function classToken(prefix: string, value: string | null): string {
+  if (!value) return "";
+  const slug = value.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
+  return slug ? ` ${prefix}-${slug}` : "";
+}
+
+/**
+ * Render a `::cell{language=… kernel=… execution_count=N}` block.
+ *
+ * The current viewer (Phase 2.1) renders cells as syntax-highlightable
+ * `<pre><code>` with class metadata. Actual cell execution
+ * (re-running the source via Pyodide) lands in Phase 2.3b.1; the HTML
+ * island below is the static surface those features will hook into.
+ */
+function renderCellBlock(attrBody: string, lang: string, source: string): string {
+  const language = pickAttr(attrBody, "language") ?? pickAttr(attrBody, "lang") ?? lang ?? "";
+  const kernel = pickAttr(attrBody, "kernel");
+  const execCount = pickAttr(attrBody, "execution_count");
+  const id = parseId(attrBody);
+
+  const classes = [
+    "mdz-cell",
+    classToken("mdz-cell-lang", language).trim(),
+    classToken("mdz-cell-kernel", kernel).trim(),
+    classToken("mdz-cell-exec", execCount).trim(),
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  // Build a screen-reader-friendly description so a visually-rendered
+  // cell is announced with its language / kernel / execution count.
+  const ariaParts: string[] = [];
+  if (language) ariaParts.push(`${language} cell`);
+  if (kernel) ariaParts.push(`kernel ${kernel}`);
+  if (execCount) ariaParts.push(`execution count ${execCount}`);
+  const ariaLabel = ariaParts.join(", ") || "code cell";
+
+  const idAttr = id ? ` id="${escapeHtml(id)}"` : "";
+  const langClass = language ? ` class="language-${escapeHtml(language)}"` : "";
+  return `<div${idAttr} class="${classes}" aria-label="${escapeHtml(ariaLabel)}"><pre class="mdz-cell-source"><code${langClass}>${escapeHtml(source)}</code></pre></div>`;
+}
+
+/**
+ * Render a fenced `::output{type=… mime=…}` block. The body is the
+ * literal cell output text (stdout, repr, JSON, etc.); the type
+ * attribute drives the class token so downstream CSS can render
+ * stream output differently from JSON differently from error tracebacks.
+ */
+function renderOutputBlock(attrBody: string, _lang: string, body: string): string {
+  const type = pickAttr(attrBody, "type") ?? "text";
+  const mime = pickAttr(attrBody, "mime");
+  const classes = [
+    "mdz-output",
+    classToken("mdz-output", type).trim(),
+    classToken("mdz-output-mime", mime).trim(),
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return `<div class="${classes}" aria-label="${escapeHtml(`output (${type})`)}"><pre class="mdz-output-body"><code>${escapeHtml(body)}</code></pre></div>`;
+}
+
+/**
+ * Render `::output{type=image src=…}` standalone form. The image
+ * itself comes from the archive's asset map; the renderer emits a
+ * standard `<img>` whose src will be rewritten by the sanitizer's
+ * `resolveAsset` pass against the archive entries.
+ */
+function renderOutputImage(attrBody: string): string {
+  const src = pickAttr(attrBody, "src");
+  if (!src) {
+    return `<div class="mdz-output mdz-output-image mdz-output-empty" aria-label="output image (missing src)"></div>`;
+  }
+  const alt = pickAttr(attrBody, "alt") ?? "cell output image";
+  const mime = pickAttr(attrBody, "mime") ?? "";
+  return `<div class="mdz-output mdz-output-image${classToken("mdz-output-mime", mime)}"><img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"/></div>`;
 }
 

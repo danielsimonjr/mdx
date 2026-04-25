@@ -196,6 +196,58 @@ CI hygiene:
   bumps to address esbuild + undici + vite Dependabot alerts (5
   alerts; awaits committed lockfile for re-scan).
 
+### Added — Phase 2.1 viewer: `::cell` + `::output` rendering (2026-04-24)
+
+`<mdz-viewer>` now renders code cells and their outputs as
+sanitizer-safe HTML islands. Realizes the cell-display surface real
+papers need; static rendering only — actual cell execution
+(re-running source via Pyodide) is Phase 2.3b.1.
+
+- **`::cell{language=… kernel=… execution_count=N}`** + fenced
+  source pair compiles to
+  `<div class="mdz-cell mdz-cell-lang-X mdz-cell-kernel-Y
+  mdz-cell-exec-N"><pre><code class="language-X">…</code></pre>
+  </div>`. Class-token metadata (no `data-*` — the sanitizer
+  doesn't allow them) so downstream CSS / future cell-execution
+  hooks can read the cell's identity. Source is HTML-escaped; an
+  injection like `<script>alert(1)</script>` inside cell source
+  surfaces as visible text.
+- **Falls back to fenced-block lang** when the directive omits
+  `language=` (covers archives where authors lean on the fence
+  syntax for hint).
+- **ARIA description** synthesized from language / kernel /
+  exec-count so a screen reader announces "python cell, kernel
+  python3, execution count 1" rather than just "code block".
+- **Quoted-id charset enforcement** — same strict rule applied to
+  `::fig` extends to `::cell{id="…"}` (a malformed quoted id is
+  silently dropped from output rather than emitted as
+  `<div id="bad space">`).
+- **`::output{type=…}`** + fenced body renders as
+  `<div class="mdz-output mdz-output-text">` (or whatever `type`
+  is), MIME tag carried as `mdz-output-mime-…` class. Image-form
+  `::output{type=image src=… alt=…}` (standalone line, no fence)
+  emits `<img>` with the src forwarded to the sanitizer's
+  `resolveAsset` rewriter.
+- **Empty image marker** — `::output{type=image}` with no `src`
+  surfaces as a visible `mdz-output-empty` placeholder rather than
+  a broken-image icon.
+
+Pipeline placement: the new multi-line block-substitution stage
+runs BEFORE the existing line-by-line directive walk inside
+`processDirectives`. Multi-line patterns (`::cell{}\n\n```X\n…\n```\n`)
+have to consume multiple lines as a unit; the line walker can't
+see them otherwise. Image-form `::output` is matched as a single
+whole-line pattern.
+
+Tests: 11 new directive tests (35 total in the suite). Coverage
+includes structural HTML shape, escape behavior (`<script>` in cell
+source comes through as `&lt;script&gt;`), ARIA labels, id
+preservation + charset enforcement, language fallback, image
+output happy path + empty case, regression guard that prose
+followed by a fenced block does NOT get consumed as a phantom
+cell. Total viewer tests now: **96** (38 sanitizer + 35 directives
++ 13 math + 10 references). All pass; tsc --noEmit clean.
+
 ### Changed — ROADMAP: Phase 2.3 editor work chunked into session-sized sub-phases (2026-04-24)
 
 The original Phase 2.3a (Desktop editor MVP, 4–6 months) and Phase

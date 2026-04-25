@@ -333,6 +333,152 @@ First we cite ::cite[jones2021]. Later ::cite[smith2020].
 // End-to-end through the full render pipeline
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// ::cell + ::output (Milestone E)
+// ---------------------------------------------------------------------------
+
+describe("cell + output blocks", () => {
+  const CELL_MD = [
+    "::cell{language=python kernel=python3 execution_count=1}",
+    "",
+    "```python",
+    "import numpy as np",
+    "print(np.ones(3))",
+    "```",
+  ].join("\n");
+
+  it("renders a cell as <div class='mdz-cell ...'><pre><code>", () => {
+    const out = processDirectives(CELL_MD, { references: NO_REFS });
+    expect(out).toContain('class="mdz-cell mdz-cell-lang-python mdz-cell-kernel-python3 mdz-cell-exec-1"');
+    expect(out).toContain('<pre class="mdz-cell-source">');
+    expect(out).toContain('<code class="language-python">');
+    expect(out).toContain("import numpy as np");
+  });
+
+  it("escapes cell source — no XSS via TeX-like content", () => {
+    const md = [
+      "::cell{language=html}",
+      "",
+      "```html",
+      "<script>alert(1)</script>",
+      "```",
+    ].join("\n");
+    const out = processDirectives(md, { references: NO_REFS });
+    expect(out).not.toMatch(/<script[^>]*>alert/i);
+    expect(out).toContain("&lt;script&gt;");
+  });
+
+  it("emits an aria-label naming language + kernel + exec count", () => {
+    const out = processDirectives(CELL_MD, { references: NO_REFS });
+    expect(out).toMatch(/aria-label="python cell, kernel python3, execution count 1"/);
+  });
+
+  it("preserves cell id when present", () => {
+    const md = [
+      "::cell{id=fig1-source language=python}",
+      "",
+      "```python",
+      "x = 1",
+      "```",
+    ].join("\n");
+    const out = processDirectives(md, { references: NO_REFS });
+    expect(out).toContain('id="fig1-source"');
+  });
+
+  it("rejects malformed quoted ids on cells (charset enforcement)", () => {
+    // Same charset rule that ::fig uses applies to cells.
+    const md = [
+      `::cell{id="bad space" language=python}`,
+      "",
+      "```python",
+      "x",
+      "```",
+    ].join("\n");
+    const out = processDirectives(md, { references: NO_REFS });
+    expect(out).not.toContain('id="bad space"');
+  });
+
+  it("falls back to fenced-block lang when directive omits language=", () => {
+    const md = [
+      "::cell{kernel=ir}",
+      "",
+      "```r",
+      "summary(x)",
+      "```",
+    ].join("\n");
+    const out = processDirectives(md, { references: NO_REFS });
+    expect(out).toContain("mdz-cell-lang-r");
+    expect(out).toContain('<code class="language-r">');
+  });
+
+  it("renders a stream output block", () => {
+    const md = [
+      "::output{type=text}",
+      "",
+      "```",
+      "[1. 1. 1.]",
+      "```",
+    ].join("\n");
+    const out = processDirectives(md, { references: NO_REFS });
+    expect(out).toContain('class="mdz-output mdz-output-text"');
+    expect(out).toContain("[1. 1. 1.]");
+  });
+
+  it("renders an image-output standalone form", () => {
+    const md = `::output{type=image src=assets/images/plot.png alt="Histogram"}`;
+    const out = processDirectives(md, { references: NO_REFS });
+    expect(out).toContain('class="mdz-output mdz-output-image"');
+    expect(out).toContain('src="assets/images/plot.png"');
+    expect(out).toContain('alt="Histogram"');
+  });
+
+  it("emits empty-image marker for image output without src", () => {
+    const md = `::output{type=image}`;
+    const out = processDirectives(md, { references: NO_REFS });
+    expect(out).toContain("mdz-output-empty");
+    expect(out).not.toContain("<img");
+  });
+
+  it("does not consume a fenced block following non-cell prose", () => {
+    // Regression guard: the multi-line regex must NOT eat fenced
+    // blocks that follow prose (or any non-`::cell{...}` line).
+    const md = [
+      "Just some prose.",
+      "",
+      "```python",
+      "x = 1",
+      "```",
+    ].join("\n");
+    const out = processDirectives(md, { references: NO_REFS });
+    expect(out).not.toContain("mdz-cell");
+    // Original fenced block still in markdown form for marked to handle.
+    expect(out).toContain("```python");
+  });
+
+  it("end-to-end: cells + outputs survive marked + sanitizer", () => {
+    const md = [
+      "# Demo",
+      "",
+      CELL_MD,
+      "",
+      "::output{type=text}",
+      "",
+      "```",
+      "[1. 1. 1.]",
+      "```",
+    ].join("\n");
+    const html = renderMarkdown(md, {
+      resolveAsset: () => null,
+      references: NO_REFS,
+    });
+    expect(html).toContain("mdz-cell");
+    expect(html).toContain("mdz-output");
+    // Sanitizer keeps <pre> + <code> + <div> + <span>.
+    expect(html).toMatch(/<pre[^>]*>/);
+    expect(html).toMatch(/<code[^>]*>/);
+  });
+});
+
 describe("end-to-end render pipeline", () => {
   it("preserves directive HTML islands through marked + sanitizer", () => {
     const md = `
