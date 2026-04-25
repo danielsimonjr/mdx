@@ -103,54 +103,51 @@ document.mdx (ZIP container)
 
 ## Quick Start
 
-### Creating an MDX Document (Python)
+### Creating an MDZ Document (Python)
 
 ```python
-import zipfile
-import json
-import uuid
+import zipfile, json, uuid
 from datetime import datetime, timezone
 
-# Create a minimal MDX document
-with zipfile.ZipFile('my-document.mdx', 'w', zipfile.ZIP_DEFLATED) as mdx:
-    # Add manifest
-    timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-    manifest = {
-        "mdx_version": "2.0.0",
-        "document": {
-            "title": "My Document",
-            "id": str(uuid.uuid4()),  # UUID v4 required
-            "created": timestamp,
-            "modified": timestamp
-        },
-        "content": {
-            "entry_point": "document.md",
-            "extensions": ["tables", "attributes", "alignment"]
-        }
-    }
-    mdx.writestr('manifest.json', json.dumps(manifest, indent=2))
+timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+manifest = {
+    "mdx_version": "2.0.0",
+    "document": {
+        "id": str(uuid.uuid4()),     # UUID v4 required
+        "title": "My Document",
+        "created": timestamp,
+        "modified": timestamp,
+        "language": "en",
+    },
+    "content": {"entry_point": "document.md"},
+}
 
-    # Add content
-    mdx.writestr('document.md', '# Hello World\n\nThis is my MDX document.')
+with zipfile.ZipFile('my-document.mdz', 'w', zipfile.ZIP_DEFLATED) as out:
+    # Spec §10.2: manifest.json MUST be the first entry.
+    out.writestr('manifest.json', json.dumps(manifest, indent=2))
+    out.writestr('document.md', '# Hello World\n\nThis is my MDZ document.')
 ```
 
-### Creating an MDX Document (TypeScript)
+### Creating an MDZ Document (TypeScript)
 
 ```typescript
-import { MDXDocument } from './implementations/typescript/mdx_format';
+import { MDZDocument } from './implementations/typescript/mdx_format';
 
-const doc = MDXDocument.create("My Document", {
+const doc = MDZDocument.create("My Document", {
   author: { name: "Your Name", email: "you@example.com" }
 });
-doc.setContent("# Hello World\n\nThis is my MDX document.");
+doc.setContent("# Hello World\n\nThis is my MDZ document.");
 await doc.addImage(imageData, "figure.png", { altText: "A figure" });
-const blob = await doc.save();
+const blob = await doc.save();      // produces .mdz bytes
 ```
 
-### Reading an MDX Document
+> The TypeScript class is `MDZDocument`; `MDXDocument` is a
+> deprecated alias retained through 2027-01-01 for legacy callers.
+
+### Reading an MDZ Document
 
 ```typescript
-const doc = await MDXDocument.open(fileData);
+const doc = await MDZDocument.open(fileData);   // accepts .mdz or .mdx
 console.log(doc.title);
 console.log(doc.getContent());
 ```
@@ -158,40 +155,29 @@ console.log(doc.getContent());
 ## Repository Structure
 
 ```
-mdx/
-├── spec/                          # Specification documents
-│   ├── MDX_FORMAT_SPECIFICATION.md
-│   └── manifest.schema.json      # JSON Schema for validation
-├── docs/                          # Developer documentation
-│   ├── implementation-guide.md   # Implementation patterns
-│   ├── tool-builder-guide.md     # Building utilities
-│   └── format-internals.md       # Technical reference
-├── implementations/               # Reference implementations
-│   ├── typescript/               # TypeScript/JavaScript
-│   │   └── mdx_format.ts
-│   └── python/                   # Python
-│       └── mdx_format.py
-├── cli/                           # Command-line tool
-│   ├── src/                      # CLI source code
-│   └── dist/                     # Built executables
-├── editor-desktop/                # Electron production editor (Phase 2.3)
-├── packages/mdz-viewer/           # <mdz-viewer> web component (Phase 2.1)
-├── packages/mdz-viewer-hosted/    # Cloudflare Worker for view.mdz-format.org (Phase 2.2)
-├── browser-extension/             # MV3 cross-browser extension (Phase 2.5)
-├── legacy/                        # pre-Phase-2 demos retained for reference
-│   ├── editor/                    # WYSIWYG demo (replaced by editor-desktop/)
-│   ├── viewer/                    # read-only viewer demo (replaced by packages/mdz-viewer/)
-│   └── chrome-extension/          # Chrome-only ext (replaced by browser-extension/)
-├── examples/                      # Example MDX documents
-│   ├── example-document.mdx       # Basic example
-│   ├── alignment-basic.mdx        # v1.1 alignment examples
-│   ├── alignment-directives.mdx   # v1.1 alignment with directives
-│   ├── alignment-complex.mdx      # v1.1 nested containers
-│   └── technical-doc.mdx          # Real-world technical documentation
-├── tests/                         # Conformance test files
-│   └── alignment/                 # v1.1 alignment tests
-└── .github/                       # GitHub templates & CI
+mdx/                                # repo root (directory rename to mdz/ deferred — see CLAUDE.md)
+├── spec/                          # Specification + grammar + profiles + extensions
+├── docs/                          # POSITIONING / FUNDING / SUPPORT_MATRIX / governance / proposals
+├── implementations/               # TypeScript + Python reference impls
+├── cli/                           # `mdz` / `mdx` Node.js command-line tool
+├── packages/                      # mdz-viewer web component + mdz-viewer-hosted worker
+├── editor-desktop/                # Phase 2.3 Electron editor + Phase 2.3a.7 e2e suite
+├── browser-extension/             # Phase 2.5 cross-browser MV3 extension
+├── bindings/rust/                 # Phase 4.1 Rust binding (read + verify)
+├── integrations/                  # Phase 4.2 Pandoc + VS Code hooks
+├── tools/corpus-fetcher/          # Phase 4.3 arXiv corpus tooling
+├── tree-sitter-mdz/               # alpha grammar
+├── examples/                      # v1, v1.1, v2 example archives
+├── tests/                         # conformance + parity + accessibility + roadmap-gates
+├── legacy/                        # pre-Phase-2 demos retained for reference (do not import)
+└── .github/                       # CI workflows, issue templates
 ```
+
+For the full annotated tree (including renderer modules,
+sub-package layouts, and the v1.x/v2.0 source files inside
+`implementations/`), see [CLAUDE.md](CLAUDE.md). For
+"which implementation supports which feature," see
+[docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md).
 
 ## Specification
 
@@ -202,25 +188,35 @@ The complete specification is available at:
 
 **Current Version:** 2.0.0 (Draft)
 
-**MIME Type:** `application/vnd.mdx-container+zip`
+**File Extensions:** `.mdz` (primary, write new archives with this);
+`.mdx` is accepted by readers as a legacy alias through 2027-01-01.
 
-**File Extensions:** `.mdx` (primary), `.mdxc` (alternative, to avoid conflict with MDX/JSX)
+**MIME Types:** `application/vnd.mdz-container+zip` (primary);
+`application/vnd.mdx-container+zip` (legacy alias, same window).
+Both are proposed — neither is IANA-registered yet.
 
 **JSON Schema:**
 [`spec/manifest-v2.schema.json`](spec/manifest-v2.schema.json) (v2.0),
 [`spec/manifest.schema.json`](spec/manifest.schema.json) (v1.1 baseline,
-still accepted)
+still accepted by readers).
+
+**Profiles** (spec §7):
+[`spec/profiles/mdz-advanced-v1.json`](spec/profiles/mdz-advanced-v1.json) (strict superset),
+[`spec/profiles/scientific-paper-v1.json`](spec/profiles/scientific-paper-v1.json) (IMRaD + CSL-JSON + DID/ORCID),
+[`spec/profiles/api-reference-v1.json`](spec/profiles/api-reference-v1.json) (semver doc + Endpoints section).
+Validate with `mdz validate <file> --profile <id>`.
 
 ## Comparison with Other Formats
 
-| Format | MDX Advantage |
+| Format | MDZ Advantage |
 |--------|---------------|
 | DOCX | Human-readable source, simpler structure, web-native media |
 | PDF | Editable source, smaller size, true interactivity |
 | 3D PDF | Open format, modern 3D standards (glTF), no proprietary tools |
 | HTML | Self-contained, offline-capable, version-controlled |
 | Plain Markdown | Bundled assets, rich metadata, collaboration features |
-| EPUB | Simpler structure, better for documents vs. books |
+| EPUB | Simpler structure, better for documents vs. books — and round-trips both ways via `mdz export-epub` / `mdz import-epub` |
+| `.ipynb` | Bundled non-notebook assets, signed provenance, locale variants — and imports notebooks via `mdz import-ipynb` |
 
 ## Extended Markdown Syntax
 
@@ -262,31 +258,50 @@ cd cli
 npm install
 ```
 
-**Commands:**
+**Commands** (the binary ships as both `mdz` and `mdx` for the
+2027-01-01 backward-compat window — examples lead with `mdz`):
+
 ```bash
-# View - Open in browser with full rendering
-mdx view document.mdx
-mdx v document.mdx -p 8080    # Custom port
+# View — open in browser with full rendering
+mdz view document.mdz
+mdz v document.mdz -p 8080         # Custom port
 
-# Extract - Extract archive contents
-mdx extract document.mdx
-mdx x document.mdx ./output   # Custom output directory
+# Extract — extract archive contents
+mdz extract document.mdz
+mdz x document.mdz ./output
 
-# Info - Display document information
-mdx info document.mdx
-mdx i document.mdx -c         # Show content
-mdx i document.mdx -a         # Show asset details
+# Info — display document metadata
+mdz info document.mdz
+mdz i document.mdz -c              # Show content
+mdz i document.mdz -a              # Show asset details
 
-# Edit - Interactive terminal editor
-mdx edit document.mdx
+# Edit — interactive terminal editor
+mdz edit document.mdz
 
-# Create - Create new document from template
-mdx create
-mdx c "My Document" -t article -o my-doc.mdx
+# Create — new document from template
+mdz create
+mdz c "My Document" -t article -o my-doc.mdz
 
-# Validate - Check document structure
-mdx validate document.mdx
-mdx val document.mdx -v   # Verbose mode
+# Validate — structural + manifest checks
+mdz validate document.mdz
+mdz validate document.mdz --profile mdz-advanced
+mdz validate document.mdz --a11y-report   # Phase 3.3: WCAG sidecar JSON
+
+# Verify — signature chain + integrity hashes (Phase 3.2)
+mdz verify document.mdz
+mdz verify document.mdz --offline --trust trust.json
+
+# Import / export — Phase 2.4 EPUB + Jupyter bridges
+mdz import-ipynb notebook.ipynb            # → notebook.mdz
+mdz import-epub book.epub                  # → book.mdz
+mdz export-epub document.mdz -o out.epub
+mdz export-jats document.mdz -o out.xml
+
+# Snapshot — Phase 4.5 + 4.6.9 delta-snapshots-v1
+mdz snapshot list document.mdz
+mdz snapshot view document.mdz 2.0.0
+mdz snapshot create document.mdz --version 2.1.0 --parent 2.0.0 -m "abstract revision"
+mdz snapshot export document.mdz 2.0.0 -o snapshot-2.0.0.md --with-manifest
 ```
 
 **Build Executable:**
@@ -297,65 +312,56 @@ npm run build:all    # All platforms
 
 See [cli/README.md](cli/README.md) for full documentation.
 
-### Web Editor
+### Desktop editor (Phase 2.3, supported)
 
-A lightweight, browser-based WYSIWYG editor similar to Word. No installation required.
+The production editor lives at `editor-desktop/` — Electron 31 +
+Vite + CodeMirror 6 + a live `<mdz-viewer>` preview pane. Ships
+394 vitest cases across 21 test files; signed installers for
+macOS / Windows / Linux are produced by the Phase 2.3a.6 release
+pipeline once code-signing secrets are wired in CI.
 
-**Features:**
-- **Visual Mode** - WYSIWYG editing with live formatting
-- **Markdown Mode** - Edit raw markdown source
-- **Split View** - Side-by-side markdown and preview
-- Formatting toolbar (headings, bold, italic, lists, tables, etc.)
-- Drag-and-drop asset management
-- Document outline navigation
-- Open/save MDX files directly
-- Word and character count
-
-**Usage:**
 ```bash
-cd legacy/editor
-python -m http.server 8080
-# Open http://localhost:8080 in your browser
+cd editor-desktop
+npm install --include=optional   # ~200 MB Electron platform binary
+npm run dev                      # vite + electron, live reload
+npm run build                    # tsc + vite build → dist/
 ```
 
-Or simply open `legacy/editor/index.html` in any modern browser.
+Phase 2.3b features land on top: Pyodide kernels with per-cell
+▶ Run buttons, accessibility checker (WCAG live scan), block-level
+diff with Compare-versions modal, peer-review annotation sidebar
+with reply creation (Phase 2.3b.4.3), Compare-locales side-by-side
+view with sync-scroll, AVIF/WebP variant pipeline, 9-directive
+picker pack. Launch with `--role=public` to hide editorial
+deliberation per the peer-review spec.
 
-See [legacy/editor/README.md](legacy/editor/README.md) for full documentation.
+See [editor-desktop/README.md](editor-desktop/README.md).
 
-> **Note:** The Phase 2.3 production editor at `editor-desktop/` is the
-> supported entry point for new work. The legacy single-file demo above
-> is retained for reference; see `legacy/README.md`.
+### Web component viewer (Phase 2.1, supported)
 
-### Web Viewer
+`<mdz-viewer>` at `packages/mdz-viewer/` — framework-agnostic
+custom element that renders any MDZ archive in the browser.
+Ships sanitized markdown, citations, KaTeX math, IndexedDB
+caching, and a delta-snapshots-v1 reader. Hosted at
+`view.mdz-format.org` (deploy pending) via the
+`packages/mdz-viewer-hosted/` Cloudflare Worker.
 
-A read-only viewer for MDX documents. Open `legacy/viewer/index.html` in
-a browser. The Phase 2.1 production viewer is at `packages/mdz-viewer/`
-(the `<mdz-viewer>` web component).
+### Browser extension (Phase 2.5, code-ready)
 
-**Features:**
-- Drag-and-drop file loading
-- Markdown rendering with syntax highlighting
-- Asset preview and download
-- Manifest inspection
+MV3 cross-browser (Chrome / Firefox / Edge / Brave) extension at
+`browser-extension/`. Detects MDZ archives in tabs and renders
+them inline. Reproducible-build CI gate compares two sequential
+zips byte-for-byte. Real icon artwork + addon-store submissions
+are external-action items.
 
-### Chrome Extension
+### Legacy demos (pre-Phase-2, reference only)
 
-A native Chrome extension for viewing MDX files directly in the browser.
-
-**Features:**
-- View MDX documents without a web server
-- Document outline navigation
-- Export to HTML, Markdown, or JSON
-- Syntax-highlighted code blocks
-
-**Installation:**
-```bash
-cd chrome-extension
-node setup.js              # Download dependencies
-# Load unpacked extension via chrome://extensions
-```
-
-See [chrome-extension/README.md](chrome-extension/README.md) for setup instructions.
+The single-file WYSIWYG demo (`legacy/editor/index.html`),
+read-only HTML viewer (`legacy/viewer/index.html`), and original
+Chrome-only extension (`legacy/chrome-extension/`) are preserved
+under `legacy/` for reference. They are not actively maintained;
+new work should use the supported tools above. See
+[legacy/README.md](legacy/README.md) for the migration table.
 
 ## Contributing
 

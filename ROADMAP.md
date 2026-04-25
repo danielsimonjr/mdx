@@ -681,7 +681,8 @@ is independent — sequence by user demand, not by checklist order.
       a separate task (#196).
 
   **Depends on:** 2.3a.2 + the Phase 3.3 fixture pack (currently
-  23/50 fixtures).
+  30/50 fixtures: 23 structural under `tests/accessibility/fixtures/`
+  + 7 browser-driven under `tests/accessibility/fixtures-axe/`).
 
 #### 2.3b.3 Block-level diff view
 
@@ -1073,8 +1074,8 @@ For large documents (embedded videos, high-res figures), full-ZIP-into-memory
 is a real constraint.
 
 - [x] Research — `docs/proposals/streaming.md` ships with the HTTP-Range strategy, prerequisites, prior-art comparison, and resolutions to the three open questions (signature verification via eager-manifest + deferred-asset + `mdz-asset-unverified` sentinel; cache bound to origin MUST NOT; streaming writes out-of-scope until Phase 5+).
-- [ ] Viewer update: fetch asset bytes on-demand via HTTP range requests — implementation pending.
-- [ ] Editor update: lazy video load — editor not yet built.
+- [ ] Viewer update: fetch asset bytes on-demand via HTTP range requests — implementation pending. Affects `packages/mdz-viewer/src/archive.ts`.
+- [ ] Editor update: lazy video load — defer fetching `::video[src]` bytes from the open archive until the user scrolls the cell into view. The editor itself shipped Phase 2.3a.1; this is an asset-loading optimization on top of the existing renderer. Affects `editor-desktop/src/renderer/editor-pane.ts` (intersection-observer hook).
 
 ### 4.5 Delta encoding for versions
 
