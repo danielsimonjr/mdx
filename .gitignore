@@ -31,6 +31,10 @@ __pycache__/
 *.pyc
 *.pyo
 .pytest_cache/
+# hypothesis (property-based testing) cache — relocated to tests/property/
+# by `HYPOTHESIS_STORAGE_DIRECTORY` in test_parser_properties.py; the
+# explicit ignore here guards against the env-var being missed.
+.hypothesis/
 
 # TypeScript
 *.js.map

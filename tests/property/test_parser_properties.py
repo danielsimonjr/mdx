@@ -14,11 +14,24 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "implementations" / "python"))
+
+# Pin Hypothesis's cache directory next to the test file rather than
+# letting it default to `<cwd>/.hypothesis/`. Without this, running
+# `python tests/property/test_parser_properties.py` from the repo
+# root creates a `.hypothesis/` directory at the project root —
+# self-gitignored but cosmetic clutter. Setting this BEFORE importing
+# hypothesis is required; otherwise hypothesis has already resolved
+# the storage path.
+os.environ.setdefault(
+    "HYPOTHESIS_STORAGE_DIRECTORY",
+    str(Path(__file__).resolve().parent / ".hypothesis"),
+)
 
 if sys.platform == "win32" and hasattr(sys.stdout, "buffer"):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
