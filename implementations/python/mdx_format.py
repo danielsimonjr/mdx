@@ -3,7 +3,7 @@
 MDX Example Document Creator (Corrected Version)
 =================================================
 
-This script creates a properly structured MDX document following the 
+This script creates a properly structured MDX document following the
 corrected specification where all assets are under the assets/ directory.
 
 Key corrections from the original:
@@ -75,11 +75,11 @@ def compute_content_hash(data: bytes) -> str:
 
 def create_example_mdx():
     """Create a comprehensive example MDX document with correct structure."""
-    
+
     # ========================================================================
     # 1. Define the document content
     # ========================================================================
-    
+
     content = '''# MDX Format Demonstration Document
 
 ## Introduction
@@ -233,16 +233,16 @@ The MDX format represents an open approach to document packaging that prioritize
 
 ---
 
-*Document Version: 1.0.0*  
+*Document Version: 1.0.0*
 *Last Updated: ''' + iso_timestamp()[:10] + '''*
 '''
 
     # ========================================================================
     # 2. Create assets
     # ========================================================================
-    
+
     assets: Dict[str, bytes] = {}
-    
+
     # Structure diagram SVG
     structure_svg = '''<?xml version="1.0" encoding="UTF-8"?>
 <svg width="600" height="300" xmlns="http://www.w3.org/2000/svg">
@@ -252,31 +252,31 @@ The MDX format represents an open approach to document packaging that prioritize
   </text>
   <rect x="50" y="60" width="500" height="220" rx="8" fill="#e9ecef" stroke="#adb5bd" stroke-width="2"/>
   <text x="70" y="85" font-family="monospace" font-size="14" fill="#495057">document.mdx</text>
-  
+
   <rect x="70" y="100" width="140" height="45" rx="4" fill="#fff3cd" stroke="#ffc107"/>
   <text x="140" y="128" text-anchor="middle" font-family="monospace" font-size="11" fill="#856404">manifest.json</text>
-  
+
   <rect x="230" y="100" width="140" height="45" rx="4" fill="#d4edda" stroke="#28a745"/>
   <text x="300" y="128" text-anchor="middle" font-family="monospace" font-size="11" fill="#155724">document.md</text>
-  
+
   <rect x="390" y="100" width="140" height="45" rx="4" fill="#cce5ff" stroke="#007bff"/>
   <text x="460" y="128" text-anchor="middle" font-family="monospace" font-size="11" fill="#004085">assets/</text>
-  
+
   <rect x="70" y="165" width="140" height="45" rx="4" fill="#e2d9f3" stroke="#6f42c1"/>
   <text x="140" y="193" text-anchor="middle" font-family="monospace" font-size="11" fill="#432874">styles/</text>
-  
+
   <rect x="230" y="165" width="140" height="45" rx="4" fill="#f5c6cb" stroke="#dc3545"/>
   <text x="300" y="193" text-anchor="middle" font-family="monospace" font-size="11" fill="#721c24">history/</text>
-  
+
   <rect x="390" y="165" width="140" height="45" rx="4" fill="#d1ecf1" stroke="#17a2b8"/>
   <text x="460" y="193" text-anchor="middle" font-family="monospace" font-size="11" fill="#0c5460">annotations/</text>
-  
+
   <text x="70" y="250" font-family="system-ui" font-size="10" fill="#6c757d">
     Required: manifest.json, document.md | Optional: assets/, styles/, history/, annotations/
   </text>
 </svg>'''
     assets['assets/images/structure-diagram.svg'] = structure_svg.encode('utf-8')
-    
+
     # Model preview SVG
     model_preview_svg = '''<?xml version="1.0" encoding="UTF-8"?>
 <svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
@@ -301,7 +301,7 @@ The MDX format represents an open approach to document packaging that prioritize
   </text>
 </svg>'''
     assets['assets/images/model-preview.svg'] = model_preview_svg.encode('utf-8')
-    
+
     # Sample CSV data
     csv_data = '''Quarter,Revenue,Expenses,Profit,Growth
 Q1 2025,1250000,980000,270000,0.12
@@ -309,7 +309,7 @@ Q2 2025,1480000,1050000,430000,0.18
 Q3 2025,1620000,1120000,500000,0.09
 Q4 2025,1890000,1200000,690000,0.17'''
     assets['assets/data/quarterly-results.csv'] = csv_data.encode('utf-8')
-    
+
     # Minimal glTF model
     gltf_data = json.dumps({
         "asset": {"version": "2.0", "generator": "MDX Example"},
@@ -317,17 +317,17 @@ Q4 2025,1890000,1200000,690000,0.17'''
         "scenes": [{"name": "Scene", "nodes": [0]}],
         "nodes": [{"name": "Cube", "mesh": 0}],
         "meshes": [{"name": "Cube", "primitives": [{"attributes": {"POSITION": 0}}]}],
-        "accessors": [{"bufferView": 0, "componentType": 5126, "count": 8, "type": "VEC3", 
+        "accessors": [{"bufferView": 0, "componentType": 5126, "count": 8, "type": "VEC3",
                        "max": [1, 1, 1], "min": [-1, -1, -1]}],
         "bufferViews": [{"buffer": 0, "byteLength": 96}],
         "buffers": [{"byteLength": 96}]
     }, indent=2)
     assets['assets/models/component.gltf'] = gltf_data.encode('utf-8')
-    
+
     # ========================================================================
     # 3. Create styles
     # ========================================================================
-    
+
     theme_css = '''/* MDX Theme */
 :root {
   --primary: #2563eb;
@@ -398,14 +398,14 @@ blockquote {
 }
 '''
     styles: Dict[str, bytes] = {'styles/theme.css': theme_css.encode('utf-8')}
-    
+
     # ========================================================================
     # 4. Build manifest
     # ========================================================================
-    
+
     doc_id = generate_uuid()
     timestamp = iso_timestamp()
-    
+
     manifest = {
         "mdx_version": "2.0.0",
         "document": {
@@ -498,11 +498,11 @@ blockquote {
             "snapshots_directory": "history/snapshots"
         }
     }
-    
+
     # ========================================================================
     # 5. Build version history
     # ========================================================================
-    
+
     versions = {
         "schema_version": "1.0.0",
         "current_version": "1.0.0",
@@ -531,11 +531,11 @@ blockquote {
             }
         ]
     }
-    
+
     # ========================================================================
     # 6. Build annotations
     # ========================================================================
-    
+
     annotations = {
         "schema_version": "1.0.0",
         "@context": "http://www.w3.org/ns/anno.jsonld",
@@ -582,50 +582,50 @@ blockquote {
             }
         ]
     }
-    
+
     # ========================================================================
     # 7. Create the MDX file
     # ========================================================================
-    
+
     output_path = Path(__file__).parent / 'example-document.mdx'
-    
+
     with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zf:
         # Manifest first
         zf.writestr('manifest.json', json.dumps(manifest, indent=2))
-        
+
         # Main content
         zf.writestr('document.md', content)
-        
+
         # Assets
         for path, data in assets.items():
             zf.writestr(path, data)
-        
+
         # Styles
         for path, data in styles.items():
             zf.writestr(path, data)
-        
+
         # Version history
         zf.writestr('history/versions.json', json.dumps(versions, indent=2))
         zf.writestr('history/snapshots/v0.1.0.md', '# Initial Draft\n\nPlaceholder content.')
         zf.writestr('history/snapshots/v1.0.0.md', content)
-        
+
         # Annotations
         zf.writestr('annotations/annotations.json', json.dumps(annotations, indent=2))
-    
+
     print(f"[OK] Created: {output_path}")
-    
+
     # ========================================================================
     # 8. Also extract to directory for inspection
     # ========================================================================
-    
+
     extract_path = Path(__file__).parent / 'example-extracted'
     extract_path.mkdir(parents=True, exist_ok=True)
-    
+
     with zipfile.ZipFile(output_path, 'r') as zf:
         zf.extractall(extract_path)
-    
+
     print(f"[OK] Extracted to: {extract_path}")
-    
+
     # Print summary
     print("\nDocument Summary:")
     print(f"  Title: {manifest['document']['title']}")
@@ -633,7 +633,7 @@ blockquote {
     print(f"  Assets: {sum(len(v) for v in manifest['assets'].values())}")
     print(f"  Versions: {len(versions['versions'])}")
     print(f"  Annotations: {len(annotations['annotations'])}")
-    
+
     # Verify structure
     print("\nArchive contents:")
     with zipfile.ZipFile(output_path, 'r') as zf:

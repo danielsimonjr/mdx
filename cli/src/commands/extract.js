@@ -19,8 +19,15 @@ async function extractCommand(file, output, options) {
             process.exit(1);
         }
 
-        // Determine output directory
-        const baseName = path.basename(file, '.mdx');
+        // Determine output directory. Strip whichever of the two
+        // accepted extensions the input carries; `path.basename(p, ext)`
+        // is a no-op when the ext doesn't match, so this handles both
+        // `.mdz` and the legacy `.mdx` (and any unrecognised extension
+        // falls back to using the full basename).
+        const ext = path.extname(file).toLowerCase();
+        const baseName = (ext === '.mdz' || ext === '.mdx')
+            ? path.basename(file, ext)
+            : path.basename(file);
         const outputDir = output ? path.resolve(output) : path.resolve(baseName + '-extracted');
 
         // Check if output exists

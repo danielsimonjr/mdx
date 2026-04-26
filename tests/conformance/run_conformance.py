@@ -75,12 +75,41 @@ def _run_negative(md_path: Path) -> tuple[bool, str]:
 
 
 def _run_roundtrip(md_path: Path) -> tuple[bool, str]:
-    """Positive + a note that the AST survives JSON roundtrip."""
+    """Positive + AST → JSON → AST stability check.
+
+    The fixture must satisfy `_run_positive` (parser produces the
+    expected AST) AND, when that AST is serialized to JSON and parsed
+    back, the resulting structure must serialize byte-identical. This
+    catches normalization drift — for instance, a node whose key order
+    isn't deterministic, or a child list whose ordering depends on
+    insertion vs. tree-walk.
+
+    Future work (see README.md §Structure): a real Markdown-back
+    serializer that round-trips `parse(text) → serialize(ast) → text`
+    would supersede this check. Today's stability check is a useful
+    intermediate.
+    """
     ok, msg = _run_positive(md_path)
     if not ok:
         return ok, msg
-    # AST itself already round-tripped via json.dumps/loads; record separately
-    # in case we later add serialize-back-to-Markdown.
+    text = md_path.read_text(encoding="utf-8")
+    try:
+        ast1 = parse(text)
+    except ParseError as e:
+        return False, f"unexpected ParseError on roundtrip: {e}"
+    norm1 = _normalize_ast(ast1)
+    json1 = json.dumps(norm1, sort_keys=True)
+    # Re-load the serialized JSON and re-normalize. If normalization is
+    # idempotent the second pass should be a no-op; differences mean
+    # the normalizer has order-dependent behavior.
+    norm2 = _normalize_ast(json.loads(json1))
+    json2 = json.dumps(norm2, sort_keys=True)
+    if json1 != json2:
+        return False, (
+            f"AST → JSON → AST not byte-stable\n"
+            f"    pass 1: {json1[:200]}\n"
+            f"    pass 2: {json2[:200]}"
+        )
     return True, ""
 
 
