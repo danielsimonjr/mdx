@@ -8,6 +8,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security — extract Zip-Slip parity with Rust binding (2026-05-01)
+
+The Rust binding has had a `sanitize_archive_path` gate
+(`bindings/rust/src/lib.rs:745`) since Phase 4.1; the JS extractor
+relied entirely on AdmZip's internal handling, which does not
+reject every Zip-Slip vector (notably NUL bytes and Windows
+drive-letter prefixes). Audit finding #4 from 2026-05-01.
+
+`cli/src/commands/extract.js`:
+
+- New `validateEntryName(entryName)` rejects `..` segments,
+  leading `/` or `\`, drive-letter prefixes (`C:`/`Z:`), NUL bytes,
+  and empty strings. Mirrors the Rust gate's vector list.
+- New `isInsideOutputDir(entryName, outputDir)` is a
+  belt-and-suspenders check: `path.resolve(path.join(outputDir,
+  entryName))` must equal `outputDir` or start with `outputDir +
+  path.sep`. Catches symlink / unicode-normalisation vectors the
+  per-segment validator might miss.
+- Extract flow runs both checks against every entry BEFORE
+  AdmZip's `extractAllTo` touches the filesystem. A single bad
+  entry exits 1 with a clear diagnostic; legitimate archives
+  proceed unchanged.
+- Both helpers exported for unit tests.
+
+Tests (`cli/test/extract.test.js`, new file):
+
+- 9 rejection-vector cases (`..`, leading `/`, leading `\`,
+  drive-letter `C:` / `Z:`, NUL byte, empty, mid-path `..`,
+  backslash `..`).
+- 4 accept cases (manifest.json, nested assets, hash-pinned
+  asset path, `..` inside a longer segment name).
+- 3 `isInsideOutputDir` cases (normal, traversal-flattened,
+  nested).
+
+All 16 new tests pass; smoke test against
+`examples/example-document.mdx` still extracts cleanly.
+
 ### Changed (BREAKING for v2.0 draft) — sig-chain v2 domain separation (2026-05-01)
 
 The signature-chain `prev_signature` construction (spec §16.3) was
