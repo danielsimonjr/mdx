@@ -350,6 +350,12 @@ pub struct SignatureEntry {
     pub algorithm: String,
     /// Base64 signature bytes.
     pub signature: String,
+    /// ISO 8601 timestamp when signed (spec §16.2). Optional; the
+    /// chain-hash-v2 input encodes a missing timestamp as the empty
+    /// string so older fixtures without it still produce a deterministic
+    /// chain anchor (just a weaker one — writers SHOULD set it).
+    #[serde(default)]
+    pub timestamp: Option<String>,
     /// Hash of the previous chain entry's signature (required on all but the first).
     #[serde(default)]
     pub prev_signature: Option<String>,
@@ -700,8 +706,16 @@ impl Archive {
                 .into());
             }
             for (i, entry) in sigs.iter().enumerate().skip(1) {
-                let expected =
-                    format!("sha256:{}", sha256_hex(sigs[i - 1].signature.as_bytes()));
+                // v2 chain construction (spec §16.3): domain-separated
+                // canonical JSON of the prior entry's identifying fields.
+                // Hashing only the opaque signature bytes (v1) was
+                // graft-vulnerable — an attacker could lift entry[i-1]'s
+                // signature off a different document and the chain would
+                // still link. The Node verifier in
+                // `cli/src/commands/verify.js::sigChainPrevHashV2` is the
+                // canonical reference; this mirror MUST stay in lockstep
+                // with it.
+                let expected = format!("sha256:{}", sig_chain_prev_hash_v2(&sigs[i - 1]));
                 match &entry.prev_signature {
                     Some(ps) if ps == &expected => {}
                     Some(ps) => {
@@ -817,6 +831,64 @@ fn sha256_hex(bytes: &[u8]) -> String {
     let mut hasher = sha2::Sha256::new();
     hasher.update(bytes);
     hex::encode(hasher.finalize())
+}
+
+/// Compute the v2 sig-chain prev_signature hash input — the
+/// domain-separated, canonically-encoded previous entry. Returns the
+/// lowercase hex SHA-256 (without the `sha256:` prefix).
+///
+/// Mirrors `sigChainPrevHashV2` in `cli/src/commands/verify.js`. The
+/// canonical form is: `b"mdz-sig-chain-v2|" || canonical_json` where
+/// `canonical_json` is `{"algorithm":"...","signature":"...","signer_did":"...","timestamp":"..."}`
+/// with keys in lexicographic order, no whitespace, missing fields
+/// encoded as the empty string. JCS's number / unicode rules do not
+/// apply here because all four fields are plain strings.
+///
+/// Domain separation prevents the same bytes being usable as a
+/// pre-image of an unrelated protocol step (or v1 chain entry) — that
+/// graft-attack vector is what motivated this helper in the first
+/// place.
+#[cfg(feature = "verify")]
+fn sig_chain_prev_hash_v2(prev: &SignatureEntry) -> String {
+    let did = prev.signer.did.as_deref().unwrap_or("");
+    let timestamp = prev.timestamp.as_deref().unwrap_or("");
+    // Hand-build the canonical JSON: keys lexicographic, fields are
+    // plain strings, no whitespace. Pulling in serde_json::to_string
+    // would re-order alphabetically anyway, but writing it by hand
+    // keeps parity with the JS reference impl byte-for-byte.
+    let canonical_json = format!(
+        r#"{{"algorithm":{},"signature":{},"signer_did":{},"timestamp":{}}}"#,
+        json_string(&prev.algorithm),
+        json_string(&prev.signature),
+        json_string(did),
+        json_string(timestamp),
+    );
+    let mut input = Vec::with_capacity(b"mdz-sig-chain-v2|".len() + canonical_json.len());
+    input.extend_from_slice(b"mdz-sig-chain-v2|");
+    input.extend_from_slice(canonical_json.as_bytes());
+    sha256_hex(&input)
+}
+
+/// Encode a string as a JSON string literal — escapes the six
+/// characters JSON requires (`"`, `\`, control 0x00-0x1F). Bypasses
+/// `serde_json` because we already do canonical key ordering inline.
+#[cfg(feature = "verify")]
+fn json_string(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('"');
+    for ch in s.chars() {
+        match ch {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
 }
 
 // ---------------------------------------------------------------------------

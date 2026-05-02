@@ -8,6 +8,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (BREAKING for v2.0 draft) — sig-chain v2 domain separation (2026-05-01)
+
+The signature-chain `prev_signature` construction (spec §16.3) was
+graft-vulnerable: hashing only the opaque signature bytes meant an
+attacker could lift a leaf signature off a different document and
+the chain would still link. v2.0 is still a draft spec with no
+released downstream consumers; this is a pre-1.0 normative change.
+
+New construction (§16.3.1):
+
+```
+prev_signature = "sha256:" + hex(sha256(
+  b"mdz-sig-chain-v2|" || canonical_json({
+    "algorithm": prev.algorithm,
+    "signature": prev.signature,
+    "signer_did": prev.signer.did,
+    "timestamp": prev.timestamp,
+  })
+))
+```
+
+Keys are lex order, no whitespace, missing fields encode as the
+empty string. The leading domain tag prevents the same byte
+sequence being usable as a pre-image of an unrelated protocol step
+or of the deprecated v1 chain construction.
+
+Implementations updated in lockstep:
+
+- `cli/src/commands/verify.js::sigChainPrevHashV2` — exported for
+  unit tests + cross-impl parity.
+- `bindings/rust/src/lib.rs::sig_chain_prev_hash_v2` — feature-gated
+  behind `verify`. Mirrors the JS reference byte-for-byte.
+- `bindings/rust/src/lib.rs::SignatureEntry` adds an optional
+  `timestamp` field (spec §16.2 already named it; the Rust struct
+  was missing it).
+- `bindings/rust/examples/parity_dump.rs` re-emits `timestamp` so
+  cross-impl parity dumps stay round-trippable.
+- `bindings/rust/tests/archive_integration.rs` rebuilds its chain
+  fixtures with the v2 construction; adds a graft-attack regression
+  test that mutates entry-0's `signer.did` and asserts the chain is
+  rejected.
+
+Spec (`spec/MDX_FORMAT_SPECIFICATION_v2.0.md`):
+
+- §16.3.1 (new) documents the v2 hash construction with worked
+  example and the rationale for domain separation.
+- Appendix C records the change as pre-1.0 draft, no released
+  consumers.
+
+Tests: +6 new verify cases (sigChainPrevHashV2 determinism,
+sensitivity to algorithm / signer.did / timestamp, domain-tag-
+distinguishes-from-v1, end-to-end graft-attack rejection). All 30
+verify + 125 TS-implementation tests pass.
+
 ### Security — verify + trust-pill hardening (2026-05-01)
 
 Two related "don't lie about cryptographic status" fixes that

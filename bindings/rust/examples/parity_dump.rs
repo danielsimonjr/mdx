@@ -134,6 +134,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 o.insert("signer".into(), Value::Object(signer));
                 o.insert("algorithm".into(), json!(s.algorithm));
                 o.insert("signature".into(), json!(s.signature));
+                insert_opt(&mut o, "timestamp", &s.timestamp);
                 insert_opt(&mut o, "prev_signature", &s.prev_signature);
                 Value::Object(o)
             })

@@ -1111,9 +1111,40 @@ Signatures MAY depend on each other via `prev_signature` (hash of the prior sign
 ```json
 {
   "role": "reviewer",
-  "prev_signature": "sha256:<hash of author signature entry>"
+  "prev_signature": "sha256:<v2 chain hash of author signature entry>"
 }
 ```
+
+#### 16.3.1 Chain hash construction (v2)
+
+`prev_signature` is the SHA-256, hex-encoded with the `sha256:` prefix, of the following byte sequence:
+
+```
+b"mdz-sig-chain-v2|" || canonical_json(prev_entry)
+```
+
+Where `canonical_json(prev_entry)` is the UTF-8 JSON encoding of:
+
+```json
+{
+  "algorithm": "<prev_entry.algorithm>",
+  "signature": "<prev_entry.signature>",
+  "signer_did": "<prev_entry.signer.did>",
+  "timestamp": "<prev_entry.timestamp>"
+}
+```
+
+with keys in lexicographic order, no whitespace, and missing fields encoded as the empty string. All four values are plain strings, so JCS's number-formatting and unicode-normalization rules do not apply.
+
+The leading domain tag `mdz-sig-chain-v2|` ensures that the same byte sequence cannot be reused as a pre-image of an unrelated protocol step or of the deprecated v1 chain construction.
+
+The earlier v1 chain construction (`sha256(prev_entry.signature)` of the opaque signature bytes alone) was vulnerable to a graft attack: an attacker could lift a leaf signature off a different document and the chain would still link. v1 chain values MUST NOT be accepted by v2 verifiers — the domain tag's presence in the v2 input guarantees the two constructions cannot collide.
+
+Reference implementations:
+- TypeScript / Node CLI: `cli/src/commands/verify.js::sigChainPrevHashV2`
+- Rust: `bindings/rust/src/lib.rs::sig_chain_prev_hash_v2`
+
+The two MUST stay in lockstep; the parity harness `tests/parity/rust_ts_manifest_parity.py` compares hashes computed by both implementations against shared fixtures.
 
 ### 16.4 DID Support
 
@@ -1367,6 +1398,7 @@ Reference implementations and example v2.0 documents are under
 - **Added** rich accessibility model (§14): `document.accessibility` top-level, per-asset accessibility objects, MathML fallbacks, audio/sign-language tracks
 - **Added** provenance and fork graph (§15): `derived_from[]`, multi-parent versions, optional `graph.json`
 - **Added** multi-signature + DID identity (§16): `security.signatures[]` array, signature chains, DID-based signer identity
+- **Changed (draft, 2026-05-01)** signature-chain `prev_signature` construction (§16.3.1) — domain-separated canonical encoding `b"mdz-sig-chain-v2|" || canonical_json({algorithm, signature, signer_did, timestamp})`. The earlier `sha256(prev.signature)` form was graft-vulnerable. v2.0 is still draft; this is a normative pre-1.0 spec change with no released downstream consumers.
 - **Added** responsive variants (§17): asset `variants[]`, document `content.variants[]`, media-condition and format selection
 - **Deprecated** asset `checksum` in favor of `content_hash` (both still accepted)
 - **Deprecated** `security.signature` (singular) in favor of `security.signatures[]` (both still accepted)

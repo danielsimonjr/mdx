@@ -20,7 +20,7 @@ const { test } = require('node:test');
 const assert = require('node:assert');
 const crypto = require('node:crypto');
 
-const { runChecks, decideExitCode } = require('../src/commands/verify.js');
+const { runChecks, decideExitCode, sigChainPrevHashV2 } = require('../src/commands/verify.js');
 
 // Helper — build a minimal manifest with optional signatures.
 function mkManifest(overrides = {}) {
@@ -151,11 +151,11 @@ test('chain: first entry WITH prev_signature → warning', () => {
 // Signature chain — invariant 2: entries i>0 must have correct prev_signature
 // ---------------------------------------------------------------------------
 
-test('chain: entry 1 with correct prev_signature → passes', () => {
-    const prevSig = 'base64-sig-a';
-    const expectedPrevHash = 'sha256:' + sha256Hex(Buffer.from(prevSig, 'utf8'));
+test('chain: entry 1 with correct prev_signature (v2 domain-separated) → passes', () => {
+    const prevEntry = sig({ signature: 'base64-sig-a' });
+    const expectedPrevHash = 'sha256:' + sigChainPrevHashV2(prevEntry);
     const manifest = mkManifestWithSigs([
-        sig({ signature: prevSig }),
+        prevEntry,
         sig({
             role: 'reviewer',
             signer: { name: 'B', did: 'did:web:bob.example.com' },
@@ -306,6 +306,80 @@ test('runChecks: archive with signatures sets cryptoVerifyPending', () => {
     const report = runChecks(manifest, emptyManifest, [], defaultTrust, noOpts);
     assert.strictEqual(report.cryptoVerifyPending, true);
     assert.strictEqual(report.unsigned, false);
+});
+
+// ---------------------------------------------------------------------------
+// Sig-chain v2 domain separation — Phase 3.2 hardening (#3 in 2026-05-01 audit)
+// Hashing only the opaque signature bytes (v1) was graft-vulnerable: an
+// attacker could lift a leaf signature off a different document and the
+// chain would still link. v2 binds the hash to algorithm + signer.did +
+// signature + timestamp, prefixed with a domain tag.
+// ---------------------------------------------------------------------------
+
+test('sigChainPrevHashV2: deterministic; same input → same hash', () => {
+    const a = sig({ signature: 'sig-a', timestamp: '2026-01-01T00:00:00Z' });
+    assert.strictEqual(sigChainPrevHashV2(a), sigChainPrevHashV2(a));
+});
+
+test('sigChainPrevHashV2: changing signer.did changes the hash', () => {
+    const base = sig({ signature: 'sig', timestamp: '2026-01-01T00:00:00Z' });
+    const lifted = { ...base, signer: { ...base.signer, did: 'did:web:attacker.example.com' } };
+    assert.notStrictEqual(sigChainPrevHashV2(base), sigChainPrevHashV2(lifted));
+});
+
+test('sigChainPrevHashV2: changing algorithm changes the hash', () => {
+    const a = sig({ signature: 'sig', algorithm: 'Ed25519' });
+    const b = sig({ signature: 'sig', algorithm: 'RS256' });
+    assert.notStrictEqual(sigChainPrevHashV2(a), sigChainPrevHashV2(b));
+});
+
+test('sigChainPrevHashV2: changing timestamp changes the hash', () => {
+    const a = sig({ signature: 'sig', timestamp: '2026-01-01T00:00:00Z' });
+    const b = sig({ signature: 'sig', timestamp: '2026-01-02T00:00:00Z' });
+    assert.notStrictEqual(sigChainPrevHashV2(a), sigChainPrevHashV2(b));
+});
+
+test('sigChainPrevHashV2: domain tag means v2 hash != raw sha256(signature)', () => {
+    const entry = sig({ signature: 'opaque-sig-bytes' });
+    const v1Hash = sha256Hex(Buffer.from('opaque-sig-bytes', 'utf8'));
+    assert.notStrictEqual(sigChainPrevHashV2(entry), v1Hash);
+});
+
+test('chain: graft attack — leaf signature lifted from another doc is rejected', () => {
+    // Threat model: attacker takes signatures[0]'s `signature` value
+    // from a victim document where the author's signer.did matches the
+    // attacker's, and grafts it onto a NEW document with a different
+    // signer.did. With the v1 construction (sha256 of signature bytes
+    // alone) the chain hash would still match because only `signature`
+    // bytes were hashed. The v2 construction binds in signer.did, so
+    // a graft becomes detectable.
+    const realPrev = sig({
+        signature: 'genuine-sig-from-doc-A',
+        signer: { name: 'Alice', did: 'did:web:alice.example.com' },
+        timestamp: '2026-01-01T00:00:00Z',
+    });
+    // Attacker's "grafted prev" — same signature bytes, different signer.
+    const graftedPrev = {
+        ...realPrev,
+        signer: { name: 'Mallory', did: 'did:web:mallory.example.com' },
+    };
+    // The attacker computes prev_signature from the v1 construction
+    // (sha256 of bytes alone), which v2 deliberately rejects.
+    const v1ChainHash = 'sha256:' + sha256Hex(Buffer.from(realPrev.signature, 'utf8'));
+    const manifest = mkManifestWithSigs([
+        graftedPrev,
+        sig({
+            role: 'reviewer',
+            signer: { name: 'B', did: 'did:web:bob.example.com' },
+            signature: 'leaf-sig',
+            prev_signature: v1ChainHash, // attacker's graft attempt
+        }),
+    ]);
+    const report = runChecks(manifest, emptyManifest, [], defaultTrust, noOpts);
+    assert.ok(
+        report.failures.some((f) => f.includes('does not match')),
+        'graft attack must be rejected; got ' + JSON.stringify(report.failures),
+    );
 });
 
 test('runChecks: legacy v1.1 singular signature also flags cryptoVerifyPending', () => {

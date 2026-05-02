@@ -178,25 +178,39 @@ fn signature_chain_accepts_single_root_without_prev() {
 }
 
 /// Build a manifest carrying a signature chain of the given length, with
-/// each entry's `prev_signature` hashing the previous entry's signature.
+/// each entry's `prev_signature` set per the v2 domain-separated chain
+/// construction (spec §16.3 v2 — domain tag + canonical JSON of
+/// {algorithm, signature, signer_did, timestamp}). Mirrors the JS
+/// reference impl `sigChainPrevHashV2` in `cli/src/commands/verify.js`.
 #[cfg(feature = "verify")]
 fn manifest_with_valid_chain(n: usize) -> String {
     use sha2::{Digest, Sha256};
     let mut entries = Vec::new();
-    let mut prev_sig: Option<String> = None;
+    let mut prev_canonical_input: Option<Vec<u8>> = None;
     for i in 0..n {
         let sig = format!("sig-{}", i);
-        let prev_line = if let Some(p) = &prev_sig {
+        let alg = "ed25519";
+        let did = format!("did:web:example.com/{}", i);
+        let timestamp = "2026-01-01T00:00:00Z";
+        let prev_line = if let Some(input) = &prev_canonical_input {
             let mut h = Sha256::new();
-            h.update(p.as_bytes());
+            h.update(input);
             format!(r#","prev_signature": "sha256:{}""#, hex::encode(h.finalize()))
         } else {
             String::new()
         };
         entries.push(format!(
-            r#"{{"role": "author", "signer": {{"name": "A{i}", "did": "did:web:example.com/{i}"}}, "algorithm": "ed25519", "signature": "{sig}"{prev_line}}}"#
+            r#"{{"role": "author", "signer": {{"name": "A{i}", "did": "{did}"}}, "algorithm": "{alg}", "signature": "{sig}", "timestamp": "{timestamp}"{prev_line}}}"#
         ));
-        prev_sig = Some(sig);
+        // Build the v2 canonical input bytes for the NEXT iteration's
+        // prev_signature. Keys lex order: algorithm, signature,
+        // signer_did, timestamp.
+        let canonical_json = format!(
+            r#"{{"algorithm":"{alg}","signature":"{sig}","signer_did":"{did}","timestamp":"{timestamp}"}}"#
+        );
+        let mut buf = b"mdz-sig-chain-v2|".to_vec();
+        buf.extend_from_slice(canonical_json.as_bytes());
+        prev_canonical_input = Some(buf);
     }
     format!(
         r#"{{
@@ -227,13 +241,19 @@ fn signature_chain_accepts_valid_multi_entry() {
 #[test]
 fn signature_chain_rejects_tampered_prev_hash() {
     // Compute the legitimate prev_signature hash for entry 1, then
-    // replace THAT specific substring with a synthetic bad hash. A
-    // blanket `replace("sha256:", ...)` would also clobber any future
-    // `manifest_checksum` or `content_hash` fields in the fixture —
-    // this version pins the assertion to "chain-specific corruption".
-    use sha2::{Digest, Sha256};
+    // replace THAT specific substring with a synthetic bad hash. The
+    // valid chain hash is the SHA-256 of the v2 canonical input (domain
+    // tag + canonical JSON of entry-0). We extract it from the
+    // manifest's existing `prev_signature` field rather than recomputing
+    // — keeps the test from drifting if the canonical encoding ever
+    // changes.
     let manifest = manifest_with_valid_chain(2);
-    let legit_prev = format!("sha256:{}", hex::encode(Sha256::digest(b"sig-0")));
+    let legit_prev = {
+        let needle = "\"prev_signature\": \"";
+        let start = manifest.find(needle).expect("prev_signature in fixture") + needle.len();
+        let end = manifest[start..].find('"').expect("closing quote") + start;
+        manifest[start..end].to_string()
+    };
     let tampered_prev = "sha256:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
     let manifest = manifest.replace(&legit_prev, tampered_prev);
     let archive = Archive::open(&zip_with_manifest(&manifest)).unwrap();
@@ -244,6 +264,33 @@ fn signature_chain_rejects_tampered_prev_hash() {
             assert!(msg.contains("does not match"), "got: {}", msg);
         }
         other => panic!("expected tamper-detect, got {:?}", other),
+    }
+}
+
+#[cfg(feature = "verify")]
+#[test]
+fn signature_chain_rejects_graft_attack() {
+    // Threat model: attacker lifts a leaf signature from a different
+    // document and grafts it into the chain. Under the v1 construction
+    // (sha256 of signature bytes alone) the chain hash would still
+    // match because only `signature` was hashed. The v2 construction
+    // binds `signer.did` + `algorithm` + `timestamp` into the hash
+    // input, so changing any of them breaks the chain.
+    let manifest = manifest_with_valid_chain(2);
+    // Modify entry-0's signer.did. The resulting prev_signature on
+    // entry-1 still references the OLD canonical input, so the chain
+    // must fail.
+    let manifest = manifest.replace(
+        "\"did:web:example.com/0\"",
+        "\"did:web:attacker.example.com\"",
+    );
+    let archive = Archive::open(&zip_with_manifest(&manifest)).unwrap();
+    match archive.verify_signature_chain() {
+        Err(Error::Integrity(IntegrityError::SignatureChain(msg))) => {
+            assert!(msg.contains("signatures[1]"), "got: {}", msg);
+            assert!(msg.contains("does not match"), "got: {}", msg);
+        }
+        other => panic!("expected graft-detect, got {:?}", other),
     }
 }
 

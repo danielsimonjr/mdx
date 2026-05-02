@@ -323,6 +323,49 @@ function checkSignatures(manifest, trustPolicy, options, report) {
     }
 }
 
+/**
+ * Compute the v2 sig-chain prev_signature hash input — the
+ * domain-separated, canonically-encoded previous entry. Returns the
+ * lowercase hex SHA-256 (without the `sha256:` algorithm prefix).
+ *
+ * Domain tag (`mdz-sig-chain-v2|`) ensures that even if the body bytes
+ * collide with bytes used by some unrelated protocol, the hash inputs
+ * cannot be confused. The prefixed colon separator avoids ambiguity
+ * with the algorithm-prefix syntax used elsewhere in the manifest.
+ *
+ * Canonical JSON: keys sorted lexicographically, no whitespace, UTF-8.
+ * The minimal JCS subset is sufficient because the four fields
+ * (`algorithm`, `created`, `signature`, `signer_did`) are all simple
+ * strings — no nested objects, numbers, or unicode normalisation
+ * concerns. Missing fields encode as the empty string so a partially-
+ * populated entry still has a deterministic chain anchor (and the
+ * verifier surfaces the missing-field as a separate warning).
+ */
+function sigChainPrevHashV2(prev) {
+    const canon = {
+        algorithm: typeof prev.algorithm === 'string' ? prev.algorithm : '',
+        signature: typeof prev.signature === 'string' ? prev.signature : '',
+        signer_did: prev.signer && typeof prev.signer.did === 'string' ? prev.signer.did : '',
+        timestamp: typeof prev.timestamp === 'string' ? prev.timestamp : '',
+    };
+    // Lexicographic key order — JSON.stringify with a pre-sorted key
+    // list gives the canonical encoding without pulling in a JCS library.
+    // The four fields are all simple strings so JCS's other
+    // canonicalization rules (number-formatting, unicode normalization)
+    // do not apply.
+    const canonicalJson = JSON.stringify(canon, [
+        'algorithm',
+        'signature',
+        'signer_did',
+        'timestamp',
+    ]);
+    const input = Buffer.concat([
+        Buffer.from('mdz-sig-chain-v2|', 'utf8'),
+        Buffer.from(canonicalJson, 'utf8'),
+    ]);
+    return crypto.createHash('sha256').update(input).digest('hex');
+}
+
 function verifyContentHash(declared, contentBytes) {
     const match = /^([a-z0-9]+):([a-f0-9]+)$/i.exec(declared);
     if (!match) {
@@ -356,7 +399,14 @@ function verifySignatureChain(signatures, trustPolicy, options, report) {
     }
 
     // Invariant 2: every entry i>0 must have prev_signature and it must
-    // match sha256 of the previous entry's signature bytes.
+    // match the domain-separated hash of the previous entry's identifying
+    // fields (spec §16.3, v2 chain construction). Hashing only the opaque
+    // signature bytes — the v1 construction — was vulnerable to a graft
+    // attack: an attacker could lift entry[i-1]'s signature off a
+    // different document and the chain would still link. v2 binds the
+    // hash to the prior entry's algorithm + signer.did + signature +
+    // created and prefixes the input with a domain tag so the same bytes
+    // can never be reused as a prev-image of a different protocol step.
     for (let i = 1; i < signatures.length; i++) {
         const prev = signatures[i - 1];
         const curr = signatures[i];
@@ -366,8 +416,7 @@ function verifySignatureChain(signatures, trustPolicy, options, report) {
             );
             continue;
         }
-        const prevSigBytes = Buffer.from(prev.signature || '', 'utf8');
-        const expectedPrevHash = 'sha256:' + crypto.createHash('sha256').update(prevSigBytes).digest('hex');
+        const expectedPrevHash = 'sha256:' + sigChainPrevHashV2(prev);
         if (curr.prev_signature === expectedPrevHash) {
             report.passes.push(`signatures[${i}].prev_signature chains correctly`);
         } else {
@@ -438,3 +487,4 @@ function printReport(report) {
 module.exports = verifyCommand;
 module.exports.runChecks = runChecks; // exposed for unit tests
 module.exports.decideExitCode = decideExitCode; // exposed for unit tests
+module.exports.sigChainPrevHashV2 = sigChainPrevHashV2; // exposed for unit tests + parity
