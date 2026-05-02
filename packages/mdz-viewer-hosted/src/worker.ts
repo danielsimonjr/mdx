@@ -10,8 +10,11 @@
  *
  * Security posture (implements ROADMAP Phase 3.1 CSP profile):
  *   - Content-Security-Policy strict: default-src 'self'; script-src
- *     'self' 'unsafe-inline' for the inline viewer bootstrap; img-src
- *     data: blob: https:; object-src 'none'; frame-ancestors 'self'.
+ *     'self' 'nonce-<per-request>' (no 'unsafe-inline'); img-src data:
+ *     blob: https:; object-src 'none'; frame-ancestors 'self'.
+ *     The per-request nonce is generated in `fetch()` via
+ *     `crypto.randomUUID()`, embedded in the CSP header AND on every
+ *     inline `<script>` tag. Audit finding #5 from 2026-05-01.
  *   - CORS: Access-Control-Allow-Origin: * on GET only (no credentials).
  *   - Permissions-Policy: interest-cohort=(), geolocation=(), camera=(),
  *     microphone=() — viewer has no legitimate need for these.
@@ -32,29 +35,50 @@ interface Env {
   // — none used in the 0.1 alpha.
 }
 
-const CSP_HEADER = [
-  "default-src 'self'",
-  // Bootstrap script is inlined — the nonce is generated per-request below,
-  // so 'unsafe-inline' is a fallback for clients that don't support nonces.
-  "script-src 'self' 'unsafe-inline'",
-  "style-src 'self' 'unsafe-inline'",
-  // Archives load via HTTPS; blob: needed for inflated asset URLs; data:
-  // needed for inline SVG / base64 images that the sanitizer allows.
-  "img-src 'self' data: blob: https:",
-  "media-src 'self' blob: https:",
-  "connect-src 'self' https:",
-  "font-src 'self' data:",
-  "object-src 'none'",
-  "frame-ancestors 'self'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  // Turn on Trusted Types for browsers that support it — the viewer's
-  // sanitizer is the only trusted source of HTML.
-  "require-trusted-types-for 'script'",
-].join("; ");
+/**
+ * Build the CSP header for a single response, embedding the
+ * per-request `nonce`. The bootstrap `<script type="module">` tag in
+ * `baseShell` carries the same nonce; the browser then rejects any
+ * other inline script — exactly the protection `'unsafe-inline'`
+ * couldn't give us. Dropping `'unsafe-inline'` was the whole point of
+ * audit finding #5.
+ */
+function buildCspHeader(nonce: string): string {
+  return [
+    "default-src 'self'",
+    // No 'unsafe-inline' fallback: every legitimate inline script
+    // carries the per-request nonce. A leftover 'unsafe-inline' would
+    // override the nonce restriction in some browsers (CSP spec
+    // §6.7.3.5) and silently re-enable the vector this fix closes.
+    `script-src 'self' 'nonce-${nonce}'`,
+    "style-src 'self' 'unsafe-inline'",
+    // Archives load via HTTPS; blob: needed for inflated asset URLs; data:
+    // needed for inline SVG / base64 images that the sanitizer allows.
+    "img-src 'self' data: blob: https:",
+    "media-src 'self' blob: https:",
+    "connect-src 'self' https:",
+    "font-src 'self' data:",
+    "object-src 'none'",
+    "frame-ancestors 'self'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    // Turn on Trusted Types for browsers that support it — the viewer's
+    // sanitizer is the only trusted source of HTML.
+    "require-trusted-types-for 'script'",
+  ].join("; ");
+}
 
-const COMMON_HEADERS: Record<string, string> = {
-  "Content-Security-Policy": CSP_HEADER,
+/**
+ * Per-request 128-bit nonce. `crypto.randomUUID` is mandatory in the
+ * Workers runtime; stripping the dashes gives a 32-char base16 nonce
+ * (exceeds the 128-bit minimum CSP spec §6.7.3.4 recommends). Each
+ * response builds its OWN nonce — never reuse across requests.
+ */
+function newNonce(): string {
+  return crypto.randomUUID().replace(/-/g, "");
+}
+
+const STATIC_HEADERS: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "Permissions-Policy":
@@ -65,23 +89,47 @@ const COMMON_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
+/**
+ * Headers that go on every response. The CSP must vary per request
+ * (each one carries a fresh nonce), so this returns a fresh object
+ * every call rather than a shared module-level constant. `nonce` is
+ * `null` for non-HTML responses (text, healthz, robots.txt) — those
+ * still get a CSP, but with no script-src exception since they carry
+ * no inline scripts.
+ */
+function commonHeaders(nonce: string | null): Record<string, string> {
+  // For non-HTML responses we want a CSP that's strictly tighter than
+  // the HTML one — no nonce slot at all. Re-use buildCspHeader with a
+  // sentinel value the browser will never match.
+  const cspNonce = nonce ?? "no-inline";
+  return {
+    ...STATIC_HEADERS,
+    "Content-Security-Policy": buildCspHeader(cspNonce),
+  };
+}
+
 export default {
   async fetch(request: Request, _env: Env, _ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
     if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: COMMON_HEADERS });
+      // Preflight responses carry no body; a no-inline CSP is fine.
+      return new Response(null, { status: 204, headers: commonHeaders(null) });
     }
     if (request.method !== "GET" && request.method !== "HEAD") {
       return text("Method not allowed", 405);
     }
 
+    // One nonce per request — never share across requests, never share
+    // across responses.
+    const nonce = newNonce();
+
     switch (url.pathname) {
       case "/":
       case "/index.html":
-        return html(renderIndexPage(url), 200, url);
+        return html(renderIndexPage(url, nonce), 200, url, nonce);
       case "/embed.html":
-        return html(renderEmbedPage(url), 200, url);
+        return html(renderEmbedPage(url, nonce), 200, url, nonce);
       case "/robots.txt":
         return text(
           [
@@ -122,15 +170,25 @@ export function cacheControlFor(url: URL): string {
   return "public, max-age=300, stale-while-revalidate=86400";
 }
 
-export function html(body: string, status = 200, url: URL | null = null): Response {
+export function html(
+  body: string,
+  status = 200,
+  url: URL | null = null,
+  nonce: string | null = null,
+): Response {
   return new Response(body, {
     status,
     headers: {
-      ...COMMON_HEADERS,
+      ...commonHeaders(nonce),
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": url ? cacheControlFor(url) : "public, max-age=300, stale-while-revalidate=86400",
       // Vary on Accept so a future JSON variant of the same URL
       // doesn't share a cache slot with the HTML.
+      // Also vary on the body's CSP nonce — without this, a CDN edge
+      // could replay an HTML response (with one nonce) against a CSP
+      // header (with a fresher nonce) and break the page. Cloudflare
+      // caches by URL by default; HTML responses are private (max-age
+      // 300, not s-maxage), so this is belt-and-suspenders.
       "Vary": "Accept",
     },
   });
@@ -140,7 +198,9 @@ export function text(body: string, status = 200, contentType = "text/plain; char
   return new Response(body, {
     status,
     headers: {
-      ...COMMON_HEADERS,
+      // Plain-text responses carry no inline scripts; pass `null` so
+      // the CSP slot has no usable nonce.
+      ...commonHeaders(null),
       "Content-Type": contentType,
     },
   });
@@ -164,7 +224,7 @@ function canonicalUrl(url: URL, safeArchiveUrl: string | null): string {
   return `${url.origin}${url.pathname}`;
 }
 
-function renderIndexPage(url: URL): string {
+function renderIndexPage(url: URL, nonce: string): string {
   const archiveUrl = url.searchParams.get("url");
   // Only accept http(s) URLs — disallow `javascript:`, `file:`, `data:` etc.
   // The viewer's sanitizer also rejects these, but refusing at the Worker
@@ -175,13 +235,14 @@ function renderIndexPage(url: URL): string {
     title: safeUrl
       ? `Viewing ${safeUrl}`
       : "MDZ Viewer — drop an archive to render",
-    body: safeUrl ? renderViewerBody(safeUrl) : renderLandingBody(),
+    body: safeUrl ? renderViewerBody(safeUrl) : renderLandingBody(nonce),
     archiveUrl: safeUrl,
     canonical: canonicalUrl(url, safeUrl),
+    nonce,
   });
 }
 
-function renderEmbedPage(url: URL): string {
+function renderEmbedPage(url: URL, nonce: string): string {
   const archiveUrl = url.searchParams.get("url");
   const safeUrl = isSafeUrl(archiveUrl) ? archiveUrl : null;
   if (!safeUrl) {
@@ -189,6 +250,7 @@ function renderEmbedPage(url: URL): string {
       title: "MDZ Embed",
       body: '<p style="padding:1rem;color:#666">Pass ?url=https://... to embed an MDZ archive.</p>',
       canonical: canonicalUrl(url, null),
+      nonce,
     });
   }
   // Embed page omits header/footer chrome — intended to be <iframe>'d.
@@ -197,10 +259,11 @@ function renderEmbedPage(url: URL): string {
     body: `<mdz-viewer src="${escapeHtml(safeUrl)}" theme="auto"></mdz-viewer>`,
     archiveUrl: safeUrl,
     canonical: canonicalUrl(url, safeUrl),
+    nonce,
   });
 }
 
-function renderLandingBody(): string {
+function renderLandingBody(nonce: string): string {
   return `
   <header>
     <h1>MDZ Viewer</h1>
@@ -231,7 +294,7 @@ function renderLandingBody(): string {
     <a href="https://github.com/danielsimonjr/mdx/tree/master/packages/mdz-viewer-hosted">
     packages/mdz-viewer-hosted</a>. MIT-licensed.</small></p>
   </footer>
-  <script>
+  <script nonce="${nonce}">
     document.getElementById('load-form').addEventListener('submit', (e) => {
       e.preventDefault();
       const u = document.getElementById('url').value.trim();
@@ -258,10 +321,13 @@ interface ShellOptions {
   archiveUrl?: string | null;
   /** Canonical URL for this page (the request URL). */
   canonical?: string | null;
+  /** Per-request CSP nonce. Embedded on every inline `<script>` tag
+   *  so the strict CSP can drop `'unsafe-inline'`. */
+  nonce: string;
 }
 
 function baseShell(opts: ShellOptions): string {
-  const { title, body, archiveUrl, canonical } = opts;
+  const { title, body, archiveUrl, canonical, nonce } = opts;
   const description = archiveUrl
     ? `View MDZ archive ${archiveUrl} — rendered live in your browser, no download required.`
     : "Render MDZ (Markdown Zipped Container) archives in the browser. Free, stateless, open-source.";
@@ -328,7 +394,7 @@ function baseShell(opts: ShellOptions): string {
     (registering the <mdz-viewer> custom element); subsequent
     use of <mdz-viewer> in markup just works.
   -->
-  <script type="module">
+  <script type="module" nonce="${nonce}">
     import '/index.js';
   </script>
 </head>

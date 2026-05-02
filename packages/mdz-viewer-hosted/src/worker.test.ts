@@ -190,6 +190,46 @@ describe("security headers", () => {
     expect(csp).toContain("require-trusted-types-for 'script'");
   });
 
+  // Audit finding #5 from 2026-05-01. Previously the CSP carried
+  // `script-src 'self' 'unsafe-inline'`, which neutered the rest of
+  // the policy (CSP §6.7.3.5 — `'unsafe-inline'` is ignored when a
+  // nonce or hash is also present, but it was the ONLY value here).
+  // The fix: per-request nonce, no `'unsafe-inline'` fallback.
+  it("CSP script-src has nonce and NO 'unsafe-inline'", async () => {
+    const r = await get("https://view.mdz-format.org/");
+    const csp = r.headers.get("Content-Security-Policy") ?? "";
+    // Pull the script-src directive specifically — checking the whole
+    // CSP string is too coarse ("unsafe-inline" lives in style-src too).
+    const scriptSrc = csp.split(";").find((d) => d.trim().startsWith("script-src")) ?? "";
+    expect(scriptSrc).toMatch(/'nonce-[a-f0-9]{32}'/);
+    expect(scriptSrc).not.toContain("unsafe-inline");
+  });
+
+  it("inline <script> tags carry the same nonce as the CSP", async () => {
+    const r = await get("https://view.mdz-format.org/");
+    const csp = r.headers.get("Content-Security-Policy") ?? "";
+    const cspNonceMatch = /'nonce-([a-f0-9]{32})'/.exec(csp);
+    expect(cspNonceMatch).not.toBeNull();
+    const cspNonce = cspNonceMatch![1];
+    const body = await r.text();
+    // Every <script ...> tag in the body must carry nonce="<cspNonce>".
+    const scriptTags = body.match(/<script\b[^>]*>/gi) ?? [];
+    expect(scriptTags.length).toBeGreaterThan(0);
+    for (const tag of scriptTags) {
+      expect(tag).toContain(`nonce="${cspNonce}"`);
+    }
+  });
+
+  it("nonce is fresh per request (no reuse)", async () => {
+    const r1 = await get("https://view.mdz-format.org/");
+    const r2 = await get("https://view.mdz-format.org/");
+    const n1 = /'nonce-([a-f0-9]{32})'/.exec(r1.headers.get("Content-Security-Policy") ?? "");
+    const n2 = /'nonce-([a-f0-9]{32})'/.exec(r2.headers.get("Content-Security-Policy") ?? "");
+    expect(n1).not.toBeNull();
+    expect(n2).not.toBeNull();
+    expect(n1![1]).not.toBe(n2![1]);
+  });
+
   it("X-Content-Type-Options is nosniff", async () => {
     const r = await get("https://view.mdz-format.org/");
     expect(r.headers.get("X-Content-Type-Options")).toBe("nosniff");

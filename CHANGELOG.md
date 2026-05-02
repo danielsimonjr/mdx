@@ -8,6 +8,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security — viewer-hosted Worker drops CSP 'unsafe-inline' for per-request nonce (2026-05-01)
+
+The Cloudflare Worker that serves view.mdz-format.org carried
+`script-src 'self' 'unsafe-inline'` even though the file's docstring
+claimed a per-request nonce was generated. The nonce was never
+actually wired up — `'unsafe-inline'` made the rest of the CSP
+script-src directive performative. Audit finding #5.
+
+`packages/mdz-viewer-hosted/src/worker.ts`:
+
+- New `newNonce()` generates a 128-bit nonce via
+  `crypto.randomUUID().replace(/-/g, "")` (32 hex chars). One nonce
+  per request, never shared across requests or responses.
+- New `buildCspHeader(nonce)` emits `script-src 'self'
+  'nonce-XYZ'` — no `'unsafe-inline'` fallback. Per CSP §6.7.3.5
+  leaving `'unsafe-inline'` alongside a nonce can override the
+  nonce restriction in some browsers.
+- Both inline `<script>` tags (the bootstrap module-import and
+  the landing-page form handler) carry the same per-request
+  nonce attribute. Tested: every `<script>` tag in the response
+  body carries the CSP's nonce.
+- `commonHeaders(nonce)` builds the response-header bundle with a
+  freshly-rendered CSP each call. Non-HTML responses
+  (text / robots.txt / healthz) pass `null`, which routes through
+  a sentinel nonce string that no inline script can match —
+  effectively no inline scripts allowed.
+- Page-render functions (`renderIndexPage`, `renderEmbedPage`,
+  `renderLandingBody`, `baseShell`) thread the nonce through.
+
+Tests (`packages/mdz-viewer-hosted/src/worker.test.ts`): 3 new
+cases — CSP `script-src` carries nonce + no `'unsafe-inline'`,
+inline `<script>` tags carry the same nonce as the CSP header,
+and nonce is fresh per request (two GETs return different
+nonces). All 35 worker tests pass.
+
 ### Security — extract Zip-Slip parity with Rust binding (2026-05-01)
 
 The Rust binding has had a `sanitize_archive_path` gate
