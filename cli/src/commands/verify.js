@@ -27,10 +27,15 @@
  *     fetching the DID document out-of-band).
  *
  * Exit codes:
- *   0 — all checks pass
+ *   0 — all checks pass AND archive carries cryptographically-verifiable
+ *       signatures (or user passed --allow-unverified-signatures for an
+ *       intentionally unsigned archive)
  *   1 — IO error
  *   2 — archive malformed (JSON parse failure, missing manifest)
- *   3 — signature / integrity verification failed (this is the interesting one)
+ *   3 — signature / integrity verification failed; OR signatures are
+ *       declared but cryptographic verification has not yet shipped
+ *       (Phase 3.2 — refusing to lie about crypto status); OR archive is
+ *       unsigned and `--allow-unverified-signatures` was not passed
  *
  * Non-scope in this starter:
  *   - Revocation URL fetching (listed in threat model T10 — Phase 3.2)
@@ -81,8 +86,7 @@ async function verifyCommand(inputPath, options) {
         const report = runChecks(manifest, manifestBytes, entries, trustPolicy, options);
         printReport(report);
 
-        if (report.failures.length > 0) process.exit(3);
-        process.exit(0);
+        process.exit(decideExitCode(report, options));
     } catch (error) {
         spinner.fail(chalk.red(`Error: ${error.message}`));
         if (error.stack) console.error(error.stack);
@@ -112,6 +116,18 @@ function runChecks(manifest, manifestBytes, entries, trustPolicy, options) {
         passes: [],
         warnings: [],
         failures: [],
+        // True when `security.signatures[]` is non-empty but the CLI has
+        // not yet implemented cryptographic verification (Phase 3.2).
+        // Surfaced separately from `failures` so tests of the structural
+        // checks can still inspect the report cleanly; consumed by
+        // `decideExitCode` to translate "structure looks fine but we
+        // can't actually prove the bytes match" into a non-zero exit.
+        cryptoVerifyPending: false,
+        // True when the archive carries no signatures at all (neither
+        // v2 chain nor legacy v1.1 singular). Default exit code in this
+        // case is non-zero to prevent the caller from interpreting silence
+        // as approval; pass `--allow-unverified-signatures` to opt in.
+        unsigned: false,
     };
 
     checkStructure(manifest, report);
@@ -121,6 +137,25 @@ function runChecks(manifest, manifestBytes, entries, trustPolicy, options) {
     checkSignatures(manifest, trustPolicy, options, report);
 
     return report;
+}
+
+/**
+ * Map a verification report + CLI options to a process exit code.
+ * Pure: no I/O, no side effects. Exposed for unit tests that exercise
+ * the "no, you can't claim verification when there is none" rule
+ * without spawning the full CLI.
+ *
+ * Order of checks reflects severity:
+ *   1. Hard failures (`report.failures`) → 3
+ *   2. Signatures declared but crypto-verify not yet implemented → 3
+ *   3. Archive unsigned and the user did NOT opt in → 3
+ *   4. Otherwise → 0
+ */
+function decideExitCode(report, options) {
+    if (report.failures.length > 0) return 3;
+    if (report.cryptoVerifyPending) return 3;
+    if (report.unsigned && !options.allowUnverifiedSignatures) return 3;
+    return 0;
 }
 
 function checkStructure(manifest, report) {
@@ -251,8 +286,11 @@ function checkSignatures(manifest, trustPolicy, options, report) {
     const signatures = manifest.security && manifest.security.signatures;
     if (Array.isArray(signatures) && signatures.length > 0) {
         verifySignatureChain(signatures, trustPolicy, options, report);
-        // Until Ed25519/RS256/ES256 verification ships (Phase 3.2), tell users
-        // that structural verification != cryptographic verification.
+        // Until Ed25519/RS256/ES256 verification ships (Phase 3.2), refuse
+        // to imply success: the chain *structure* may be correct while the
+        // signature *bytes* are forged or grafted. Flag the report so
+        // `decideExitCode` translates this into a non-zero exit.
+        report.cryptoVerifyPending = true;
         report.warnings.push(
             'Structural signature-chain verification only; cryptographic ' +
                 'signature-value verification (Ed25519/RS256/ES256) is Phase 3.2 — ' +
@@ -263,6 +301,9 @@ function checkSignatures(manifest, trustPolicy, options, report) {
     // Check legacy v1.1 singular signature
     const legacy = manifest.security && manifest.security.signature;
     if (legacy) {
+        // Legacy singular signature is structurally present but, like the
+        // v2 chain, is not yet cryptographically verified by this CLI.
+        report.cryptoVerifyPending = true;
         report.warnings.push(
             'Archive uses legacy v1.1 security.signature (singular); full chain verification unavailable',
         );
@@ -270,7 +311,15 @@ function checkSignatures(manifest, trustPolicy, options, report) {
             report.passes.push(`legacy signature signed_by: ${legacy.signed_by}`);
         }
     } else {
-        report.warnings.push('No signatures declared — archive is unsigned');
+        // Archive is unsigned. Surface as a warning so the report stays
+        // readable; gate the exit code on `--allow-unverified-signatures`
+        // so a CI script that pipes `mdz verify` into `&&` cannot mistake
+        // silence for approval.
+        report.unsigned = true;
+        report.warnings.push(
+            'No signatures declared — archive is unsigned. Pass ' +
+                '--allow-unverified-signatures to acknowledge this is intentional.',
+        );
     }
 }
 
@@ -388,3 +437,4 @@ function printReport(report) {
 
 module.exports = verifyCommand;
 module.exports.runChecks = runChecks; // exposed for unit tests
+module.exports.decideExitCode = decideExitCode; // exposed for unit tests

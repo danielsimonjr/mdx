@@ -57,16 +57,46 @@ function isDecision(motivation: string): boolean {
   return motivation === "review-accept" || motivation === "review-reject" || motivation === "review-request-changes";
 }
 
-function trustPill(annotation: Annotation, warnings: ReadonlyArray<TrustWarning>): string {
+/**
+ * Render the trust badge for one annotation.
+ *
+ * Tri-state semantics — the renderer must NEVER display a green
+ * "signed" pill until cryptographic verification has actually
+ * succeeded, even if `findTrustWarnings` produced no entry for this
+ * annotation (e.g., reader-role annotations get no warning by spec):
+ *
+ *   - `verified === true` AND no warning   → "signed" (green)
+ *   - warning matches this annotation       → severity-coloured pill
+ *   - else (default)                        → "unverified" (neutral)
+ *
+ * The `verified` argument MUST be set explicitly by the caller; until
+ * Phase 2.3b.4.4 wires the signature data from
+ * `security/signatures.json`, callers should pass `false` and the
+ * sidebar will correctly show "unverified" instead of an unearned
+ * "signed" badge. Defaulting to `false` here means a forgotten
+ * argument fails closed, not open.
+ */
+function trustPill(
+  annotation: Annotation,
+  warnings: ReadonlyArray<TrustWarning>,
+  verified: boolean,
+): string {
   const w = warnings.find((x) => x.annotationId === annotation.id);
-  if (!w) {
+  if (w) {
+    const cls = w.severity === "error" ? "trust-error" : "trust-warning";
+    return `<span class="annotation-trust ${cls}" title="${escapeHtml(w.reason)}">${escapeHtml(w.severity)}</span>`;
+  }
+  if (verified) {
     return `<span class="annotation-trust trust-ok" title="signed">signed</span>`;
   }
-  const cls = w.severity === "error" ? "trust-error" : "trust-warning";
-  return `<span class="annotation-trust ${cls}" title="${escapeHtml(w.reason)}">${escapeHtml(w.severity)}</span>`;
+  return `<span class="annotation-trust trust-unverified" title="signature not yet verified">unverified</span>`;
 }
 
-function renderHeader(annotation: Annotation, warnings: ReadonlyArray<TrustWarning>): string {
+function renderHeader(
+  annotation: Annotation,
+  warnings: ReadonlyArray<TrustWarning>,
+  verified: boolean,
+): string {
   const role = escapeHtml(annotation.role);
   const motivation = escapeHtml(annotation.motivation);
   const creator = annotation.creator?.name ?? annotation.creator?.id ?? "(anonymous)";
@@ -80,7 +110,7 @@ function renderHeader(annotation: Annotation, warnings: ReadonlyArray<TrustWarni
       : `<span class="annotation-motivation">${escapeHtml(motivationLabel(annotation.motivation))}</span>`,
     `<span class="annotation-creator">${escapeHtml(creator)}</span>`,
     date ? `<time datetime="${escapeHtml(annotation.created!)}">${escapeHtml(date)}</time>` : "",
-    trustPill(annotation, warnings),
+    trustPill(annotation, warnings, verified),
     `</header>`,
     // Hidden marker so motivationCls is preserved for tests / a11y.
     motivationCls ? `<!-- ${motivation} -->` : "",
@@ -111,6 +141,7 @@ function renderBody(annotation: Annotation): string {
 export function renderAnnotationThread(
   node: AnnotationThreadNode,
   warnings: ReadonlyArray<TrustWarning>,
+  verified: boolean = false,
 ): string {
   const a = node.annotation;
   const role = escapeHtml(a.role);
@@ -121,20 +152,26 @@ export function renderAnnotationThread(
       `<button type="button" data-annotation-action="reply" aria-label="Reply to this annotation">Reply</button>` +
       `</div>`;
   const replies = node.replies.length > 0
-    ? `<div class="annotation-replies">${node.replies.map((r) => renderAnnotationThread(r, warnings)).join("")}</div>`
+    ? `<div class="annotation-replies">${node.replies.map((r) => renderAnnotationThread(r, warnings, verified)).join("")}</div>`
     : "";
-  return `<article class="annotation annotation-${role}" data-annotation-id="${escapeHtml(a.id)}">${renderHeader(a, warnings)}${renderBody(a)}${actions}${replies}</article>`;
+  return `<article class="annotation annotation-${role}" data-annotation-id="${escapeHtml(a.id)}">${renderHeader(a, warnings, verified)}${renderBody(a)}${actions}${replies}</article>`;
 }
 
-/** Render every thread in the sidebar's main panel. */
+/** Render every thread in the sidebar's main panel.
+ *
+ * `verified` defaults to `false` so the sidebar fails closed: until the
+ * caller explicitly opts into "signatures have been cryptographically
+ * verified" (Phase 2.3b.4.4 wiring), every annotation surfaces as
+ * "unverified" rather than as a misleading "signed" pill. */
 export function renderAnnotationSidebar(
   threads: ReadonlyArray<AnnotationThreadNode>,
   warnings: ReadonlyArray<TrustWarning>,
+  verified: boolean = false,
 ): string {
   if (threads.length === 0) {
     return `<p class="annotation-empty">No annotations.</p>`;
   }
-  return threads.map((t) => renderAnnotationThread(t, warnings)).join("");
+  return threads.map((t) => renderAnnotationThread(t, warnings, verified)).join("");
 }
 
 /** Compact summary for the sidebar header. */

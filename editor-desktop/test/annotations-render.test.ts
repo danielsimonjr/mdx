@@ -91,11 +91,41 @@ describe("renderAnnotationThread", () => {
     expect(html).toContain("trust-error");
   });
 
-  it("shows trust-ok when the creator is in the signed set", () => {
+  it("shows trust-ok when the creator is in the signed set AND verified=true", () => {
     const warnings = findTrustWarnings([EDITOR_DECISION], new Set(["did:web:editor.journal.com"]));
-    const html = renderAnnotationThread(buildThreads([EDITOR_DECISION])[0], warnings);
+    const html = renderAnnotationThread(buildThreads([EDITOR_DECISION])[0], warnings, true);
     expect(html).toContain("trust-ok");
     expect(html).not.toContain("trust-error");
+  });
+
+  // Security: the renderer must default to "unverified" when crypto
+  // verification has not run, even on annotations that have no
+  // role-required-signature rule (e.g. reader role). Previously the
+  // `trustPill` helper short-circuited to a green "signed" pill on the
+  // absence of a warning, which was security theatre — it lied about
+  // whether anything had actually been verified.
+  it("defaults to neutral 'unverified' pill when verified flag is omitted", () => {
+    const html = renderAnnotationThread(buildThreads([REVIEWER_COMMENT])[0], []);
+    expect(html).toContain("trust-unverified");
+    expect(html).not.toContain("trust-ok");
+  });
+
+  it("renders 'unverified' for reader-role annotations until signatures are wired", () => {
+    const reader: Annotation = {
+      ...REVIEWER_COMMENT,
+      role: "reader",
+      motivation: "commenting",
+    };
+    // findTrustWarnings has no rule for reader role → empty warnings.
+    // The pill MUST still surface as "unverified", not "signed".
+    const html = renderAnnotationThread(buildThreads([reader])[0], []);
+    expect(html).toContain("trust-unverified");
+    expect(html).not.toMatch(/class="annotation-trust trust-ok"/);
+  });
+
+  it("renderAnnotationSidebar defaults to verified=false (fails closed)", () => {
+    const html = renderAnnotationSidebar(buildThreads([REVIEWER_COMMENT]), []);
+    expect(html).toContain("trust-unverified");
   });
 
   it("renders 'anonymous' creator when neither name nor id is present", () => {

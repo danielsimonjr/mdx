@@ -8,6 +8,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security — verify + trust-pill hardening (2026-05-01)
+
+Two related "don't lie about cryptographic status" fixes that
+together unblock Phase 2.3b.4.4 (signing + comments). Neither
+implements the actual crypto-verify pipeline (still Phase 3.2);
+both stop the existing surfaces from CLAIMING verified status
+when nothing has actually been verified.
+
+CLI (`cli/src/commands/verify.js`, `cli/src/index.js`):
+
+- `mdz verify` now exits **3** instead of 0 when an archive
+  declares signatures but cryptographic verification has not
+  yet shipped. Before this change a CI script piping
+  `mdz verify archive.mdz && deploy` would interpret the
+  exit-0-with-warning as approval — security theatre.
+- `mdz verify` now exits **3** on archives that declare no
+  signatures at all unless the user passes
+  `--allow-unverified-signatures`. The opt-in flag preserves
+  the legitimate "I know this is unsigned and that's OK"
+  workflow without letting silence read as approval.
+- `runChecks` returns two new dedicated flags
+  (`cryptoVerifyPending`, `unsigned`) so the structural-check
+  unit tests can stay focused without polluting `failures`.
+  Exit-code translation lives in a new exported pure
+  `decideExitCode(report, options)` helper for testability.
+
+Editor (`editor-desktop/src/renderer/annotations-render.ts`,
+`editor-desktop/src/renderer/index.ts`):
+
+- `trustPill` is now tri-state: green "signed" requires BOTH
+  no warning AND an explicit `verified: true` argument. The
+  default falls through to a neutral "unverified" pill.
+  Previously the pill displayed "signed" whenever
+  `findTrustWarnings` returned no entry — which it never does
+  for `reader`-role annotations regardless of signature
+  status. The renderer now fails closed.
+- `renderAnnotationThread` and `renderAnnotationSidebar`
+  thread the new `verified: boolean` argument through.
+  Default value is `false`, so a forgotten argument shows
+  "unverified" rather than an unearned green pill.
+- `refreshAnnotationsPanel` passes `verified: false`
+  explicitly until Phase 2.3b.4.4 wires real signature data
+  from `security/signatures.json`.
+
+Tests:
+
+- `cli/test/verify.test.js` adds 8 new cases covering
+  `decideExitCode` for hard-failure / pending-crypto /
+  unsigned / opt-in / clean reports, plus `runChecks`
+  flag-setting on signed / legacy-signed / unsigned archives.
+- `editor-desktop/test/annotations-render.test.ts` adds 3
+  new cases asserting the renderer defaults to "unverified",
+  that reader-role annotations no longer get a free "signed"
+  pill, and that the sidebar fails closed at the entry
+  point.
+
 ### Added — Phase 2.3b.4.3: annotation reply-creation flow + --role flag (2026-04-25)
 
 The editor's annotation surface graduates from read-only to

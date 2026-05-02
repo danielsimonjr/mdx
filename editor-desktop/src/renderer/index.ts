@@ -144,13 +144,18 @@ function refreshAnnotationsPanel(): void {
     annotationCountEl.textContent = "0";
     return;
   }
-  // We don't yet have signature data wired up — pass an empty set,
-  // which means every signed-required annotation surfaces as a warning.
-  // Phase 3 signature integration will replace this with the real
-  // signed-creator id set from `security/signatures.json`.
+  // We don't yet have signature data wired up — pass an empty set
+  // AND `verified: false` so the sidebar fails closed. The empty set
+  // makes findTrustWarnings flag role-required signatures (editor /
+  // author / reviewer); the explicit `verified=false` ensures the
+  // remaining annotations (e.g. reader role, which has no
+  // signature-required rule) display "unverified" rather than an
+  // unearned "signed" pill. Phase 2.3b.4.4 will resolve real signature
+  // data from `security/signatures.json` and pass `verified: true`.
+  const verified = false;
   const warnings = findTrustWarnings(visible, new Set());
   const threads = buildThreads(visible);
-  annotationListEl.innerHTML = renderAnnotationSidebar(threads, warnings);
+  annotationListEl.innerHTML = renderAnnotationSidebar(threads, warnings, verified);
   annotationCountEl.textContent = String(threads.length);
   // Update the title-bar mini-summary too, so users see whether
   // annotations are present without opening the panel.

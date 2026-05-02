@@ -115,6 +115,10 @@ program
   .description('Verify signature chain + integrity of an MDZ archive')
   .option('--trust <path>', 'Trust policy JSON — only listed DIDs accepted as signers')
   .option('--offline', 'Skip DID resolution (use cached keys only)')
+  .option(
+    '--allow-unverified-signatures',
+    'Exit 0 even when the archive carries no signatures. Without this flag, an unsigned archive fails verification (exit 3) so CI scripts cannot mistake silence for approval.',
+  )
   .action(verifyCommand);
 
 // Validate command - validate MDZ file structure

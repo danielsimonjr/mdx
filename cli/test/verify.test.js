@@ -20,7 +20,7 @@ const { test } = require('node:test');
 const assert = require('node:assert');
 const crypto = require('node:crypto');
 
-const { runChecks } = require('../src/commands/verify.js');
+const { runChecks, decideExitCode } = require('../src/commands/verify.js');
 
 // Helper — build a minimal manifest with optional signatures.
 function mkManifest(overrides = {}) {
@@ -257,4 +257,61 @@ test('trust: missing DID → warning (not failure)', () => {
     const manifest = mkManifestWithSigs([sig({ signer: { name: 'A' }, signature: 'sig' })]);
     const report = runChecks(manifest, emptyManifest, [], defaultTrust, noOpts);
     assert.ok(report.warnings.some((w) => w.includes('no DID')));
+});
+
+// ---------------------------------------------------------------------------
+// Exit code semantics — Phase 3.2 hardening (#1 in 2026-05-01 audit)
+// "mdz verify" must not exit 0 just because crypto-verify isn't shipped
+// yet, and must not exit 0 on an unsigned archive without an explicit
+// opt-in flag. CI pipelines piping the verifier into `&&` rely on this.
+// ---------------------------------------------------------------------------
+
+test('decideExitCode: hard failures → exit 3', () => {
+    const report = { failures: ['boom'], cryptoVerifyPending: false, unsigned: false };
+    assert.strictEqual(decideExitCode(report, {}), 3);
+});
+
+test('decideExitCode: signatures declared but crypto-verify pending → exit 3', () => {
+    const report = { failures: [], cryptoVerifyPending: true, unsigned: false };
+    assert.strictEqual(decideExitCode(report, {}), 3);
+});
+
+test('decideExitCode: unsigned without opt-in flag → exit 3', () => {
+    const report = { failures: [], cryptoVerifyPending: false, unsigned: true };
+    assert.strictEqual(decideExitCode(report, {}), 3);
+});
+
+test('decideExitCode: unsigned WITH --allow-unverified-signatures → exit 0', () => {
+    const report = { failures: [], cryptoVerifyPending: false, unsigned: true };
+    assert.strictEqual(decideExitCode(report, { allowUnverifiedSignatures: true }), 0);
+});
+
+test('decideExitCode: clean report → exit 0', () => {
+    const report = { failures: [], cryptoVerifyPending: false, unsigned: false };
+    assert.strictEqual(decideExitCode(report, {}), 0);
+});
+
+test('runChecks: archive without security flags as unsigned (not failure)', () => {
+    const manifest = mkManifest();
+    const report = runChecks(manifest, Buffer.from(JSON.stringify(manifest)), [], defaultTrust, noOpts);
+    // Must not pollute `failures` (existing tests rely on this); the
+    // unsigned signal lives on a dedicated flag instead.
+    assert.strictEqual(report.failures.length, 0);
+    assert.strictEqual(report.unsigned, true);
+    assert.strictEqual(report.cryptoVerifyPending, false);
+});
+
+test('runChecks: archive with signatures sets cryptoVerifyPending', () => {
+    const manifest = mkManifestWithSigs([sig()]);
+    const report = runChecks(manifest, emptyManifest, [], defaultTrust, noOpts);
+    assert.strictEqual(report.cryptoVerifyPending, true);
+    assert.strictEqual(report.unsigned, false);
+});
+
+test('runChecks: legacy v1.1 singular signature also flags cryptoVerifyPending', () => {
+    const manifest = mkManifest({
+        security: { signature: { signed_by: 'did:web:legacy.example.com', value: 'base64-sig' } },
+    });
+    const report = runChecks(manifest, Buffer.from(JSON.stringify(manifest)), [], defaultTrust, noOpts);
+    assert.strictEqual(report.cryptoVerifyPending, true);
 });
