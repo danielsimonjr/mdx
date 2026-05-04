@@ -1,0 +1,3 @@
+# Cargo build artifacts. Cargo.lock IS tracked (Phase 4.6.10) — only
+# target/ is excluded because it's reproducible from the lockfile.
+target/

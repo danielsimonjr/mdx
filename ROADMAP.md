@@ -1221,7 +1221,7 @@ cycle skipped. Items are split by origin so credit + blame are clear.
       version-bump path: removes the underlying Node-20 condition
       rather than just silencing a warning. CI logs confirm the
       forced-runtime behavior.
-- [ ] **`--locked` Cargo build** — still commented out. Committing `Cargo.lock` + re-enabling is tracked but not done; a lockfile commit needs coordination with the optional-dep `verify` feature so `cargo test --no-default-features` still resolves correctly.
+- [x] **`--locked` Cargo build** — done 2026-05-01 (Phase 4.6.10). `bindings/rust/Cargo.lock` generated against rustc 1.95.0 and committed; `.github/workflows/ci.yml` switched to `cargo build --locked` / `cargo test --locked` for both the default-features and `--no-default-features` jobs. Lockfile resolves both feature sets cleanly: 25/25 tests pass with `verify` on (8 lib + 16 integration + 1 doc), 15/15 pass with `verify` off (5 lib + 9 integration + 1 doc — the verify-gated 7 are correctly excluded). Stale `IntegrityError` import in `tests/archive_integration.rs` gated behind `#[cfg(feature = "verify")]` to silence the no-default-features warning.
 - [x] **CHANGELOG.md line-length** — wrapping pass on 2026-04-25 brought the file under the 90-char threshold for prose lines. Lines remaining over 80 are intentional (URL-bearing, table rows, fenced code) and within markdownlint's standard exemptions. `continue-on-error: true` shield removed from the markdown lint step in a follow-up commit.
 
 ### 4.6.7 External / blocked items (not actionable in-session)

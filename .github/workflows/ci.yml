@@ -444,29 +444,31 @@ jobs:
           toolchain: '1.85'
 
       - name: Cargo build (default features)
-        # `--locked` not used — lock file is gitignored during alpha while
-        # dependency minors churn. CI re-resolves each run.
+        # `--locked` enforces that the committed `Cargo.lock` resolves
+        # without modification — Phase 4.6.10. Catches drift between
+        # the lockfile and `Cargo.toml` constraints in CI.
         run: |
           cd bindings/rust
-          cargo build
+          cargo build --locked
 
       - name: Cargo test (default features)
         run: |
           cd bindings/rust
-          cargo test
+          cargo test --locked
 
       - name: Cargo build (no default features)
         # Ensures the FeatureDisabled runtime path still compiles when
         # the `verify` feature is off — catches accidental hard deps.
+        # Same lockfile must satisfy both feature sets (Phase 4.6.10).
         run: |
           cd bindings/rust
-          cargo build --no-default-features
+          cargo build --locked --no-default-features
 
       - name: Cargo test (no default features)
         # Exercises the FeatureDisabled runtime path in tests.
         run: |
           cd bindings/rust
-          cargo test --no-default-features
+          cargo test --locked --no-default-features
 
       - name: Cross-impl parity harness (Rust parses TS-written archive)
         run: |

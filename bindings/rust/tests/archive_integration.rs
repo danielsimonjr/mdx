@@ -9,7 +9,9 @@
 
 use std::io::Write;
 
-use mdz::{Archive, ArchiveError, Error, IntegrityError};
+use mdz::{Archive, ArchiveError, Error};
+#[cfg(feature = "verify")]
+use mdz::IntegrityError;
 
 /// Build an in-memory ZIP archive with the given `(path, bytes)` entries.
 fn build_zip(entries: &[(&str, &[u8])]) -> Vec<u8> {

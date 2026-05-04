@@ -8,6 +8,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 4.6.10: Cargo.lock committed + `--locked` Cargo CI (2026-05-01)
+
+`bindings/rust/Cargo.lock` is now tracked. Generated against
+rustc 1.95.0 (749-line lockfile) and verified to resolve cleanly
+under both feature configurations the CI matrix exercises.
+
+`.github/workflows/ci.yml` (Validate Rust Binding job): all four
+cargo invocations switched from re-resolving each run to
+`--locked`. Catches dependency drift in CI rather than after a
+phantom passing build, and pins the supply-chain surface for
+the `verify` crypto crates (sha2 / hex / blake3).
+
+Test inventory unblocked by toolchain access:
+
+- **Default features** (`verify` on): 8 lib + 16 integration + 1
+  doc = **25 passing**. The 16 integration tests in
+  `bindings/rust/tests/archive_integration.rs` had been
+  source-only since Phase 4.1 — never executed because no
+  CI host had `cargo` until Phase 4.6.10.
+- **No default features** (`verify` off): 5 lib + 9 integration
+  + 1 doc = **15 passing**. The 7 `#[cfg(feature = "verify")]`
+  integration tests are correctly excluded; the
+  `verify_methods_return_feature_disabled_without_flag` test
+  exercises the FeatureDisabled runtime path.
+- **Cross-impl parity harness** (`tests/parity/rust_ts_manifest_parity.py`):
+  Rust ↔ TS manifest agreement on the typed subset, OK against
+  `examples/example-document.mdx`.
+
+Drive-by: `tests/archive_integration.rs` had a stale
+`IntegrityError` import that produced a warning under
+`--no-default-features`. Now gated behind
+`#[cfg(feature = "verify")]` to match the consumers below.
+
+The `Cargo.lock` is **not** in `.gitignore` — it never was; the
+prior CI comment claiming "lock file is gitignored during alpha"
+was stale. The blocker was always toolchain access on a build
+host, resolved 2026-05-01 by installing rustc 1.95.0 locally.
+
 ### Security — viewer-hosted Worker drops CSP 'unsafe-inline' for per-request nonce (2026-05-01)
 
 The Cloudflare Worker that serves view.mdz-format.org carried
