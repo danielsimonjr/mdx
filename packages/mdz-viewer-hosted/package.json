@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@mdz-format/viewer": "*"
+    "@mdz-format/viewer": "0.1.0-alpha.0"
   },
   "comment": "`@mdz-format/viewer: *` works because the npm workspaces config in the repo root symlinks packages/* into each workspace's node_modules. Swap to a version pin once the viewer is published.",
   "devDependencies": {
