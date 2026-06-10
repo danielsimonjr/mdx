@@ -274,7 +274,7 @@ maintainer, double it.
 5. 2.5 browser extension (depends on 2.1)
 6. 2.3b editor Pro features (depends on 2.3a and real author feedback)
 
-### Status snapshot (2026-04-25)
+### Status snapshot (2026-06-10)
 
 | Sub-phase | State | What landed | What's pending |
 |-----------|-------|-------------|----------------|
