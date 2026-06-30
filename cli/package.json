@@ -40,6 +40,6 @@
     "outputPath": "dist"
   },
   "devDependencies": {
-    "@yao-pkg/pkg": "^6.18.2"
+    "@yao-pkg/pkg": "^6.21.0"
   }
 }

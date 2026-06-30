@@ -16,9 +16,11 @@
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",
-    "adm-zip": "^0.5.10"
+    "adm-zip": "^0.5.10",
+    "vite": "^7.3.6"
   },
   "comment-devdeps": "adm-zip is hoisted to the root so cross-package test runners (browser-extension/build.js, tests/conformance/integrity/run_integrity_conformance.js) can require it without reaching into a sibling package's node_modules. The cli package keeps its own copy because it ships as a published binary.",
+  "comment-vite": "vite is pinned at the root only to anchor the hoisted vite that vitest/vite-node share across the workspace test runs. vite 7.3.6 (esbuild ^0.27.0 || ^0.28.0) lets npm resolve esbuild 0.28.1 and clears the dev-only esbuild advisory (Dependabot #73); vite 7.3.5 capped esbuild at ^0.27.0 (=<0.28.0). The shipped editor-desktop/mdz-viewer builds keep their own nested vite 6 + esbuild 0.25 and are untouched.",
   "engines": {
     "node": ">=20"
   },
