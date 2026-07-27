@@ -26,7 +26,7 @@
   "optionalDependencies": {
     "electron": "^39.8.5",
     "electron-updater": "^6.3.0",
-    "sharp": "^0.33.0",
+    "sharp": "^0.35.3",
     "@playwright/test": "^1.47.0"
   },
   "devDependencies": {
