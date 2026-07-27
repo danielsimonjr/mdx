@@ -19,6 +19,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history is REQUIRED here. check_snapshot_freshness.py resolves
+          # the snapshot's reference date via `git log -1 -- ROADMAP.md`, and
+          # falls back to "now" when that returns nothing. Under the default
+          # shallow clone (depth 1) the lookup always returns nothing, so the
+          # check silently compared the snapshot against TODAY instead of
+          # against ROADMAP.md's own last commit -- failing permanently once
+          # the heading aged past 30 days, on every PR, regardless of content.
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
