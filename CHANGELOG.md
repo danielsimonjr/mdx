@@ -8,6 +8,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed — orphan `cli/package-lock.json` (2026-08-03)
+
+`cli/` is declared a member of the root `workspaces` array, so npm always
+resolves it through the **root** lockfile — even when invoked as
+`cd cli && npm install`, which is what CI does. `cli/package-lock.json` was
+therefore inert: nothing has ever installed from it.
+
+It was, however, still indexed by GitHub's dependency graph, and it had gone
+stale. Dependabot PR #20 (`e421001`, 2026-07-27) bumped `adm-zip` to `^0.6.0`
+in `cli/package.json`, the root `package.json` and the root `package-lock.json`
+— but not `cli/package-lock.json`, because npm redirected the write to the
+root. The orphan kept recording `adm-zip@0.5.16` (GHSA-xcpc-8h2w-3j85, high —
+crafted ZIP triggers a 4 GB allocation) and `tar@7.5.16`, raising two standing
+alerts against versions no build installs.
+
+Verified before removal:
+
+- The root lock resolves `adm-zip@0.6.0` and `tar@7.5.22` — both patched.
+- With the stale orphan deliberately in place, `npm ci` inside `cli/` still
+  places `adm-zip 0.6.0` / `tar 7.5.22`, confirming the root lock governs
+  (832 packages resolved, not the orphan's 189).
+- Every dependency in `cli/package.json` is present in the root lock, and
+  the root lock carries `cli` as a workspace link.
+- CI installs with `npm install`, not `npm ci`, so no job required the file.
+- The CLI suite passes against `adm-zip@0.6.0` — a 0.x minor, so semver
+  permits breaking changes, and `export-epub.js` documents behaviour that has
+  varied across adm-zip versions. Run in an isolated tree: **93 tests, 0
+  failures** (verify 30, snapshots 23, extract 16, import-epub 15, a11y 9),
+  plus the `info` / `validate` / `extract` smoke commands CI runs.
+
+`implementations/typescript/package-lock.json` is a second, untracked orphan
+of the same kind; it is local-only and was left alone.
+
 ### Added — Phase 4.6.10: Cargo.lock committed + `--locked` Cargo CI (2026-05-01)
 
 `bindings/rust/Cargo.lock` is now tracked. Generated against
