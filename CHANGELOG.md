@@ -8,6 +8,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security — undici (2026-08-04)
+
+Clears two alerts (1 high + 1 medium) against `undici`. Top-level `undici` is now
+**8.10.0** and `node-gyp`'s nested copy **6.28.0**; both are clear of every open
+advisory, and `npm audit` reports 0 vulnerabilities.
+
+**This was not a surgical bump, and the diff says so.** `undici` was held at
+exactly `7.28.0` by `miniflare`, which pins it *exactly* rather than by range —
+and `miniflare@latest` still pins `7.28.0`, while `wrangler` pins miniflare
+exactly in turn. So no in-range update existed. Overrides did not work either:
+npm 11.16 accepted `"undici@<7.29.0"` and the parent-scoped
+`{"miniflare": {"undici": ">=7.29.0"}}` without complaint, reported "up to date",
+and **never recorded an `overrides` key in the lockfile at all**. Those override
+entries were removed again rather than left as dead weight pretending to be the fix.
+
+What actually moved it was regenerating `package-lock.json` from scratch, which
+re-resolved the whole tree: **144 packages changed version, 144 added, 115 removed**
+— babel, changesets, cloudflare workerd and the rest. That is a full dependency
+refresh of a stale lockfile, not a targeted patch, and it is recorded here as such.
+
+Worth noting for risk: every consumer of `undici` here is dev/build tooling
+(`miniflare`, `@yao-pkg/pkg-fetch`, `node-gyp`) — none of it ships in an MDZ
+artifact.
+
+Verified after the refresh: `npm ci` clean, `npm test --workspaces` **397 tests
+across 21 files**, the CLI suites **93 tests** (verify 30, snapshots 23, extract 16,
+import-epub 15, a11y 9), and the `info` / `validate` smoke commands CI runs.
+
+
 ### Removed — orphan `cli/package-lock.json` (2026-08-03)
 
 `cli/` is declared a member of the root `workspaces` array, so npm always
