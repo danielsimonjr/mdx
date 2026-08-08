@@ -36,7 +36,6 @@ Verified after the refresh: `npm ci` clean, `npm test --workspaces` **397 tests
 across 21 files**, the CLI suites **93 tests** (verify 30, snapshots 23, extract 16,
 import-epub 15, a11y 9), and the `info` / `validate` smoke commands CI runs.
 
-
 ### Removed — orphan `cli/package-lock.json` (2026-08-03)
 
 `cli/` is declared a member of the root `workspaces` array, so npm always
