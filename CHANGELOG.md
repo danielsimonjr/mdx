@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Security — electron 39 → 40, removing `extract-zip` (2026-08-13)
+### Security — electron 39 → 41.10.5, removing `extract-zip` (2026-08-13)
 
 Clears a **high** advisory against `extract-zip@2.0.1`, reached through
 `electron@39.8.10` in `editor-desktop`.
@@ -18,15 +18,23 @@ itself: 2.0.1 **is** the latest published release and the advisory covers `<= 2.
 there is no version to move to. It is not accurate about this dependency *tree*. Electron
 **40** replaced the dependency with `@electron-internal/extract-zip`, so bumping one major
 removes the vulnerable package rather than patching it — `npm ls extract-zip` now reports an
-empty tree. 40 is the earliest major that does this; 41–43 do too, but there was no reason
-to take four majors when one suffices.
+empty tree.
+
+**Landed on 40 first, and 40 was the wrong answer.** It is the earliest major that drops
+`extract-zip`, so it looked like the minimal change. Re-checking the alerts *after* pushing
+showed `extract-zip` fixed and **two new high alerts opened against `electron` itself** —
+`>= 40.0.0-alpha.1, < 41.10.3` (sandboxed iframe bypassing `allow-popups` via OpenURL),
+patched in **41.10.3**. Optimising for the smallest jump traded one high for two. Corrected
+to `^41.10.3`, resolving to 41.10.5: the minimum release clear of *both* the `extract-zip`
+dependency and the Electron advisory. The lesson is that "smallest bump that fixes the
+stated alert" is not the same question as "smallest bump that leaves the tree clean"
 
 ⚠️ **The Electron runtime is not covered by CI, so this bump is not verified end to end.**
 The `validate-editor-desktop` job installs with `ELECTRON_SKIP_BINARY_DOWNLOAD=1` and
 type-checks `tsconfig.test.json`, which deliberately *excludes* the Electron-dependent
 sources. What is verified: type-check clean, 21 test files / 397 tests pass, and the
 vulnerable package is gone. What is not: that the packaged desktop app still launches and
-behaves under Electron 40. `electron` is an `optionalDependency` on an
+behaves under Electron 41. `electron` is an `optionalDependency` on an
 `0.1.0-alpha.0` package, so the blast radius is small — but the app should be run manually
 before any desktop release is cut from this.
 
