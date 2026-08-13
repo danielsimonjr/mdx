@@ -8,6 +8,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security — electron 39 → 40, removing `extract-zip` (2026-08-13)
+
+Clears a **high** advisory against `extract-zip@2.0.1`, reached through
+`electron@39.8.10` in `editor-desktop`.
+
+The alert reports `first_patched_version: NONE`, and that is accurate about the package
+itself: 2.0.1 **is** the latest published release and the advisory covers `<= 2.0.1`, so
+there is no version to move to. It is not accurate about this dependency *tree*. Electron
+**40** replaced the dependency with `@electron-internal/extract-zip`, so bumping one major
+removes the vulnerable package rather than patching it — `npm ls extract-zip` now reports an
+empty tree. 40 is the earliest major that does this; 41–43 do too, but there was no reason
+to take four majors when one suffices.
+
+⚠️ **The Electron runtime is not covered by CI, so this bump is not verified end to end.**
+The `validate-editor-desktop` job installs with `ELECTRON_SKIP_BINARY_DOWNLOAD=1` and
+type-checks `tsconfig.test.json`, which deliberately *excludes* the Electron-dependent
+sources. What is verified: type-check clean, 21 test files / 397 tests pass, and the
+vulnerable package is gone. What is not: that the packaged desktop app still launches and
+behaves under Electron 40. `electron` is an `optionalDependency` on an
+`0.1.0-alpha.0` package, so the blast radius is small — but the app should be run manually
+before any desktop release is cut from this.
+
 ### Security — undici (2026-08-04)
 
 Clears two alerts (1 high + 1 medium) against `undici`. Top-level `undici` is now
