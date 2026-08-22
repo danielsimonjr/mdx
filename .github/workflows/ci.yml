@@ -79,6 +79,10 @@ jobs:
     name: TypeScript Unit Tests
     runs-on: ubuntu-latest
     steps:
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: '1.4.0'
       - uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -100,6 +104,10 @@ jobs:
     name: Validate Viewer Build (Phase 4.6.9)
     runs-on: ubuntu-latest
     steps:
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: '1.4.0'
       - uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -289,6 +297,10 @@ jobs:
     name: Validate CLI Tool
     runs-on: ubuntu-latest
     steps:
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: '1.4.0'
       - uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -361,6 +373,10 @@ jobs:
     name: Phase 2/3 Tests (viewer sanitizer + accessibility)
     runs-on: ubuntu-latest
     steps:
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: '1.4.0'
       - uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -543,6 +559,10 @@ jobs:
     name: Validate Editor Desktop (Phase 2.3a.1)
     runs-on: ubuntu-latest
     steps:
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: '1.4.0'
       - uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -578,6 +598,10 @@ jobs:
     name: Validate Browser Extension (Phase 2.5)
     runs-on: ubuntu-latest
     steps:
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: '1.4.0'
       - uses: actions/checkout@v4
 
       - name: Setup Node.js
