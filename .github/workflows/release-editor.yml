@@ -58,8 +58,13 @@ jobs:
         with:
           node-version: "20"
 
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: '1.4.0'
       - name: Install workspace dependencies
-        run: npm install --include=optional
+        run: bun install
         env:
           # Skip the Electron platform-binary download until the
           # editor-desktop install needs it.
@@ -68,17 +73,17 @@ jobs:
       - name: Type check
         run: |
           cd editor-desktop
-          npm run typecheck:core
+          bun run typecheck:core
 
       - name: Run unit tests
         run: |
           cd editor-desktop
-          npm run test
+          bun run test
 
       - name: Build editor (TypeScript + vite)
         run: |
           cd editor-desktop
-          npm run build
+          bun run build
 
       - name: Detect signing secrets (macOS)
         if: matrix.os == 'macos-latest'
@@ -108,7 +113,7 @@ jobs:
         if: matrix.os == 'macos-latest' && steps.mac-signing.outputs.sign == 'true'
         run: |
           cd editor-desktop
-          npm run dist
+          bun run dist
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
@@ -121,7 +126,7 @@ jobs:
         if: matrix.os == 'macos-latest' && steps.mac-signing.outputs.sign == 'false'
         run: |
           cd editor-desktop
-          npm run dist:unsigned
+          bun run dist:unsigned
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -129,7 +134,7 @@ jobs:
         if: matrix.os == 'windows-latest' && steps.win-signing.outputs.sign == 'true'
         run: |
           cd editor-desktop
-          npm run dist
+          bun run dist
         env:
           CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
@@ -139,7 +144,7 @@ jobs:
         if: matrix.os == 'windows-latest' && steps.win-signing.outputs.sign == 'false'
         run: |
           cd editor-desktop
-          npm run dist:unsigned
+          bun run dist:unsigned
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -147,7 +152,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           cd editor-desktop
-          npm run dist
+          bun run dist
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

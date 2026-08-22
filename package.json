@@ -2,7 +2,7 @@
   "name": "mdz-monorepo",
   "version": "0.0.0",
   "private": true,
-  "description": "MDZ (Markdown Zipped Container) — monorepo root. See README.md and ROADMAP.md. The installable packages live in packages/; the CLI lives in cli/; reference implementations in implementations/.",
+  "description": "MDZ (Markdown Zipped Container) \u2014 monorepo root. See README.md and ROADMAP.md. The installable packages live in packages/; the CLI lives in cli/; reference implementations in implementations/.",
   "workspaces": [
     "packages/*",
     "cli",
@@ -10,9 +10,9 @@
     "editor-desktop"
   ],
   "scripts": {
-    "test": "npm run test --workspaces --if-present",
+    "test": "bun run --workspaces --if-present test",
     "test:a11y-real": "node tests/accessibility/run_axe.js",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "bun run --workspaces --if-present typecheck"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",
