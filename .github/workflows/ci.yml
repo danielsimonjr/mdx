@@ -122,7 +122,7 @@ jobs:
         # Phase 2.1 viewer needs to emit a clean dist/ for the
         # Phase 2.2 hosted Worker's [assets] binding to serve.
         # This step exercises the build pipeline end-to-end.
-        run: bun run build -w @mdz-format/viewer
+        run: cd packages/mdz-viewer && bun run build
 
       - name: Assert dist/ contains the expected entry point
         run: |
