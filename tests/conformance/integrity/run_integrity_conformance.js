@@ -30,7 +30,9 @@ const AdmZip = require('adm-zip');
 
 const ROOT = __dirname;
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
-const VALIDATE_CMD = path.join(REPO_ROOT, 'cli', 'src', 'index.js');
+// The CLI entry is TypeScript since the Bun migration, so it is spawned
+// with `bun` rather than `node`.
+const VALIDATE_CMD = path.join(REPO_ROOT, 'cli', 'src', 'index.ts');
 
 function listFixtures() {
   return fs
@@ -63,7 +65,7 @@ function runVerify(archivePath, subcommand) {
   let stderr = '';
   let exitCode = 0;
   try {
-    stdout = execFileSync('node', args, {
+    stdout = execFileSync('bun', args, {
       encoding: 'utf-8',
       stdio: ['ignore', 'pipe', 'pipe'],
     });

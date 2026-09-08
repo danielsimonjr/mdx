@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — the last CLI-rename consumer, and a stale ROADMAP status snapshot
+
+- **`tests/conformance/integrity/run_integrity_conformance.js`** spawned
+  `node` against a CLI path assembled from segments
+  (`path.join(REPO_ROOT, 'cli', 'src', 'index.js')`). Grepping for the literal
+  string `cli/src/index.js` could never find it, which is why it survived two
+  earlier sweeps. It now targets `index.ts` and spawns `bun`; 4/4 fixtures pass.
+- **The ROADMAP status snapshot was 90 days stale.** Committing `ROADMAP.md`
+  reset the freshness check's reference date, and the gate then measured the
+  `2026-06-10` heading against today. The gate was right — the snapshot's own
+  numbers had drifted, and all three test counts it asserted were wrong:
+  viewer 145 -> **150**, hosted 32 -> **35**, editor-desktop 394 -> **397**.
+  Each was re-measured, not copied forward. The table also gains a `toolchain`
+  row recording the TypeScript 7 / Bun state and the outstanding `cli` typing
+  work.
+
 ### Fixed — three consumers and one build config the CLI rename exposed
 
 Follow-up to the `cli` TypeScript migration. Each of these was found by CI, not
