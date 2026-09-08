@@ -9,7 +9,7 @@
  *     output path; non-zero exit throws with stderr surfaced;
  *     spawn-error throws with the underlying message.
  *   - `resolveCliPath`: walks two directories up from the compiled
- *     main module to find `cli/src/index.js`.
+ *     main module to find `cli/src/index.ts`.
  *
  * The runner is injected so we never actually fork the Node CLI in
  * tests — keeps the suite fast (<100 ms) and CI-platform-independent.
@@ -144,14 +144,14 @@ describe("runIpynbImport", () => {
     };
     void runIpynbImport("/tmp/notebook.ipynb", {
       runner,
-      cliPath: "/repo/cli/src/index.js",
+      cliPath: "/repo/cli/src/index.ts",
       nodeBin: "/usr/bin/node",
     });
     // schedule complete to avoid leaving the test pending
     child.complete(0);
     expect(captured).not.toBeNull();
     expect(captured!.node).toBe("/usr/bin/node");
-    expect(captured!.cliPath).toBe("/repo/cli/src/index.js");
+    expect(captured!.cliPath).toBe("/repo/cli/src/index.ts");
     expect(captured!.ipynbPath).toBe("/tmp/notebook.ipynb");
   });
 });

@@ -8,6 +8,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — three consumers and one build config the CLI rename exposed
+
+Follow-up to the `cli` TypeScript migration. Each of these was found by CI, not
+by the local run, and each is worth naming because the local gates could not
+have caught them:
+
+- **`packages/mdz-viewer/tsconfig.build.json` had no explicit `rootDir`.**
+  TypeScript 7 rejects that when `outDir` is set (TS5011), so `bun run build`
+  failed. The package's `typecheck` script uses a *different* tsconfig with
+  `noEmit`, so the workspace typecheck fan-out reported green while the build
+  config was broken — the same shape as the `editor-desktop` defect above. A
+  scan of every tsconfig in the repo found no other instance.
+- **`tests/conformance/history/run_history_conformance.js`** `require`d
+  `cli/src/lib/snapshots.js`. It is now ESM importing the `.ts` module and runs
+  under `bun` rather than `node`; CI invokes it accordingly. 5/5 fixtures pass.
+- **`ROADMAP.md` cited 16 `cli/**/*.js` paths** that the rename invalidated.
+  The cited-path gate caught every one.
+- **One citation, `dist/index.js`, was only ever resolving by accident.** The
+  gate falls back to matching a *basename anywhere in the tree*, and
+  `cli/src/index.js` happened to supply it. It is a build artifact that does
+  not exist in a fresh checkout, so the entry now cites
+  `packages/mdz-viewer/src/index.ts`, which does. 177/177 citations resolve.
+- `spec/profiles/scientific-paper-v1.json` and the `editor-desktop` test's
+  fixture path strings updated for the rename.
+
 ### Changed — `cli` migrated to TypeScript on Bun (2026-09-07)
 
 All 15 sources under `cli/src` and all 5 suites under `cli/test` move from

@@ -1,34 +1,39 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * delta-snapshots-v1 conformance runner.
  *
  * Walks every fixture directory under `tests/conformance/history/`
- * and exercises the CLI's `cli/src/lib/snapshots.js` against it.
+ * and exercises the CLI's `cli/src/lib/snapshots.ts` against it.
  * The viewer's TypeScript impl ships its own unit suite that pins
  * the same algorithm — both implementations passing means the
  * spec's two reference impls agree.
  *
  * Run from the repo root:
  *
- *     node tests/conformance/history/run_history_conformance.js
+ *     bun tests/conformance/history/run_history_conformance.js
+ *
+ * Runs under Bun, not Node: the CLI library it imports is TypeScript
+ * since the Bun migration, and this runner is ESM for the same reason.
  *
  * Exit 0 on full pass; exit 1 with a per-fixture failure summary
  * otherwise. CI consumes the exit code; humans read the per-fixture
  * lines for actionable diagnostics.
  */
 
-'use strict';
-
-const fs = require('node:fs');
-const path = require('node:path');
-const {
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
   parseIndex,
   resolveVersion,
   applyUnifiedDiff,
   SnapshotError,
-} = require('../../../cli/src/lib/snapshots.js');
+} from '../../../cli/src/lib/snapshots.ts';
 
-const ROOT = __dirname;
+// __dirname does not exist in an ES module.
+// __dirname does not exist in an ES module. fileURLToPath handles the
+// Windows drive-letter form that a raw URL pathname gets wrong.
+const ROOT = path.dirname(fileURLToPath(import.meta.url));
 
 function listFixtures() {
   return fs

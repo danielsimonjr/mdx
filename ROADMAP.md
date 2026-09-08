@@ -105,7 +105,7 @@ archive. Every v2.0 feature maps to a concrete scientific-paper need:
 these are not optional for journal acceptance):**
 
 - [x] **JATS-XML bridge** — `mdz export-jats` ships in Phase 2 as
-      `cli/src/commands/export-jats.js`. Handles front matter (title,
+      `cli/src/commands/export-jats.ts`. Handles front matter (title,
       authors with did:web→ORCID, abstract, keywords, license), body
       (headings, paragraphs, lists, tables, code, images, inline math),
       back (CSL-JSON references), and supplementary-material linking
@@ -154,7 +154,7 @@ these are not optional for journal acceptance):**
       key was rejected as redundant — the SPDX id IS the string (or
       the `type` field), which is what OA-compliance tools key on.
 - [x] **`.ipynb` → MDZ migration path** — `mdz import-ipynb` ships as
-      `cli/src/commands/import-ipynb.js`. Cells → `::cell`; outputs
+      `cli/src/commands/import-ipynb.ts`. Cells → `::cell`; outputs
       (stream/display_data/execute_result) → `::output` with
       documented
       MIME-bundle → `::output` mapping (text/plain, image/png, application/json,
@@ -464,7 +464,7 @@ end-to-end and export it to a journal as JATS-XML.
       bridges. Renderer waits for the import to settle, then opens
       the produced `.mdz` directly.
 - [x] Bridge module at `editor-desktop/src/main/ipynb-import.ts`
-      spawns the existing `cli/src/commands/import-ipynb.js` as a
+      spawns the existing `cli/src/commands/import-ipynb.ts` as a
       child process (NOT in-renderer; the CLI calls
       `process.exit()` on unhappy paths and would kill the editor
       if loaded in-process).
@@ -667,15 +667,15 @@ is independent — sequence by user demand, not by checklist order.
       runner enforces. 23 fixtures × parity + 14 unit tests = 37
       vitest cases.
 - [x] **Compliance-report export** — done 2026-04-25. CLI gains
-      `--a11y-report [path]` flag (`cli/src/index.js:128`); when
+      `--a11y-report [path]` flag (`cli/src/index.ts:128`); when
       set, validate writes a WCAG sidecar JSON (`<archive>.a11y.json`
       by default, or the path provided) with schema_version 1.0,
-      wcag_version 2.2, level AA. Rules ported into `cli/src/lib/a11y.js`
+      wcag_version 2.2, level AA. Rules ported into `cli/src/lib/a11y.ts`
       stay in lockstep with the TS sibling (`accessibility-checker.ts`)
       and Python sibling (`tests/accessibility/run_accessibility.py`)
       — image-alt / heading-order / link-name / document-language.
       Sidecar walks primary + every locale variant declared in
-      `manifest.content.locales`. 9 vitest cases (`cli/test/a11y.test.js`);
+      `manifest.content.locales`. 9 vitest cases (`cli/test/a11y.test.ts`);
       new CI step `Test --a11y-report (Phase 3.3 WCAG sidecar JSON)`
       runs them on every push. Fixture-pack expansion to 50 stays
       a separate task (#196).
@@ -723,7 +723,7 @@ is independent — sequence by user demand, not by checklist order.
       — done 2026-04-25 in Phase 4.5.2. See the Phase 4.5 entry
       below for the canonical implementation note (this entry was
       a Phase 2.3b.3 cross-reference that hadn't been rolled up).
-      `cli/src/commands/snapshot.js` + `cli/src/lib/snapshots.js`.
+      `cli/src/commands/snapshot.ts` + `cli/src/lib/snapshots.ts`.
 
   **Depends on:** 2.3a.2. Algorithm + read side shipped 2026-04-24;
   UI surface and writer CLI deferred.
@@ -955,7 +955,7 @@ for documents that don't need cells.
   - `::cell` source → `<pre><code>` with `prism`-style highlighting (outputs
     baked in as alt content since EPUB can't execute)
 - [x] `epub-to-mdz` CLI — `mdz import-epub` ships at
-      `cli/src/commands/import-epub.js`. OPF parse with comment-strip,
+      `cli/src/commands/import-epub.ts`. OPF parse with comment-strip,
       CDATA-unwrap, and multi-language title selection; spine walk in
       reading order; XHTML → Markdown via turndown; image dedup by
       destination path with basename-collision disambiguation; chapter
@@ -1011,12 +1011,12 @@ enforcement. Fix this before any real adoption.
 - [x] CSP profile — `docs/security/CSP.md` ships.
 - [x] `::include` external-URL permissions enforcement in reference impls — verified done 2026-04-25. The viewer (`packages/mdz-viewer/src/directives.ts`) refuses external (URL) includes that don't carry a `content_hash` attribute, rendering an `mdz-include-missing` placeholder with the message "requires content_hash"; URL includes WITH a `content_hash` render as an `mdz-include-pending` placeholder (the bytes aren't fetched at render time — the placeholder shows the expected hash so a downstream loader can fetch + verify). Both branches are covered by integration tests (`directives.test.ts:420` "refuses external includes without content_hash" and `:429` "emits a pending placeholder for external includes WITH content_hash"). Matches the spec's "external transclusion requires integrity declaration" rule.
 - [x] Signature trust model docs (DID resolution / revocation / rotation) — `docs/security/SIGNATURE_TRUST.md` ships. Covers signer identity, key-discovery resolution chain (did:web / did:key / trust file / certificate fallback), trust-decision policies (default / strict / offline), revocation per DID method, key rotation patterns (forward chain / historical verification / co-signed rotation), and what viewers MUST surface to users.
-- [x] Reference verifier `mdz verify archive.mdz` — ships at `cli/src/commands/verify.js` with structural chain + trust-file support (tests at `cli/test/verify.test.js`). Full cryptographic signature verification (Ed25519/RS256/ES256 over resolved DID keys) is still Phase 3.2 per both the Node and Rust verifier caveats.
+- [x] Reference verifier `mdz verify archive.mdz` — ships at `cli/src/commands/verify.ts` with structural chain + trust-file support (tests at `cli/test/verify.test.ts`). Full cryptographic signature verification (Ed25519/RS256/ES256 over resolved DID keys) is still Phase 3.2 per both the Node and Rust verifier caveats.
 - [x] Threat model doc at `docs/security/THREAT_MODEL.md` — ships.
 
 ### 3.2 Subresource integrity enforcement
 
-- [x] Integrity field verification landed in the Node verifier + Rust binding (`verify_integrity`, `verify_content_id`). Conformance-suite-level viewer flagging is not yet implemented — the existing negative fixtures cover parser-level errors, not archive-level integrity mismatch. Archive-level integrity tests live in `cli/test/verify.test.js` and `bindings/rust/tests/archive_integration.rs` instead.
+- [x] Integrity field verification landed in the Node verifier + Rust binding (`verify_integrity`, `verify_content_id`). Conformance-suite-level viewer flagging is not yet implemented — the existing negative fixtures cover parser-level errors, not archive-level integrity mismatch. Archive-level integrity tests live in `cli/test/verify.test.ts` and `bindings/rust/tests/archive_integration.rs` instead.
 - [x] Add integrity-fail fixtures — done 2026-04-25.
       `tests/conformance/integrity/` now hosts archive-level
       fixtures with their own runner
@@ -1098,7 +1098,7 @@ against its parent, not a full copy. Relevant once documents commonly have >20 v
 - [x] **Writer + reader CLI subcommands** — `mdz snapshot create
       <file> <version>` / `mdz snapshot view <file> <version>` /
       `mdz snapshot list <file>`. The CLI ships a CommonJS port of
-      the reader logic at `cli/src/lib/snapshots.js` (deliberate
+      the reader logic at `cli/src/lib/snapshots.ts` (deliberate
       duplication so the CLI doesn't pull in an ESM runtime) plus a
       writer-side LCS-based unified-diff generator
       (`generateUnifiedDiff`) that produces patches the reader
@@ -1277,7 +1277,7 @@ normal completion flow.
       English default. Adding a language is a one-line
       addition to `LABELS_BY_LANG`.
 - [x] **EPUB export `adm-zip → yazl` swap** — done 2026-04-25.
-      `cli/src/commands/export-epub.js` now writes the output EPUB
+      `cli/src/commands/export-epub.ts` now writes the output EPUB
       via `yazl.ZipFile` with explicit per-entry ordering and
       `compress: false` for the mimetype entry. Removed the prior
       adm-zip workaround helpers (`_addStoredEntry` flipping
@@ -1452,14 +1452,14 @@ the drift this session found."
       build the fixture archive that unblocks the `.skip` stubs.
 - [x] **Verify viewer build pipeline emits `dist/index.js`
       end-to-end** — done 2026-04-25. New `validate-viewer-build`
-      CI job runs `npm run build -w @mdz-format/viewer` + asserts
+      CI job runs `bun run build` in the viewer package + asserts
       `dist/index.js` and `dist/index.d.ts` are emitted; greps
       the compiled `dist/mdz-viewer.js` for `customElements` to
       verify the custom-element registration survives compilation.
       `packages/mdz-viewer-hosted/src/worker.ts` updated: the
-      stub script-tag now imports `/index.js` (matches the
-      package's `main` field) instead of the speculative
-      `/viewer.js`. Locally verified: `tsc -p tsconfig.build.json`
+      stub script-tag now imports the URL matching the package's
+      `main` field instead of the speculative viewer path; the
+      entry point is `packages/mdz-viewer/src/index.ts`. Locally verified: `tsc -p tsconfig.build.json`
       emits 11 .js + 11 .d.ts files; `dist/index.js` exists;
       `dist/mdz-viewer.js` references `customElements` twice
       (define + get).
@@ -1480,8 +1480,8 @@ the drift this session found."
 **E. Features**
 
 - [x] **`mdz snapshot export` subcommand** — done 2026-04-25.
-      `cli/src/commands/snapshot.js` gains `exportSubcommand` +
-      wiring in `cli/src/index.js`. Reuses the existing
+      `cli/src/commands/snapshot.ts` gains `exportSubcommand` +
+      wiring in `cli/src/index.ts`. Reuses the existing
       `reconstruct` helper, writes the resulting markdown to
       `--output` (`-o` short form), and with `--with-manifest`
       writes `<outfile>.manifest.json` alongside — the projected

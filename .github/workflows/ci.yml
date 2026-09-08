@@ -352,7 +352,7 @@ jobs:
           bun test test/
 
       - name: Run delta-snapshots-v1 conformance fixtures
-        run: node tests/conformance/history/run_history_conformance.js
+        run: bun tests/conformance/history/run_history_conformance.js
 
       - name: Install root dependencies (adm-zip for cross-package runners)
         # Phase 4.6.9: adm-zip is hoisted to the workspace root so
