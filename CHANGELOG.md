@@ -8,6 +8,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — TypeScript 7 + Bun toolchain pin (2026-09-07)
+
+- Root pins `packageManager: bun@1.4.2` and `engines.bun >= 1.4.2`.
+- `typescript` moves `^5.3.0`/`^5.5.0` -> `^7.0.2` in `implementations/typescript`,
+  `packages/mdz-viewer`, `packages/mdz-viewer-hosted` and `editor-desktop`.
+  A single `typescript@7.0.2` resolves across the whole workspace.
+
+### Fixed — `editor-desktop` main-process build was self-contradictory
+
+TypeScript 7 removed `moduleResolution: node10`, which surfaced a defect present
+since the package's first commit (`df04b70`):
+
+- `tsconfig.main.json` declared `module: CommonJS` while `package.json` declares
+  `"type": "module"` and the sources use `import.meta`. A CommonJS emit
+  contradicts both, and a `.js` file under `type: module` is parsed as ESM
+  regardless of what was written into it. The config now uses
+  `module`/`moduleResolution: nodenext`, which matches the sources and the
+  package type. Verified by reading the emit, not just the exit code.
+- `src/main/main.ts` lazily loaded optional Electron deps with a **bare
+  `require`**. `require` is not defined in an ES module, so that call throws
+  `ReferenceError` and the surrounding catch reports "Electron is not installed"
+  whatever is actually on disk. It now goes through
+  `createRequire(import.meta.url)`, which keeps the load lazy -- a static import
+  would make an optional dependency mandatory.
+
+**Nothing reported either problem because nothing ran this build.** CI's
+`validate-editor-desktop` job typechecks `tsconfig.test.json` and runs vitest;
+it never invokes `bun run build`, so `tsconfig.main.json` was unexercised.
+
+- `editor-desktop` had `typecheck:core` but no `typecheck`, so the root
+  `bun run --workspaces --if-present typecheck` skipped it silently. It now has
+  a `typecheck` script covering **both** tsconfigs, and the root fan-out reports
+  4 packages instead of 3.
+- `dist` / `dist:unsigned` called `npm run build` inside a Bun workspace.
+
 ### Security — electron 39 → 41.10.5, removing `extract-zip` (2026-08-13)
 
 Clears a **high** advisory against `extract-zip@2.0.1`, reached through

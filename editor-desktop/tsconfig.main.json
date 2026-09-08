@@ -4,10 +4,10 @@
     "outDir": "./dist",
     "noEmit": false,
     "rootDir": "./src",
-    "module": "CommonJS",
-    "moduleResolution": "node"
+    "module": "nodenext",
+    "moduleResolution": "nodenext"
   },
-  "comment": "Compiles main.ts + preload.ts to CommonJS for Electron's main-process loader. Renderer code (index.ts) goes through Vite separately (vite.config.ts) and ships as an ES module bundle.",
+  "comment": "Compiles main.ts + preload.ts for Electron's main-process loader. Renderer code (index.ts) goes through Vite separately (vite.config.ts) and ships as an ES module bundle. Emits ESM, not CommonJS: package.json declares \"type\": \"module\" and the sources use import.meta, so a CommonJS emit contradicts both. The config said module=CommonJS with moduleResolution=node from the first commit (df04b70); TypeScript 7 removed node10 resolution and surfaced it. This build is not covered by CI, which typechecks only tsconfig.test.json, so nothing reported the contradiction for as long as it existed.",
   "include": [
     "src/main/**/*.ts",
     "src/preload/**/*.ts"

@@ -18,9 +18,9 @@
  * webContents driving.
  */
 
-/* eslint-disable @typescript-eslint/no-require-imports */
 
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { promises as fsp, existsSync } from "node:fs";
 
@@ -36,14 +36,24 @@ import { encodeVariants, type VariantPlanEntry } from "./variant-encoder.js";
 
 // Electron is in optionalDependencies; require lazily so the module
 // can be imported by typecheck even when electron isn't installed.
+//
+// The lazy load goes through createRequire, not a bare `require`. This file
+// emits as ESM -- package.json declares "type": "module" and the code uses
+// import.meta -- and `require` is not defined in an ES module, so a bare call
+// throws ReferenceError and the catch below reports "Electron is not
+// installed" no matter what is on disk. A static `import` is not the fix
+// either: it would make an optional dependency mandatory at load time, which
+// is exactly what the lazy load exists to avoid.
 type ElectronModule = typeof import("electron");
 type AutoUpdaterModule = typeof import("electron-updater");
+
+const requireOptional = createRequire(import.meta.url);
 
 let electron: ElectronModule;
 let autoUpdater: AutoUpdaterModule["autoUpdater"] | null = null;
 
 try {
-  electron = require("electron") as ElectronModule;
+  electron = requireOptional("electron") as ElectronModule;
 } catch (e) {
   throw new Error(
     "Electron is not installed. The editor shell requires Electron at " +
@@ -53,7 +63,7 @@ try {
 }
 
 try {
-  autoUpdater = (require("electron-updater") as AutoUpdaterModule).autoUpdater;
+  autoUpdater = (requireOptional("electron-updater") as AutoUpdaterModule).autoUpdater;
 } catch {
   autoUpdater = null; // optional; Phase 2.3a.6 wires the real feed
 }
