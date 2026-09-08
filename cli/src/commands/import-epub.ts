@@ -34,13 +34,13 @@
 
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
-const AdmZip = require('adm-zip');
-const chalk = require('chalk');
-const ora = require('ora');
-const TurndownService = require('turndown');
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import AdmZip from 'adm-zip';
+import chalk from 'chalk';
+import ora from 'ora';
+import TurndownService from 'turndown';
 
 const EPUB_NS = {
     container: 'urn:oasis:names:tc:opendocument:xmlns:container',
@@ -285,7 +285,7 @@ function parseOpf(opfXml) {
     // Manifest items (id -> {href, mediaType}). attrs body is lowercased
     // for the per-attribute sub-regexes to handle mixed-case attr names
     // (`Media-Type`, `ID`, `Href`) — XML allows them.
-    const manifest = {};
+    const manifest: Record<string, any> = {};
     const itemRe = /<item\b([^>]*)\/>|<item\b([^>]*)>/gi;
     let m;
     while ((m = itemRe.exec(normalizedXml)) !== null) {
@@ -355,8 +355,10 @@ function extractAccessibility(xml) {
 // MDZ manifest construction
 // ---------------------------------------------------------------------------
 
-function buildMdzManifest(meta) {
-    const m = {
+function buildMdzManifest(meta): Record<string, any> {
+    // Open record: the optional blocks below (keywords, license, accessibility)
+    // are attached conditionally, which the inferred literal type rejects.
+    const m: Record<string, any> = {
         mdx_version: '2.0.0',
         document: {
             id: normalizeUuid(meta.identifier),
@@ -478,5 +480,5 @@ function posixJoin(...parts) {
     return path.posix.normalize(parts.filter(Boolean).join('/'));
 }
 
-module.exports = importEpub;
-module.exports._internal = { parseOpf, parseOpfHref, buildMdzManifest, normalizeUuid, unescapeXml };
+export default importEpub;
+export const _internal = { parseOpf, parseOpfHref, buildMdzManifest, normalizeUuid, unescapeXml };

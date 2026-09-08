@@ -7,23 +7,25 @@
  * archives throughout.
  */
 
-const { program } = require('commander');
-const chalk = require('chalk');
-const path = require('path');
+import { program } from 'commander';
+import chalk from 'chalk';
+import path from 'path';
 
 // Import commands
-const viewCommand = require('./commands/view');
-const extractCommand = require('./commands/extract');
-const infoCommand = require('./commands/info');
-const editCommand = require('./commands/edit');
-const createCommand = require('./commands/create');
-const validateCommand = require('./commands/validate');
-const importIpynbCommand = require('./commands/import-ipynb');
-const exportJatsCommand = require('./commands/export-jats');
-const exportEpubCommand = require('./commands/export-epub');
-const importEpubCommand = require('./commands/import-epub');
-const verifyCommand = require('./commands/verify');
-const snapshotCommands = require('./commands/snapshot');
+import viewCommand from './commands/view.js';
+import extractCommand from './commands/extract.js';
+import infoCommand from './commands/info.js';
+import editCommand from './commands/edit.js';
+import createCommand from './commands/create.js';
+import validateCommand from './commands/validate.js';
+import importIpynbCommand from './commands/import-ipynb.js';
+import exportJatsCommand from './commands/export-jats.js';
+import exportEpubCommand from './commands/export-epub.js';
+import importEpubCommand from './commands/import-epub.js';
+import verifyCommand from './commands/verify.js';
+// Namespace import: snapshot.ts exports its four subcommands as named exports
+// (it was `module.exports = { ... }` before the conversion), not a default.
+import * as snapshotCommands from './commands/snapshot.js';
 
 // CLI Banner
 const banner = `
@@ -130,7 +132,13 @@ program
   .option('--no-exit', 'Do not exit with error code on validation failure')
   .option('--profile <id-or-path>', 'Enforce conformance against a profile (e.g., mdz-core, mdz-advanced, scientific-paper-v1, or a path to a profile JSON)')
   .option('--a11y-report [path]', 'Write WCAG accessibility sidecar JSON. Without [path], writes <archive>.a11y.json next to the input.')
-  .action(validateCommand);
+  // Wrapped rather than passed directly: validateCommand resolves to a result
+  // object, and commander's action handler is typed void | Promise<void>.
+  // The return value is part of validateCommand's own contract, so it is
+  // discarded here instead of being removed there.
+  .action(async (file, options) => {
+    await validateCommand(file, options);
+  });
 
 // Snapshot command - manage delta-encoded version history
 const snapshot = program.command('snapshot')

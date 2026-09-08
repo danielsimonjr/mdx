@@ -22,11 +22,11 @@
 
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
-const chalk = require('chalk');
-const AdmZip = require('adm-zip');
-const {
+import fs from 'fs';
+import path from 'path';
+import chalk from 'chalk';
+import AdmZip from 'adm-zip';
+import {
   parseIndex,
   resolveVersion,
   applyUnifiedDiff,
@@ -34,7 +34,7 @@ const {
   shouldStartNewChain,
   addDeltaToIndex,
   SnapshotError,
-} = require('../lib/snapshots.js');
+} from '../lib/snapshots.js';
 
 const INDEX_PATH = 'history/snapshots/index.json';
 
@@ -294,7 +294,7 @@ function pickLatestVersion(index) {
   return lastChain.deltas[lastChain.deltas.length - 1].version;
 }
 
-module.exports = {
+export {
   viewSubcommand,
   exportSubcommand,
   listSubcommand,

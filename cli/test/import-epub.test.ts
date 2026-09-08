@@ -13,16 +13,20 @@
 
 'use strict';
 
-const { test } = require('node:test');
-const assert = require('node:assert');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
-const { execFileSync } = require('node:child_process');
+import { test } from 'node:test';
+import assert from 'node:assert';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 
-const importEpub = require('../src/commands/import-epub');
+// `_internal` is a NAMED export now. Under CommonJS it was attached onto the
+// exported function object (`module.exports._internal = ...`), so the default
+// import carried it; in ESM the default and named exports are separate
+// bindings and it has to be imported by name.
+import { _internal } from '../src/commands/import-epub.js';
 const { parseOpfHref, parseOpf, buildMdzManifest, normalizeUuid, unescapeXml } =
-    importEpub._internal;
+    _internal;
 
 // ---------------------------------------------------------------------------
 // parseOpfHref
@@ -225,7 +229,9 @@ test('round-trip: synthesized mdz → epub → mdz preserves declared values', {
     // Build a known-shape MDZ in-process so the assertions below pin
     // exact values rather than tracking whatever shape
     // examples/example-document.mdx happens to have.
-    const cliPath = path.resolve(__dirname, '..', 'src', 'index.js');
+    // The CLI entry is TypeScript now, so the subprocess is spawned with
+    // process.execPath (the Bun binary running this suite) rather than `node`.
+    const cliPath = path.resolve(__dirname, '..', 'src', 'index.ts');
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mdz-rt-'));
     const sourceMdz = path.join(tmpDir, 'src.mdz');
     const epubPath = path.join(tmpDir, 'mid.epub');
@@ -252,8 +258,8 @@ test('round-trip: synthesized mdz → epub → mdz preserves declared values', {
     inputZip.addFile('document.md', Buffer.from('# Heading\n\nA paragraph.\n'));
     inputZip.writeZip(sourceMdz);
 
-    execFileSync('node', [cliPath, 'export-epub', sourceMdz, '-o', epubPath], { stdio: 'pipe' });
-    execFileSync('node', [cliPath, 'import-epub', epubPath, '-o', finalMdzPath], { stdio: 'pipe' });
+    execFileSync(process.execPath, [cliPath, 'export-epub', sourceMdz, '-o', epubPath], { stdio: 'pipe' });
+    execFileSync(process.execPath, [cliPath, 'import-epub', epubPath, '-o', finalMdzPath], { stdio: 'pipe' });
 
     const finalManifest = JSON.parse(
         new AdmZip(finalMdzPath).getEntry('manifest.json').getData().toString('utf8'),
@@ -278,7 +284,7 @@ test('round-trip: synthesized mdz → epub → mdz preserves declared values', {
 // ---------------------------------------------------------------------------
 
 test('import-epub: refuses an EPUB with META-INF/encryption.xml', { timeout: 60000 }, () => {
-    const cliPath = path.resolve(__dirname, '..', 'src', 'index.js');
+    const cliPath = path.resolve(__dirname, '..', 'src', 'index.ts');
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mdz-drm-'));
     const epubPath = path.join(tmpDir, 'drm.epub');
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -294,7 +300,7 @@ test('import-epub: refuses an EPUB with META-INF/encryption.xml', { timeout: 600
 
     let exitCode = 0;
     try {
-        execFileSync('node', [cliPath, 'import-epub', epubPath], { stdio: 'pipe' });
+        execFileSync(process.execPath, [cliPath, 'import-epub', epubPath], { stdio: 'pipe' });
     } catch (e) {
         exitCode = e.status;
     }

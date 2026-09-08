@@ -69,16 +69,16 @@ mdx/                                    # (directory name deferred-rename)
 │           ├── parser.py
 │           ├── ast.py
 │           └── errors.py
-├── cli/                                            # Node.js CLI
+├── cli/                                            # TypeScript CLI (Bun)
 │   ├── src/
-│   │   ├── index.js                                # program: mdz
+│   │   ├── index.ts                                # program: mdz
 │   │   └── commands/
-│   │       ├── info.js / view.js / extract.js      # v1 basics
-│   │       ├── edit.js / create.js / validate.js
-│   │       ├── import-ipynb.js                     # Phase 2: Jupyter -> MDZ
-│   │       ├── export-jats.js                      # Phase 2: MDZ -> JATS 1.3
-│   │       ├── export-epub.js                      # Phase 2: MDZ -> EPUB 3.3
-│   │       └── verify.js                           # Phase 3: signature chain
+│   │       ├── info.ts / view.ts / extract.ts      # v1 basics
+│   │       ├── edit.ts / create.ts / validate.ts
+│   │       ├── import-ipynb.ts                     # Phase 2: Jupyter -> MDZ
+│   │       ├── export-jats.ts                      # Phase 2: MDZ -> JATS 1.3
+│   │       ├── export-epub.ts                      # Phase 2: MDZ -> EPUB 3.3
+│   │       └── verify.ts                           # Phase 3: signature chain
 │   └── dist/
 ├── packages/                                       # Phase 2 npm packages
 │   ├── mdz-viewer/                                 # <mdz-viewer> web component
@@ -195,19 +195,23 @@ mdx/                                    # (directory name deferred-rename)
 ```bash
 # Install dependencies
 cd cli
-npm install
+bun install
 
-# Run commands directly
-node src/index.js view document.mdx       # Open in browser
-node src/index.js extract document.mdx    # Extract contents
-node src/index.js info document.mdx       # Show metadata
-node src/index.js edit document.mdx       # Interactive editor
-node src/index.js create                  # Create new document
-node src/index.js validate document.mdx   # Validate structure
+# Run commands directly (the entry point is TypeScript; Bun runs it natively)
+bun run src/index.ts view document.mdx       # Open in browser
+bun run src/index.ts extract document.mdx    # Extract contents
+bun run src/index.ts info document.mdx       # Show metadata
+bun run src/index.ts edit document.mdx       # Interactive editor
+bun run src/index.ts create                  # Create new document
+bun run src/index.ts validate document.mdx   # Validate structure
 
-# Build standalone executable
-npm run build          # Windows x64
-npm run build:all      # All platforms (outputs to dist/)
+# Type-check and test
+bun run typecheck
+bun test test/         # 93 cases across 5 files
+
+# Build standalone executable (`bun build --compile`, no bundler dependency)
+bun run build          # Windows x64 -> dist/mdz.exe
+bun run build:all      # win-x64, macos-x64, macos-arm64, linux-x64
 ```
 
 ### Web Editor
@@ -390,9 +394,13 @@ Node.js command-line tool using Commander.js and Inquirer.js.
     to a standalone file; pair with `--with-manifest` for a
     version-specific manifest projection
 
-**Dependencies:** commander, inquirer, adm-zip, marked, marked-terminal, chalk (v4.x for CommonJS), open, ora
+**Dependencies:** commander, inquirer, adm-zip, marked, marked-terminal,
+chalk (pinned to v4.x), open, ora. The sources are ESM TypeScript; the chalk
+pin is a version constraint, not a module-system one.
 
-**Build:** Uses `pkg` to create standalone executables for Windows/Mac/Linux
+**Build:** `bun build --compile` produces standalone executables for
+Windows / macOS (x64 + arm64) / Linux. This replaced `@yao-pkg/pkg`, which
+cannot consume TypeScript; Bun provides the same capability natively.
 
 ### Web Editor (legacy)
 

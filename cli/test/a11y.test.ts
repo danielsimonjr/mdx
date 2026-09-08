@@ -6,15 +6,15 @@
  * lockstep.
  */
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
-const AdmZip = require('adm-zip');
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import AdmZip from 'adm-zip';
 
-const { checkMarkdown, buildReport } = require('../src/lib/a11y.js');
-const validateCommand = require('../src/commands/validate.js');
+import { checkMarkdown, buildReport } from '../src/lib/a11y.js';
+import validateCommand from '../src/commands/validate.js';
 
 test('image-alt: empty alt fires; non-empty alt does not', () => {
   const v = checkMarkdown('Some text\n\n![](img.png)\n\n![A diagram](other.png)');

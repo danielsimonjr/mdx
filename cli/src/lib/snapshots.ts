@@ -27,7 +27,16 @@ const DEFAULT_MAX_CHAIN_DEPTH = 50;
 const NEW_CHAIN_THRESHOLD = 0.2;
 
 class SnapshotError extends Error {
-  constructor(message, version, patchLine) {
+
+  name: any;
+
+  patchLine: any;
+
+  version: any;
+
+  // version and patchLine are optional: most throw sites raise a plain message.
+  // JavaScript allowed the omission implicitly; TypeScript needs it declared.
+  constructor(message: string, version?: any, patchLine?: any) {
     super(message);
     this.name = 'SnapshotError';
     this.version = version;
@@ -106,7 +115,7 @@ function validateChain(raw) {
 // Chain resolution
 // ---------------------------------------------------------------------------
 
-function resolveVersion(index, version, options = {}) {
+function resolveVersion(index, version, options: Record<string, any> = {}) {
   const maxDepth = options.maxChainDepth || DEFAULT_MAX_CHAIN_DEPTH;
   for (const chain of index.chains) {
     if (chain.base_version === version) return { chain, applyOrder: [] };
@@ -391,7 +400,7 @@ function addDeltaToIndex(index, opts) {
   return cloned;
 }
 
-module.exports = {
+export {
   SnapshotError,
   parseIndex,
   resolveVersion,

@@ -27,14 +27,14 @@
  */
 
 
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
-const AdmZip = require('adm-zip');     // read-only — input MDZ archive
-const yazl = require('yazl');          // write — output EPUB (explicit ordering + STORED control)
-const chalk = require('chalk');
-const ora = require('ora');
-const { marked } = require('marked');
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import AdmZip from 'adm-zip';     // read-only — input MDZ archive
+import yazl from 'yazl';          // write — output EPUB (explicit ordering + STORED control)
+import chalk from 'chalk';
+import ora from 'ora';
+import { marked } from 'marked';
 
 const EPUB_MIMETYPE = 'application/epub+zip';
 
@@ -394,4 +394,4 @@ function escapeXml(s) {
         .replace(/'/g, '&apos;');
 }
 
-module.exports = exportEpub;
+export default exportEpub;

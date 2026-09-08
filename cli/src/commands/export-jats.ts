@@ -36,12 +36,12 @@
  */
 
 
-const fs = require('fs');
-const path = require('path');
-const AdmZip = require('adm-zip');
-const chalk = require('chalk');
-const ora = require('ora');
-const { marked } = require('marked');
+import fs from 'fs';
+import path from 'path';
+import AdmZip from 'adm-zip';
+import chalk from 'chalk';
+import ora from 'ora';
+import { marked } from 'marked';
 
 async function exportJats(inputPath, options) {
     const spinner = ora('Reading archive...').start();
@@ -392,7 +392,10 @@ function renderInline(text, ctx) {
     // ever see documents where this is hot we can precompile a combined
     // alternation regex with named groups — the linear scan stays the
     // same but we avoid six separate .exec() calls per iteration.
-    const patterns = [
+    // Tuple type, not the inferred (RegExp | fn)[][]: without it the `[re, build]`
+    // destructure below types both halves as the union, so `re.exec` fails to
+    // resolve. The runtime shape was always pairs; only the annotation is new.
+    const patterns: Array<[RegExp, (...args: any[]) => string]> = [
         // [regex, builder(match, ...groups)]
         [
             /!\[([^\]]*)\]\(([^)]+)\)/,
@@ -530,5 +533,5 @@ function escapeXml(s) {
         .replace(/'/g, '&apos;');
 }
 
-module.exports = exportJats;
-module.exports.buildJats = buildJats; // exposed for unit tests
+export default exportJats;
+export { buildJats }; // exposed for unit tests

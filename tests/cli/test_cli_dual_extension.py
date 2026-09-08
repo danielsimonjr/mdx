@@ -2,7 +2,7 @@
 """Integration test that the CLI accepts both .mdz and .mdx archives.
 
 Backward-compat promise: readers MUST accept both extensions through
-2027-01-01. This test exercises the CLI's branch in `cli/src/index.js`
+2027-01-01. This test exercises the CLI's branch in `cli/src/index.ts`
 by running the `info` command against both forms of the same archive.
 If someone removes the `.endsWith('.mdx')` clause, this test fails.
 """
@@ -20,14 +20,16 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if sys.platform == "win32" and hasattr(sys.stdout, "buffer"):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
-CLI_ENTRY = REPO_ROOT / "cli" / "src" / "index.js"
+# The CLI entry is TypeScript since the Bun migration, so it is spawned with
+# `bun`, not `node`.
+CLI_ENTRY = REPO_ROOT / "cli" / "src" / "index.ts"
 SOURCE_MDX = REPO_ROOT / "examples" / "example-document.mdx"
 
 
 def _run_info(path: Path) -> tuple[int, str]:
-    """Run `node cli/src/index.js info <path>` and return (code, combined_output)."""
+    """Run `bun cli/src/index.ts info <path>` and return (code, combined_output)."""
     proc = subprocess.run(
-        ["node", str(CLI_ENTRY), "info", str(path)],
+        ["bun", str(CLI_ENTRY), "info", str(path)],
         capture_output=True,
         encoding="utf-8",
         errors="replace",
@@ -69,7 +71,7 @@ def test_cli_rejects_unknown_extension() -> None:
         fake.write_bytes(b"not an archive")
         # Default action (no subcommand) with .xyz should print help.
         proc = subprocess.run(
-            ["node", str(CLI_ENTRY), str(fake)],
+            ["bun", str(CLI_ENTRY), str(fake)],
             capture_output=True,
             encoding="utf-8",
             errors="replace",

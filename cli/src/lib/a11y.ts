@@ -167,4 +167,4 @@ function buildReport(scans, manifest) {
   };
 }
 
-module.exports = { checkMarkdown, buildReport };
+export { checkMarkdown, buildReport };

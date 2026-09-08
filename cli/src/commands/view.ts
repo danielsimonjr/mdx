@@ -2,13 +2,13 @@
  * View command - Opens MDX file in browser viewer
  */
 
-const fs = require('fs');
-const path = require('path');
-const http = require('http');
-const chalk = require('chalk');
-const open = require('open');
-const ora = require('ora');
-const AdmZip = require('adm-zip');
+import fs from 'fs';
+import path from 'path';
+import http from 'http';
+import chalk from 'chalk';
+import open from 'open';
+import ora from 'ora';
+import AdmZip from 'adm-zip';
 
 // Embedded viewer HTML
 const viewerHTML = `<!DOCTYPE html>
@@ -284,4 +284,4 @@ async function viewCommand(file, options) {
     }
 }
 
-module.exports = viewCommand;
+export default viewCommand;

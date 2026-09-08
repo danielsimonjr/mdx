@@ -2,13 +2,13 @@
  * Validate command - Validates MDX file structure and manifest
  */
 
-const fs = require('fs');
-const path = require('path');
-const chalk = require('chalk');
-const ora = require('ora');
-const AdmZip = require('adm-zip');
-const crypto = require('crypto');
-const { buildReport: buildA11yReport } = require('../lib/a11y.js');
+import fs from 'fs';
+import path from 'path';
+import chalk from 'chalk';
+import ora from 'ora';
+import AdmZip from 'adm-zip';
+import crypto from 'crypto';
+import { buildReport as buildA11yReport } from '../lib/a11y.js';
 
 // Validation result types
 const Level = {
@@ -18,6 +18,21 @@ const Level = {
 };
 
 class MDXValidator {
+
+  entries: any;
+
+  errors: any;
+
+  filePath: any;
+
+  info: any;
+
+  manifest: any;
+
+  warnings: any;
+
+  zip: any;
+
     constructor(filePath) {
         this.filePath = filePath;
         this.errors = [];
@@ -614,6 +629,6 @@ function collectA11yScans(validator) {
     return scans;
 }
 
-module.exports = validateCommand;
-module.exports.MDXValidator = MDXValidator;
-module.exports.collectA11yScans = collectA11yScans;
+export default validateCommand;
+export { MDXValidator };
+export { collectA11yScans };

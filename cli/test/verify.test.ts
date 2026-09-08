@@ -16,11 +16,11 @@
 
 'use strict';
 
-const { test } = require('node:test');
-const assert = require('node:assert');
-const crypto = require('node:crypto');
+import { test } from 'node:test';
+import assert from 'node:assert';
+import crypto from 'node:crypto';
 
-const { runChecks, decideExitCode, sigChainPrevHashV2 } = require('../src/commands/verify.js');
+import { runChecks, decideExitCode, sigChainPrevHashV2 } from '../src/commands/verify.js';
 
 // Helper — build a minimal manifest with optional signatures.
 function mkManifest(overrides = {}) {

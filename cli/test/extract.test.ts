@@ -15,11 +15,11 @@
 
 'use strict';
 
-const { test } = require('node:test');
-const assert = require('node:assert');
-const path = require('node:path');
+import { test } from 'node:test';
+import assert from 'node:assert';
+import path from 'node:path';
 
-const { validateEntryName, isInsideOutputDir } = require('../src/commands/extract.js');
+import { validateEntryName, isInsideOutputDir } from '../src/commands/extract.js';
 
 // ---------------------------------------------------------------------------
 // validateEntryName — rejection vectors

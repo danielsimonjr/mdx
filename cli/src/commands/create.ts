@@ -2,13 +2,13 @@
  * Create command - Create new MDZ files
  */
 
-const fs = require('fs');
-const path = require('path');
-const chalk = require('chalk');
-const ora = require('ora');
-const inquirer = require('inquirer');
-const AdmZip = require('adm-zip');
-const crypto = require('crypto');
+import fs from 'fs';
+import path from 'path';
+import chalk from 'chalk';
+import ora from 'ora';
+import inquirer from 'inquirer';
+import AdmZip from 'adm-zip';
+import crypto from 'crypto';
 
 // Templates
 const templates = {
@@ -213,7 +213,7 @@ async function createCommand(name, options) {
         // with every archive ever written (renaming the field would break
         // every v1.1/v2.0 reader); the VALUE is the current spec version.
         // See CHANGELOG "Renamed MDX → MDZ" for the rationale.
-        const manifest = {
+        const manifest: Record<string, any> = {
             mdx_version: '2.0.0',
             document: {
                 id: docId,
@@ -372,4 +372,4 @@ function slugify(text) {
         .replace(/^-+|-+$/g, '');
 }
 
-module.exports = createCommand;
+export default createCommand;

@@ -2,15 +2,36 @@
  * Edit command - Interactive MDX editor
  */
 
-const fs = require('fs');
-const path = require('path');
-const chalk = require('chalk');
-const ora = require('ora');
-const inquirer = require('inquirer');
-const AdmZip = require('adm-zip');
-const crypto = require('crypto');
+import { marked } from 'marked';
+import { createRequire } from 'node:module';
+import fs from 'fs';
+import path from 'path';
+import chalk from 'chalk';
+import ora from 'ora';
+import inquirer from 'inquirer';
+import AdmZip from 'adm-zip';
+import crypto from 'crypto';
+
+// marked-terminal is loaded lazily through createRequire, not a bare `require`.
+// This source is ESM now, where `require` is not defined -- a bare call throws
+// ReferenceError, and the catch at the use site would swallow it and silently fall
+// back to the plain renderer. The lazy load is kept deliberately: the terminal
+// renderer is optional and its ESM/CJS interop is what the try/catch absorbs.
+const requireOptional = createRequire(import.meta.url);
 
 class MDXEditor {
+
+  modified: any;
+
+
+  content: any;
+
+  filePath: any;
+
+  manifest: any;
+
+  zip: any;
+
     constructor(filePath) {
         this.filePath = filePath;
         this.zip = null;
@@ -364,11 +385,9 @@ class MDXEditor {
     }
 
     async previewDocument() {
-        const { marked } = require('marked');
-
         // Try to use terminal renderer for better output
         try {
-            const TerminalRenderer = require('marked-terminal');
+            const TerminalRenderer = requireOptional('marked-terminal');
             const Renderer = TerminalRenderer.default || TerminalRenderer;
             marked.setOptions({
                 renderer: new Renderer({ reflowText: true, width: 80 })
@@ -450,4 +469,4 @@ async function editCommand(file) {
     await editor.run();
 }
 
-module.exports = editCommand;
+export default editCommand;

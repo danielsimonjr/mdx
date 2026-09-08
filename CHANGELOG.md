@@ -8,6 +8,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — `cli` migrated to TypeScript on Bun (2026-09-07)
+
+All 15 sources under `cli/src` and all 5 suites under `cli/test` move from
+CommonJS JavaScript to ESM TypeScript. `cli/package.json` gains
+`"type": "module"`, `engines.bun >= 1.4.2`, `typescript ^7.0.2`, a `tsconfig.json`
+(`module`/`moduleResolution: nodenext`), and `typecheck` + `test` scripts.
+
+**`@yao-pkg/pkg` is removed.** It cannot consume TypeScript, which made it the
+blocker for this migration. `bun build --compile` provides the same capability
+natively, so the dependency is dropped rather than worked around. `build:all`
+now covers four targets (win-x64, macos-x64, macos-arm64, linux-x64); `pkg`
+covered three. **This changes the embedded runtime of the shipped binary from
+Node 18 to Bun.** The package is unpublished (`mdz-cli` 404s on npm), so there
+are no external consumers, but the change is called out because it is a runtime
+substitution, not a repackaging.
+
+Verified against a behavioural baseline captured before the conversion:
+
+- Help output for all 11 command surfaces is **byte-identical** to the
+  pre-conversion CLI.
+- `info` / `validate` / `verify` / `extract` on a real archive produce identical
+  output and an identical extracted file set.
+- 93 tests pass across all 5 suites (`bun test test/`).
+- The compiled binary runs: `--help`, `info`, and `extract` all work against a
+  real `.mdz`.
+- `tsc --noEmit` is clean. The conversion started at 150 type errors.
+
+Conversion details worth knowing:
+
+- Class fields are declared as `any`. Inventing precise types for 5.5k lines of
+  previously untyped code would be guesswork presented as knowledge; the
+  manifest schema already exists at `spec/manifest-v2.schema.json` and wiring
+  generated types to it is tracked follow-up, not something faked here.
+  `strict` is `false` for the same reason — this is a staged migration and the
+  staging is stated rather than hidden.
+- Test-only internals that were attached onto the exported function object
+  (`module.exports._internal = ...`) are now real named exports. Under CommonJS
+  the default import carried them; in ESM default and named exports are separate
+  bindings, and `test/import-epub.test.ts` imports `_internal` by name.
+- Lazy `require()` calls became `createRequire(import.meta.url)`. A bare
+  `require` is undefined in an ES module, and in `info.ts` the surrounding catch
+  was silent — it would have quietly dropped terminal rendering.
+- `snapshot.ts` exported an object (`module.exports = { ...subcommands }`), so
+  `index.ts` imports it as a namespace, preserving the `snapshotCommands.x`
+  call shape.
+
+### Fixed — CI ran four of the CLI's five test suites
+
+`.github/workflows/ci.yml` named `verify`, `import-epub`, `snapshots` and
+`a11y` in four separate `node --test` steps. **`test/extract.test.ts` was never
+executed** — the suite covering Zip-Slip path-traversal vectors. The four steps
+are replaced by a single `bun test test/`, which runs the whole directory, plus
+a `bun run typecheck` step the CLI never had. `bun-version` moves `1.4.0` ->
+`1.4.2` in all 7 jobs that install Bun.
+
+### Changed — the editor→CLI bridge now spawns Bun
+
+`editor-desktop/src/main/ipynb-import.ts` shells out to the CLI to convert
+`.ipynb`. It resolved `cli/src/index.js` and spawned `process.execPath`, which
+under Electron is the Electron binary — it runs JavaScript but not TypeScript.
+It now resolves `cli/src/index.ts` and spawns `bun`. Note this resolution was
+already development-only: it walks three directories up to a repo root that a
+packaged app does not have. `tests/cli/test_cli_dual_extension.py` spawns `bun`
+for the same reason.
+
 ### Changed — TypeScript 7 + Bun toolchain pin (2026-09-07)
 
 - Root pins `packageManager: bun@1.4.2` and `engines.bun >= 1.4.2`.

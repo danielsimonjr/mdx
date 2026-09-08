@@ -58,15 +58,21 @@ export function expectedOutputPath(ipynbPath: string): string {
 /**
  * Resolve the path to the CLI script relative to the editor-desktop
  * package root. The editor ships under `editor-desktop/` and the CLI
- * lives at `cli/src/index.js` — we walk up two directories from the
+ * lives at `cli/src/index.ts` — we walk up two directories from the
  * compiled main.js to find the repo root.
+ *
+ * This resolution is DEVELOPMENT-ONLY and always was: a packaged app has
+ * no sibling `cli/` directory three levels up from its main module. The
+ * CLI became TypeScript in the Bun migration, so the spawned runtime is
+ * now `bun` rather than `process.execPath` — Electron's binary executes
+ * JavaScript but not TypeScript.
  *
  * Exposed for unit testing — production callers don't need it.
  */
 export function resolveCliPath(mainModuleUrl: string): string {
   const dir = dirname(fileURLToPath(mainModuleUrl));
-  // editor-desktop/dist/main → editor-desktop → repo root → cli/src/index.js
-  return resolve(dir, "..", "..", "..", "cli", "src", "index.js");
+  // editor-desktop/dist/main → editor-desktop → repo root → cli/src/index.ts
+  return resolve(dir, "..", "..", "..", "cli", "src", "index.ts");
 }
 
 /**
@@ -83,7 +89,10 @@ export async function runIpynbImport(
 ): Promise<string> {
   const runner = opts.runner ?? defaultRunner;
   const cliPath = opts.cliPath ?? resolveCliPath(import.meta.url);
-  const nodeBin = opts.nodeBin ?? process.execPath;
+  // "bun", not process.execPath: the CLI entry is TypeScript and Electron's
+  // binary cannot execute it. A missing bun surfaces as a spawn ENOENT, which
+  // the error path below reports verbatim rather than swallowing.
+  const nodeBin = opts.nodeBin ?? "bun";
 
   return new Promise<string>((resolveOk, rejectErr) => {
     const child = runner.spawn({ node: nodeBin, cliPath, ipynbPath });

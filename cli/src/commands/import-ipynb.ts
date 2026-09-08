@@ -35,12 +35,12 @@
  */
 
 
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
-const AdmZip = require('adm-zip');
-const chalk = require('chalk');
-const ora = require('ora');
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import AdmZip from 'adm-zip';
+import chalk from 'chalk';
+import ora from 'ora';
 
 // Map of ipynb MIME types -> MDZ ::output type. Anything not on the list is
 // either dropped with a warning or (for image/*) extracted to assets/.
@@ -339,7 +339,7 @@ function buildManifest(nb, ctx) {
           )
         : undefined;
 
-    const manifest = {
+    const manifest: Record<string, any> = {
         mdx_version: '2.0.0',
         document: {
             id: crypto.randomUUID(),
@@ -402,5 +402,5 @@ function writeArchive(outPath, conversion) {
     zip.writeZip(outPath);
 }
 
-module.exports = importIpynb;
-module.exports.convertNotebook = convertNotebook; // exposed for unit tests
+export default importIpynb;
+export { convertNotebook }; // exposed for unit tests

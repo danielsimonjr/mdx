@@ -49,12 +49,12 @@
  */
 
 
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
-const AdmZip = require('adm-zip');
-const chalk = require('chalk');
-const ora = require('ora');
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import AdmZip from 'adm-zip';
+import chalk from 'chalk';
+import ora from 'ora';
 
 async function verifyCommand(inputPath, options) {
     const spinner = ora('Reading archive...').start();
@@ -484,7 +484,7 @@ function printReport(report) {
     }
 }
 
-module.exports = verifyCommand;
-module.exports.runChecks = runChecks; // exposed for unit tests
-module.exports.decideExitCode = decideExitCode; // exposed for unit tests
-module.exports.sigChainPrevHashV2 = sigChainPrevHashV2; // exposed for unit tests + parity
+export default verifyCommand;
+export { runChecks }; // exposed for unit tests
+export { decideExitCode }; // exposed for unit tests
+export { sigChainPrevHashV2 }; // exposed for unit tests + parity

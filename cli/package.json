@@ -2,15 +2,17 @@
   "name": "mdz-cli",
   "version": "1.0.0",
   "description": "CLI tool for working with MDZ (Markdown Zipped Container) files; reads legacy .mdx archives too",
-  "main": "src/index.js",
+  "main": "src/index.ts",
   "bin": {
-    "mdz": "./src/index.js",
-    "mdx": "./src/index.js"
+    "mdz": "./src/index.ts",
+    "mdx": "./src/index.ts"
   },
   "scripts": {
-    "start": "node src/index.js",
-    "build": "pkg . --targets node18-win-x64 --output dist/mdz.exe",
-    "build:all": "pkg . --targets node18-win-x64,node18-macos-x64,node18-linux-x64 --out-path dist"
+    "start": "bun run src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test test/",
+    "build": "bun build --compile --target=bun-windows-x64 src/index.ts --outfile dist/mdz.exe",
+    "build:all": "bun build --compile --target=bun-windows-x64 src/index.ts --outfile dist/mdz-win-x64.exe && bun build --compile --target=bun-darwin-x64 src/index.ts --outfile dist/mdz-macos-x64 && bun build --compile --target=bun-darwin-arm64 src/index.ts --outfile dist/mdz-macos-arm64 && bun build --compile --target=bun-linux-x64 src/index.ts --outfile dist/mdz-linux-x64"
   },
   "keywords": [
     "mdz",
@@ -33,13 +35,12 @@
     "turndown": "^7.2.0",
     "yazl": "^2.5.1"
   },
-  "pkg": {
-    "assets": [
-      "templates/**/*"
-    ],
-    "outputPath": "dist"
-  },
   "devDependencies": {
-    "@yao-pkg/pkg": "^6.21.0"
+    "typescript": "^7.0.2",
+    "@types/node": "^24.0.0"
+  },
+  "type": "module",
+  "engines": {
+    "bun": ">=1.4.2"
   }
 }

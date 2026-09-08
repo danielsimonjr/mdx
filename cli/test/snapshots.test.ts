@@ -12,10 +12,10 @@
  *      add-delta-to-index helper preserves immutability.
  */
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
 
-const {
+import {
   SnapshotError,
   parseIndex,
   resolveVersion,
@@ -23,7 +23,7 @@ const {
   generateUnifiedDiff,
   shouldStartNewChain,
   addDeltaToIndex,
-} = require('../src/lib/snapshots.js');
+} from '../src/lib/snapshots.js';
 
 const SIMPLE_INDEX = {
   schema_version: '1.0.0',

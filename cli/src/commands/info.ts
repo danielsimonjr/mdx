@@ -2,19 +2,27 @@
  * Info command - Displays MDX file information in terminal
  */
 
-const fs = require('fs');
-const path = require('path');
-const chalk = require('chalk');
-const ora = require('ora');
-const AdmZip = require('adm-zip');
-const { marked } = require('marked');
+import fs from 'fs';
+import path from 'path';
+import chalk from 'chalk';
+import ora from 'ora';
+import AdmZip from 'adm-zip';
+import { marked } from 'marked';
+import { createRequire } from 'node:module';
+
+const requireOptional = createRequire(import.meta.url);
 
 // Terminal renderer configuration (loaded dynamically to handle ESM)
 let terminalConfigured = false;
 function configureTerminal() {
     if (terminalConfigured) return;
     try {
-        const TerminalRenderer = require('marked-terminal');
+    // marked-terminal is loaded lazily through createRequire, not a bare `require`.
+    // These sources are ESM now, where `require` is not defined -- a bare call throws
+    // ReferenceError, and the catch below would swallow it and silently fall back to
+    // the plain renderer. Lazy loading is kept deliberately: the terminal renderer is
+    // optional and its ESM/CJS interop is what the try/catch exists to absorb.
+        const TerminalRenderer = requireOptional('marked-terminal');
         // Handle both ESM default export and CommonJS
         const Renderer = TerminalRenderer.default || TerminalRenderer;
         marked.setOptions({
@@ -241,4 +249,4 @@ function formatSize(bytes) {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-module.exports = infoCommand;
+export default infoCommand;

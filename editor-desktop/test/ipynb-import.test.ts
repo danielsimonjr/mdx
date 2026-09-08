@@ -63,7 +63,7 @@ describe("expectedOutputPath", () => {
 });
 
 describe("resolveCliPath", () => {
-  it("computes a path that ends in cli/src/index.js", () => {
+  it("computes a path that ends in cli/src/index.ts", () => {
     // pathToFileURL gives a platform-correct URL (Windows needs a
     // drive letter; POSIX doesn't). Hand-rolled `file:///repo/…`
     // strings throw on Windows because Node's WHATWG-URL parser
@@ -77,7 +77,7 @@ describe("resolveCliPath", () => {
       `${process.cwd()}/editor-desktop/dist/main/main.js`,
     ).toString();
     const cli = resolveCliPath(pseudoMain);
-    expect(cli.replace(/\\/g, "/")).toMatch(/cli\/src\/index\.js$/);
+    expect(cli.replace(/\\/g, "/")).toMatch(/cli\/src\/index\.ts$/);
   });
 });
 

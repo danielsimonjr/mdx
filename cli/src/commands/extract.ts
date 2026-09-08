@@ -2,11 +2,11 @@
  * Extract command - Extracts MDX contents to a folder
  */
 
-const fs = require('fs');
-const path = require('path');
-const chalk = require('chalk');
-const ora = require('ora');
-const AdmZip = require('adm-zip');
+import fs from 'fs';
+import path from 'path';
+import chalk from 'chalk';
+import ora from 'ora';
+import AdmZip from 'adm-zip';
 
 /**
  * Validate one ZIP `entryName` for the path-traversal vectors a
@@ -172,6 +172,6 @@ async function extractCommand(file, output, options) {
     }
 }
 
-module.exports = extractCommand;
-module.exports.validateEntryName = validateEntryName; // exposed for unit tests
-module.exports.isInsideOutputDir = isInsideOutputDir; // exposed for unit tests
+export default extractCommand;
+export { validateEntryName }; // exposed for unit tests
+export { isInsideOutputDir }; // exposed for unit tests
