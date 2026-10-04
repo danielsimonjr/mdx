@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security - vitest 3.2.6 -> 4.1.11, closing four alerts no automation could reach
+
+- GHSA alerts #125-#128 flagged `vitest` >= 2.1.0 < 4.1.11 in all four workspace packages
+  that declare it: `packages/mdz-viewer`, `packages/mdz-viewer-hosted`,
+  `editor-desktop` and `implementations/typescript`. Each pinned `^3.2.6`, and the
+  first patched release is 4.1.11, so no caret resolution could reach the fix.
+- **Dependabot could never have fixed these, by any configuration**, and the reason is
+  worth recording. The repo has no `.github/dependabot.yml`, so these ran as GitHub's
+  AUTOMATIC security updates, which use the `npm_and_yarn` ecosystem. This root is a Bun
+  workspace: `bun.lock` and no npm lockfile anywhere. Every run therefore died with
+  `dependency_file_not_supported` - confirmed in run 34525302539, not inferred. Adding a
+  `bun` entry does not help either: Dependabot's bundled bun rejects `lockfileVersion` 2,
+  which Bun 1.4 writes, and the bun ecosystem does version updates rather than security ones.
+  A manual bump was the only route, which is why these sat open since 2026-09-10.
+- Verified against a BASELINE taken on unmodified master first, so a pre-existing failure
+  could not read as upgrade breakage. Before and after are identical across the 3 -> 4 major:
+  mdx-format 125, viewer 150, viewer-hosted 35, editor-desktop 397 - **707 vitest tests over
+  33 files, 0 fail** - plus mdz-cli's 93 under `bun test`, and `typecheck` clean both times.
+- `bun.lock` resolves a single `vitest@4.1.11`; no duplicate copy survives.
+
 ### Fixed — the last CLI-rename consumer, and a stale ROADMAP status snapshot
 
 - **`tests/conformance/integrity/run_integrity_conformance.js`** spawned
