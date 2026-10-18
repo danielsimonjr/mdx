@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security - brace-expansion lockfile entries raised to the latest release of each line
+
+- `bun audit` reported three denial-of-service advisories (GHSA-6j4f-fj2g-mc7p,
+  GHSA-qhr7-859c-m2p7 and GHSA-q2hr-2g5m-vwhr) against the locked `brace-expansion`
+  5.0.9, 2.1.4 and 1.1.18. The lock now holds 5.0.12, 2.1.7 and 1.1.21, the latest
+  release of each line. Six lock entries change, and `bun.lock` is the only file
+  besides this one.
+- A walk of the lockfile graph from the production `dependencies` of the six
+  workspaces reaches no copy of `brace-expansion`, so no published package changes.
+  The copies sit under packaging and build tooling.
+- A `bun audit` of the lockfile alone in an empty directory reads 69 findings before
+  and 60 after. The 60 that remain are other packages and are not part of this change.
+
 ### Security - vitest 3.2.6 -> 4.1.11, closing four alerts no automation could reach
 
 - GHSA alerts #125-#128 flagged `vitest` >= 2.1.0 < 4.1.11 in all four workspace packages
