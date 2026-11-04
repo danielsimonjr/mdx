@@ -485,7 +485,7 @@ impl Archive {
             if file.is_dir() {
                 continue;
             }
-            let raw_name = file.name().to_string();
+            let raw_name = file.name()?.to_string();
             let clean = sanitize_archive_path(&raw_name)
                 .ok_or_else(|| Error::UnsafePath(raw_name.clone()))?;
 

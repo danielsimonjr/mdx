@@ -101,11 +101,9 @@ cargo test
 
 ## Minimum supported Rust version
 
-1.85. Pinned empirically — transitive deps under `zip 2.2` +
-`serde_json` pulled in `indexmap 2.x` at CI-install time with an
-edition = "2024" requirement, and edition 2024 was stabilized in
-Rust 1.85. If a future `cargo update` removes that transitive pull,
-MSRV could be dropped; verify before doing so.
+1.88. The `zip` 9.x dependency declares `rust-version = "1.88"`, which
+sets the floor. Lowering the MSRV needs an older `zip` line; verify the
+build on the lower toolchain before doing so.
 
 ## License
 

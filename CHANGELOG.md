@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed - Rust binding moves to zip 9 and raises its MSRV to 1.88
+
+- `bindings/rust` depends on `zip` 9.x. That release declares `rust-version = "1.88"`, so the
+  crate MSRV, the `rust-version` field and the CI toolchain of the Rust job move from 1.85 to
+  1.88. The Rust job failed on 1.85 with "zip@9.0.5 requires rustc 1.88". The `mdz` crate is
+  not published, so no consumer is affected.
+- `ZipFile::name()` returns a `Result` in zip 9. The extraction loop now propagates the error
+  with `?`; it maps to the existing `Error::Zip` variant.
+
 ### Security - brace-expansion lockfile entries raised to the latest release of each line
 
 - `bun audit` reported three denial-of-service advisories (GHSA-6j4f-fj2g-mc7p,
